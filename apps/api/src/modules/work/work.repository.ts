@@ -1,5 +1,7 @@
 import type { Prisma, PrismaClient, TaskPriority, TaskStatus } from "@atlas/db";
 
+import { enqueueDomainSideEffects } from "../../jobs/queues.js";
+import { realtimeHub } from "../../realtime/realtime.hub.js";
 import { paginationArgs } from "../../shared/pagination.js";
 
 export class WorkRepository {
@@ -246,7 +248,7 @@ export class WorkRepository {
     return Promise.all([tasks, projects]);
   }
 
-  recordActivity(input: {
+  async recordActivity(input: {
     actorUserId: string;
     entityId: string;
     entityType: string;
@@ -256,7 +258,7 @@ export class WorkRepository {
     taskId?: string;
     workspaceId: string;
   }) {
-    return this.prisma.activityEvent.create({
+    const event = await this.prisma.activityEvent.create({
       data: {
         actorUserId: input.actorUserId,
         entityId: input.entityId,
@@ -268,5 +270,21 @@ export class WorkRepository {
         workspaceId: input.workspaceId,
       },
     });
+
+    const payload = { event, type: input.eventType };
+    realtimeHub.broadcastWorkspace(input.workspaceId, payload);
+    if (input.projectId) realtimeHub.broadcastProject(input.projectId, payload);
+    if (input.taskId) realtimeHub.broadcastTask(input.taskId, payload);
+    await enqueueDomainSideEffects({
+      actorUserId: input.actorUserId,
+      entityId: input.entityId,
+      entityType: input.entityType,
+      eventId: event.id,
+      eventType: input.eventType,
+      projectId: input.projectId,
+      taskId: input.taskId,
+      workspaceId: input.workspaceId,
+    });
+    return event;
   }
 }
