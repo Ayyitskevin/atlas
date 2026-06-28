@@ -18,7 +18,9 @@
   },
   "devDependencies": {
     "@atlas/config": "workspace:*",
+    "@eslint/js": "^9.39.4",
     "turbo": "^2.5.4",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "typescript-eslint": "^8.62.0"
   }
 }
