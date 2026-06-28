@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import { prisma } from "@atlas/db";
 
-import { requireAuth } from "../shared/auth-context.js";
+import { requireAuthToken } from "../shared/auth-context.js";
 import { AtlasHttpError } from "../shared/errors.js";
 import { PermissionsService } from "../modules/permissions/permissions.service.js";
 import { realtimeHub } from "./realtime.hub.js";
@@ -18,7 +18,8 @@ export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void
   const permissions = new PermissionsService(prisma);
 
   app.get("/ws", { websocket: true }, async (socket, request) => {
-    const ctx = await requireAuth(request);
+    const query = request.query as { accessToken?: string };
+    const ctx = await requireAuthToken(request, query.accessToken);
     const cleanup = new Set<() => void>();
 
     socket.on("message", async (raw: Buffer) => {

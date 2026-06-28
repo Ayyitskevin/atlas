@@ -32,10 +32,20 @@ export async function requireAuth(request: FastifyRequest): Promise<AuthContext>
   if (!header?.startsWith("Bearer ")) {
     throw new AtlasHttpError(401, ATLAS_ERROR_CODES.UNAUTHORIZED, "Authentication required.");
   }
+  return authenticateAccessToken(request, header.slice("Bearer ".length));
+}
 
+export async function requireAuthToken(request: FastifyRequest, accessToken: string | undefined): Promise<AuthContext> {
+  if (!accessToken) {
+    throw new AtlasHttpError(401, ATLAS_ERROR_CODES.UNAUTHORIZED, "Authentication required.");
+  }
+  return authenticateAccessToken(request, accessToken);
+}
+
+async function authenticateAccessToken(request: FastifyRequest, accessToken: string): Promise<AuthContext> {
   let claims: AccessTokenClaims;
   try {
-    claims = jwt.verify(header.slice("Bearer ".length), env.JWT_ACCESS_SECRET) as AccessTokenClaims;
+    claims = jwt.verify(accessToken, env.JWT_ACCESS_SECRET) as AccessTokenClaims;
     if (claims.typ !== "access" || !claims.sub || !claims.sid) {
       throw new Error("Invalid token claims");
     }
