@@ -1,0 +1,18 @@
+import { z } from "zod";
+
+const envSchema = z.object({
+  API_HOST: z.string().default("0.0.0.0"),
+  API_PORT: z.coerce.number().int().positive().default(4000),
+  DATABASE_URL: z.string().default("postgresql://atlas:atlas@localhost:5432/atlas"),
+  JWT_ACCESS_SECRET: z.string().default("local-dev-access-secret-change-me"),
+  JWT_REFRESH_SECRET: z.string().default("local-dev-refresh-secret-change-me"),
+  LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
+  RATE_LIMIT_WINDOW: z.string().default("1 minute"),
+  REDIS_URL: z.string().default("redis://localhost:6379"),
+  S3_BUCKET: z.string().default("atlas-local"),
+  S3_ENDPOINT: z.string().default("http://localhost:9000"),
+  WEB_ORIGIN: z.string().default("http://localhost:3000"),
+});
+
+export const env = envSchema.parse(process.env);
