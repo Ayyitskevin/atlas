@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Workline - personal work manager</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Workspace navigation">
+        <div class="brand">
+          <span class="brand-mark" aria-hidden="true"></span>
+          <span class="brand-name">Workline</span>
+        </div>
+
+        <button class="primary-action" type="button" data-action="add-task">
+          <span data-icon="plus"></span>
+          <span>New task</span>
+        </button>
+
+        <nav class="nav-group" aria-label="Main">
+          <button class="nav-item" type="button" data-scope="home">
+            <span data-icon="home"></span>
+            <span>Home</span>
+          </button>
+          <button class="nav-item" type="button" data-scope="my">
+            <span data-icon="check-square"></span>
+            <span>My Tasks</span>
+          </button>
+          <button class="nav-item" type="button" data-scope="inbox">
+            <span data-icon="inbox"></span>
+            <span>Inbox</span>
+          </button>
+          <button class="nav-item" type="button" data-scope="goals">
+            <span data-icon="target"></span>
+            <span>Goals</span>
+          </button>
+          <button class="nav-item" type="button" data-scope="workload">
+            <span data-icon="users"></span>
+            <span>Workload</span>
+          </button>
+        </nav>
+
+        <div class="project-heading">
+          <span>Projects</span>
+          <button class="icon-button" type="button" data-action="new-project" aria-label="Create project">
+            <span data-icon="plus"></span>
+          </button>
+        </div>
+        <div class="project-list" id="projectList"></div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div class="workspace-context">
+            <span class="eyebrow">Personal workspace</span>
+            <h1 id="pageTitle">Workline</h1>
+          </div>
+          <div class="top-actions">
+            <label class="search-box">
+              <span data-icon="search"></span>
+              <input id="globalSearch" type="search" placeholder="Search tasks, tags, people" autocomplete="off" />
+            </label>
+            <button class="icon-button" type="button" data-action="reset-demo" aria-label="Reset demo data">
+              <span data-icon="rotate"></span>
+            </button>
+          </div>
+        </header>
+
+        <section id="headerPanel" class="header-panel"></section>
+        <section id="mainView" class="main-view" aria-live="polite"></section>
+      </main>
+
+      <aside class="right-rail" aria-label="Workspace summary">
+        <section class="rail-panel">
+          <div class="panel-title">
+            <span data-icon="inbox"></span>
+            <span>Inbox</span>
+          </div>
+          <div id="railInbox"></div>
+        </section>
+        <section class="rail-panel">
+          <div class="panel-title">
+            <span data-icon="target"></span>
+            <span>Goals</span>
+          </div>
+          <div id="railGoals"></div>
+        </section>
+        <section class="rail-panel">
+          <div class="panel-title">
+            <span data-icon="users"></span>
+            <span>Capacity</span>
+          </div>
+          <div id="railWorkload"></div>
+        </section>
+      </aside>
+    </div>
+
+    <aside class="task-drawer" id="taskDrawer" aria-label="Task details" aria-hidden="true"></aside>
+    <div class="drawer-scrim" id="drawerScrim" data-action="close-drawer"></div>
+
+    <script src="./app.js" defer></script>
+  </body>
+</html>
