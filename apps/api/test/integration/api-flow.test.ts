@@ -56,6 +56,7 @@ describe("API integration flow", () => {
     });
     expect(workspace.statusCode).toBe(201);
     workspaceId = workspace.json<{ id: string }>().id;
+    const outboxBefore = await prisma.domainEventOutbox.count();
 
     const project = await app!.inject({
       headers: authHeaders(accessToken),
@@ -91,6 +92,9 @@ describe("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/comments",
     });
     expect(comment.statusCode).toBe(201);
+
+    const outboxAfter = await prisma.domainEventOutbox.count();
+    expect(outboxAfter).toBeGreaterThan(outboxBefore);
   }, 60_000);
 
   it("invalidates access tokens after logout", async () => {

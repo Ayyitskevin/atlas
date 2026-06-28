@@ -351,6 +351,25 @@ model ActivityEvent {
   @@map("activity_events")
 }
 
+model DomainEventOutbox {
+  id            String    @id @default(uuid()) @db.Uuid
+  eventId       String    @unique @map("event_id") @db.Uuid
+  eventType     String    @map("event_type")
+  payload       Json
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime? @map("next_attempt_at") @db.Timestamptz(6)
+  lockedAt      DateTime? @map("locked_at") @db.Timestamptz(6)
+  processedAt   DateTime? @map("processed_at") @db.Timestamptz(6)
+  failedAt      DateTime? @map("failed_at") @db.Timestamptz(6)
+  lastError     String?   @map("last_error")
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([processedAt, failedAt, nextAttemptAt])
+  @@index([eventType])
+  @@map("domain_event_outbox")
+}
+
 model Notification {
   id          String             @id @default(uuid()) @db.Uuid
   workspaceId String             @map("workspace_id") @db.Uuid

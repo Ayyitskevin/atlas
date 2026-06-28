@@ -3,6 +3,7 @@ import { Worker } from "bullmq";
 import { prisma } from "@atlas/db";
 
 import { env } from "../config/env.js";
+import { startOutboxDispatcher } from "./outbox.js";
 import { queueConnection, type MutationEventJob } from "./queues.js";
 
 export function startWorkers() {
@@ -54,6 +55,8 @@ export function startWorkers() {
     });
   }
 
+  const outboxDispatcher = startOutboxDispatcher();
+
   console.info({ redis: env.REDIS_URL }, "Atlas workers started");
-  return [notificationWorker, searchWorker, emailWorker];
+  return [notificationWorker, searchWorker, emailWorker, outboxDispatcher];
 }

@@ -1,6 +1,5 @@
 import type { Prisma, PrismaClient, TaskPriority, TaskStatus } from "@atlas/db";
 
-import { enqueueDomainSideEffects } from "../../jobs/queues.js";
 import { realtimeHub } from "../../realtime/realtime.hub.js";
 import { paginationArgs } from "../../shared/pagination.js";
 import { completedAtForStatusTransition } from "./task-state.js";
@@ -296,33 +295,44 @@ export class WorkRepository {
     taskId?: string;
     workspaceId: string;
   }) {
-    const event = await this.prisma.activityEvent.create({
-      data: {
-        actorUserId: input.actorUserId,
-        entityId: input.entityId,
-        entityType: input.entityType,
-        eventType: input.eventType,
-        payload: input.payload ?? {},
-        projectId: input.projectId,
-        taskId: input.taskId,
-        workspaceId: input.workspaceId,
-      },
+    const event = await this.prisma.$transaction(async (tx) => {
+      const activityEvent = await tx.activityEvent.create({
+        data: {
+          actorUserId: input.actorUserId,
+          entityId: input.entityId,
+          entityType: input.entityType,
+          eventType: input.eventType,
+          payload: input.payload ?? {},
+          projectId: input.projectId,
+          taskId: input.taskId,
+          workspaceId: input.workspaceId,
+        },
+      });
+
+      await tx.domainEventOutbox.create({
+        data: {
+          eventId: activityEvent.id,
+          eventType: input.eventType,
+          payload: {
+            actorUserId: input.actorUserId,
+            entityId: input.entityId,
+            entityType: input.entityType,
+            eventId: activityEvent.id,
+            eventType: input.eventType,
+            projectId: input.projectId ?? null,
+            taskId: input.taskId ?? null,
+            workspaceId: input.workspaceId,
+          },
+        },
+      });
+
+      return activityEvent;
     });
 
     const payload = { event, type: input.eventType };
     realtimeHub.broadcastWorkspace(input.workspaceId, payload);
     if (input.projectId) realtimeHub.broadcastProject(input.projectId, payload);
     if (input.taskId) realtimeHub.broadcastTask(input.taskId, payload);
-    await enqueueDomainSideEffects({
-      actorUserId: input.actorUserId,
-      entityId: input.entityId,
-      entityType: input.entityType,
-      eventId: event.id,
-      eventType: input.eventType,
-      projectId: input.projectId,
-      taskId: input.taskId,
-      workspaceId: input.workspaceId,
-    });
     return event;
   }
 
