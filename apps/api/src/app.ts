@@ -49,11 +49,11 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   app.setErrorHandler((error, request, reply) => {
     request.log.error({ error }, "request failed");
-    const atlasError = error as { statusCode?: unknown; message?: unknown };
+    const atlasError = error as { statusCode?: unknown; message?: unknown; validation?: unknown };
     const statusCode = typeof atlasError.statusCode === "number" ? atlasError.statusCode : 500;
     const message = typeof atlasError.message === "string" ? atlasError.message : "Request failed.";
-    const code = error instanceof AtlasHttpError ? error.code : statusCode === 404 ? ATLAS_ERROR_CODES.NOT_FOUND : ATLAS_ERROR_CODES.INTERNAL;
-    const details = error instanceof AtlasHttpError ? error.details : {};
+    const code = error instanceof AtlasHttpError ? error.code : errorCodeForStatus(statusCode, atlasError.validation);
+    const details = error instanceof AtlasHttpError ? error.details : detailsForError(atlasError.validation);
     return reply.status(statusCode).send({
       error: {
         code,
@@ -72,4 +72,19 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(registerRealtimeRoutes, { prefix: ATLAS_API_PREFIX });
 
   return app;
+}
+
+function errorCodeForStatus(statusCode: number, validation: unknown) {
+  if (validation) return ATLAS_ERROR_CODES.VALIDATION_FAILED;
+  if (statusCode === 400) return ATLAS_ERROR_CODES.BAD_REQUEST;
+  if (statusCode === 401) return ATLAS_ERROR_CODES.UNAUTHORIZED;
+  if (statusCode === 403) return ATLAS_ERROR_CODES.FORBIDDEN;
+  if (statusCode === 404) return ATLAS_ERROR_CODES.NOT_FOUND;
+  if (statusCode === 409) return ATLAS_ERROR_CODES.CONFLICT;
+  if (statusCode === 429) return ATLAS_ERROR_CODES.RATE_LIMITED;
+  return ATLAS_ERROR_CODES.INTERNAL;
+}
+
+function detailsForError(validation: unknown): Record<string, unknown> {
+  return validation ? { validation } : {};
 }

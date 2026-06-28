@@ -133,6 +133,7 @@ describe("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/invitations",
     });
     expect(ownerInvite.statusCode).toBe(400);
+    expect(ownerInvite.json<{ error: { code: string } }>().error.code).toBe("ATLAS_VALIDATION_FAILED");
   });
 
   it("rejects cross-project section references for create and move", async () => {
