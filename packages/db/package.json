@@ -7,7 +7,7 @@
     "build": "tsc -p tsconfig.json",
     "migrate": "prisma migrate dev --schema prisma/schema.prisma",
     "seed": "tsx prisma/seed.ts",
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

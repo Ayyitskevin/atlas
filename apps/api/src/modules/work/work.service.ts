@@ -20,6 +20,7 @@ import type { AuthContext } from "../../shared/auth-context.js";
 import { AtlasHttpError } from "../../shared/errors.js";
 import { pageFromLimit } from "../../shared/pagination.js";
 import { PermissionsService } from "../permissions/permissions.service.js";
+import { defaultListPosition } from "./position.js";
 import { WorkRepository } from "./work.repository.js";
 
 export class WorkService {
@@ -32,7 +33,7 @@ export class WorkService {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
     const section = await this.workRepository.createSection({
       name: input.name,
-      position: input.position ?? Date.now(),
+      position: input.position ?? defaultListPosition(),
       projectId,
       workspaceId,
     });
@@ -80,7 +81,7 @@ export class WorkService {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
     const task = await this.workRepository.createTask({
       ...input,
-      position: input.position ?? Date.now(),
+      position: input.position ?? defaultListPosition(),
       projectId,
       workspaceId,
     });
@@ -205,7 +206,7 @@ export class WorkService {
     await this.permissions.requireTaskRole(ctx, workspaceId, taskId, "EDITOR");
     const subtask = await this.workRepository.createSubtask({
       ...input,
-      position: input.position ?? Date.now(),
+      position: input.position ?? defaultListPosition(),
       taskId,
       workspaceId,
     });

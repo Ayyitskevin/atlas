@@ -3,6 +3,7 @@ import type { Prisma, PrismaClient, TaskPriority, TaskStatus } from "@atlas/db";
 import { enqueueDomainSideEffects } from "../../jobs/queues.js";
 import { realtimeHub } from "../../realtime/realtime.hub.js";
 import { paginationArgs } from "../../shared/pagination.js";
+import { completedAtForStatusTransition } from "./task-state.js";
 
 export class WorkRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -93,7 +94,7 @@ export class WorkRepository {
       data: {
         ...input.data,
         dueDate: input.data.dueDate === undefined ? undefined : input.data.dueDate === null ? null : new Date(input.data.dueDate),
-        completedAt: input.data.status === "DONE" ? new Date() : undefined,
+        completedAt: completedAtForStatusTransition(input.data.status, new Date()),
         version: { increment: 1 },
       },
       where: { deletedAt: null, id: input.taskId, version: input.version, workspaceId: input.workspaceId },
@@ -148,7 +149,7 @@ export class WorkRepository {
     const result = await this.prisma.subtask.updateMany({
       data: {
         ...input.data,
-        completedAt: input.data.status === "DONE" ? new Date() : undefined,
+        completedAt: completedAtForStatusTransition(input.data.status, new Date()),
         version: { increment: 1 },
       },
       where: { deletedAt: null, id: input.subtaskId, version: input.version, workspaceId: input.workspaceId },
