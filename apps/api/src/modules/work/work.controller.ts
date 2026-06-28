@@ -150,9 +150,21 @@ export class WorkController {
     return this.workService.deleteComment(requireAuth(request), workspaceId, commentId);
   };
 
-  listActivity = async (request: FastifyRequest) => {
+  listWorkspaceActivity = async (request: FastifyRequest) => {
     const { workspaceId } = parseParams(request, workspaceParamsSchema);
     return this.workService.listActivity(requireAuth(request), workspaceId, parseQuery(request, activityQuerySchema));
+  };
+
+  listProjectActivity = async (request: FastifyRequest) => {
+    const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
+    const query = parseQuery(request, activityQuerySchema);
+    return this.workService.listActivity(requireAuth(request), workspaceId, { ...query, projectId });
+  };
+
+  listTaskActivity = async (request: FastifyRequest) => {
+    const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
+    const query = parseQuery(request, activityQuerySchema);
+    return this.workService.listActivity(requireAuth(request), workspaceId, { ...query, taskId });
   };
 
   listNotifications = async (request: FastifyRequest) => {

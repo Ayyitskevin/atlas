@@ -12,6 +12,20 @@ export class WorkRepository {
     return this.prisma.section.create({ data: input });
   }
 
+  findSection(input: { projectId: string; sectionId: string; workspaceId: string }) {
+    return this.prisma.section.findFirst({
+      where: { deletedAt: null, id: input.sectionId, projectId: input.projectId, workspaceId: input.workspaceId },
+    });
+  }
+
+  countSections(input: { projectId: string; sectionIds: string[]; workspaceId: string }) {
+    const ids = [...new Set(input.sectionIds)];
+    if (!ids.length) return Promise.resolve(0);
+    return this.prisma.section.count({
+      where: { deletedAt: null, id: { in: ids }, projectId: input.projectId, workspaceId: input.workspaceId },
+    });
+  }
+
   listSections(input: { cursor?: string; limit: number; projectId: string; workspaceId: string }) {
     return this.prisma.section.findMany({
       ...paginationArgs(input),
@@ -20,20 +34,29 @@ export class WorkRepository {
     });
   }
 
-  updateSection(sectionId: string, input: { name?: string; position?: number }) {
-    return this.prisma.section.update({ data: input, where: { id: sectionId } });
+  async updateSection(input: { data: { name?: string; position?: number }; projectId: string; sectionId: string; workspaceId: string }) {
+    const result = await this.prisma.section.updateMany({
+      data: input.data,
+      where: { deletedAt: null, id: input.sectionId, projectId: input.projectId, workspaceId: input.workspaceId },
+    });
+    if (!result.count) return null;
+    return this.findSection(input);
   }
 
-  softDeleteSection(sectionId: string) {
-    return this.prisma.section.update({ data: { deletedAt: new Date() }, where: { id: sectionId } });
+  async softDeleteSection(input: { projectId: string; sectionId: string; workspaceId: string }) {
+    const result = await this.prisma.section.updateMany({
+      data: { deletedAt: new Date() },
+      where: { deletedAt: null, id: input.sectionId, projectId: input.projectId, workspaceId: input.workspaceId },
+    });
+    return result.count;
   }
 
-  async reorderSections(input: { sections: Array<{ id: string; position: number }>; workspaceId: string }) {
+  async reorderSections(input: { projectId: string; sections: Array<{ id: string; position: number }>; workspaceId: string }) {
     return this.prisma.$transaction(
       input.sections.map((section) =>
         this.prisma.section.updateMany({
           data: { position: section.position },
-          where: { deletedAt: null, id: section.id, workspaceId: input.workspaceId },
+          where: { deletedAt: null, id: section.id, projectId: input.projectId, workspaceId: input.workspaceId },
         }),
       ),
     );
@@ -227,12 +250,14 @@ export class WorkRepository {
     });
   }
 
-  searchWorkspace(input: { limit: number; q: string; type?: string; workspaceId: string }) {
+  searchWorkspace(input: { limit: number; q: string; type?: string; userId: string; workspaceId: string }) {
+    const accessibleProject = this.accessibleProjectWhere(input.userId, input.workspaceId);
     const tasks = input.type && !input.type.includes("task") ? [] : this.prisma.task.findMany({
       orderBy: { updatedAt: "desc" },
       take: input.limit,
       where: {
         deletedAt: null,
+        project: accessibleProject,
         workspaceId: input.workspaceId,
         OR: [{ title: { contains: input.q, mode: "insensitive" } }, { description: { contains: input.q, mode: "insensitive" } }],
       },
@@ -241,12 +266,24 @@ export class WorkRepository {
       orderBy: { updatedAt: "desc" },
       take: input.limit,
       where: {
-        deletedAt: null,
-        workspaceId: input.workspaceId,
+        ...accessibleProject,
         OR: [{ name: { contains: input.q, mode: "insensitive" } }, { description: { contains: input.q, mode: "insensitive" } }],
       },
     });
     return Promise.all([tasks, projects]);
+  }
+
+  countWorkspaceMembers(input: { userIds: string[]; workspaceId: string }) {
+    const userIds = [...new Set(input.userIds)];
+    if (!userIds.length) return Promise.resolve(0);
+    return this.prisma.workspaceMember.count({
+      where: {
+        deletedAt: null,
+        user: { deletedAt: null, disabledAt: null },
+        userId: { in: userIds },
+        workspaceId: input.workspaceId,
+      },
+    });
   }
 
   async recordActivity(input: {
@@ -287,5 +324,17 @@ export class WorkRepository {
       workspaceId: input.workspaceId,
     });
     return event;
+  }
+
+  private accessibleProjectWhere(userId: string, workspaceId: string): Prisma.ProjectWhereInput {
+    return {
+      deletedAt: null,
+      workspaceId,
+      OR: [
+        { visibility: "WORKSPACE" },
+        { members: { some: { deletedAt: null, userId } } },
+        { workspace: { members: { some: { deletedAt: null, role: { in: ["OWNER", "ADMIN"] }, userId } } } },
+      ],
+    };
   }
 }

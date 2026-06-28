@@ -63,9 +63,9 @@ export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
   app.patch("/workspaces/:workspaceId/comments/:commentId", { schema: openApiSchema({ body: updateCommentRequestSchema, params: commentParamsSchema, tags: ["Comments"] }) }, controller.updateComment);
   app.delete("/workspaces/:workspaceId/comments/:commentId", { schema: openApiSchema({ params: commentParamsSchema, tags: ["Comments"] }) }, controller.deleteComment);
 
-  app.get("/workspaces/:workspaceId/activity", { schema: openApiSchema({ params: workspaceParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listActivity);
-  app.get("/workspaces/:workspaceId/projects/:projectId/activity", { schema: openApiSchema({ params: projectParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listActivity);
-  app.get("/workspaces/:workspaceId/tasks/:taskId/activity", { schema: openApiSchema({ params: taskParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listActivity);
+  app.get("/workspaces/:workspaceId/activity", { schema: openApiSchema({ params: workspaceParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listWorkspaceActivity);
+  app.get("/workspaces/:workspaceId/projects/:projectId/activity", { schema: openApiSchema({ params: projectParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listProjectActivity);
+  app.get("/workspaces/:workspaceId/tasks/:taskId/activity", { schema: openApiSchema({ params: taskParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listTaskActivity);
 
   app.get("/workspaces/:workspaceId/notifications", { schema: openApiSchema({ params: workspaceParamsSchema, querystring: notificationQuerySchema, tags: ["Notifications"] }) }, controller.listNotifications);
   app.post("/workspaces/:workspaceId/notifications/:notificationId/read", { schema: openApiSchema({ params: notificationParamsSchema, tags: ["Notifications"] }) }, controller.markNotificationRead);

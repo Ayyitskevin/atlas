@@ -55,17 +55,22 @@ export class WorkService {
 
   async updateSection(ctx: AuthContext, workspaceId: string, projectId: string, sectionId: string, input: UpdateSectionRequest) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
-    return this.workRepository.updateSection(sectionId, input);
+    const section = await this.workRepository.updateSection({ data: input, projectId, sectionId, workspaceId });
+    if (!section) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Section not found in this Project.");
+    return section;
   }
 
   async deleteSection(ctx: AuthContext, workspaceId: string, projectId: string, sectionId: string) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
-    return this.workRepository.softDeleteSection(sectionId);
+    const count = await this.workRepository.softDeleteSection({ projectId, sectionId, workspaceId });
+    if (!count) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Section not found in this Project.");
+    return { ok: true };
   }
 
   async reorderSections(ctx: AuthContext, workspaceId: string, projectId: string, input: ReorderSectionsRequest) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
-    await this.workRepository.reorderSections({ sections: input.sections, workspaceId });
+    await this.requireSectionsInProject(workspaceId, projectId, input.sections.map((section) => section.id));
+    await this.workRepository.reorderSections({ projectId, sections: input.sections, workspaceId });
     await this.workRepository.recordActivity({
       actorUserId: ctx.userId,
       entityId: projectId,
@@ -79,6 +84,8 @@ export class WorkService {
 
   async createTask(ctx: AuthContext, workspaceId: string, projectId: string, input: CreateTaskRequest) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
+    await this.requireSectionInProject(workspaceId, projectId, input.sectionId);
+    await this.requireWorkspaceMembers(workspaceId, input.assigneeIds);
     const task = await this.workRepository.createTask({
       ...input,
       position: input.position ?? defaultListPosition(),
@@ -148,6 +155,7 @@ export class WorkService {
   async moveTask(ctx: AuthContext, workspaceId: string, taskId: string, input: MoveTaskRequest) {
     const task = await this.getTask(ctx, workspaceId, taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
+    await this.requireSectionInProject(workspaceId, task.projectId, input.sectionId);
     const count = await this.workRepository.moveTask({ ...input, taskId, workspaceId });
     if (!count) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.STALE_VERSION, "Task has changed since it was loaded.");
     await this.workRepository.recordActivity({
@@ -165,6 +173,7 @@ export class WorkService {
   async assignTask(ctx: AuthContext, workspaceId: string, taskId: string, userId: string) {
     const task = await this.getTask(ctx, workspaceId, taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
+    await this.requireWorkspaceMembers(workspaceId, [userId]);
     const assignment = await this.workRepository.assignTask({ assignedById: ctx.userId, taskId, userId, workspaceId });
     await this.workRepository.recordActivity({
       actorUserId: ctx.userId,
@@ -204,6 +213,7 @@ export class WorkService {
 
   async createSubtask(ctx: AuthContext, workspaceId: string, taskId: string, input: CreateSubtaskRequest) {
     await this.permissions.requireTaskRole(ctx, workspaceId, taskId, "EDITOR");
+    if (input.assigneeId) await this.requireWorkspaceMembers(workspaceId, [input.assigneeId]);
     const subtask = await this.workRepository.createSubtask({
       ...input,
       position: input.position ?? defaultListPosition(),
@@ -230,6 +240,7 @@ export class WorkService {
     const subtask = await this.workRepository.findSubtask(workspaceId, subtaskId);
     if (!subtask) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Subtask not found.");
     await this.permissions.requireTaskRole(ctx, workspaceId, subtask.taskId, "EDITOR");
+    if (input.assigneeId) await this.requireWorkspaceMembers(workspaceId, [input.assigneeId]);
     const count = await this.workRepository.updateSubtask({
       data: { assigneeId: input.assigneeId, status: input.status, title: input.title },
       subtaskId,
@@ -285,7 +296,13 @@ export class WorkService {
   }
 
   async listActivity(ctx: AuthContext, workspaceId: string, query: ActivityQuery) {
-    await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
+    if (query.taskId) {
+      await this.permissions.requireTaskRole(ctx, workspaceId, query.taskId, "VIEWER");
+    } else if (query.projectId) {
+      await this.permissions.requireProjectRole(ctx, workspaceId, query.projectId, "VIEWER");
+    } else {
+      await this.permissions.requireWorkspaceRole(ctx, workspaceId, "ADMIN");
+    }
     return pageFromLimit(await this.workRepository.listActivity({ ...query, workspaceId }), query.limit);
   }
 
@@ -311,7 +328,27 @@ export class WorkService {
 
   async search(ctx: AuthContext, workspaceId: string, query: SearchQuery) {
     await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
-    const [tasks, projects] = await this.workRepository.searchWorkspace({ ...query, workspaceId });
+    const [tasks, projects] = await this.workRepository.searchWorkspace({ ...query, userId: ctx.userId, workspaceId });
     return { items: [...projects.map((project) => ({ type: "project", project })), ...tasks.map((task) => ({ type: "task", task }))] };
+  }
+
+  private async requireSectionInProject(workspaceId: string, projectId: string, sectionId: string) {
+    const section = await this.workRepository.findSection({ projectId, sectionId, workspaceId });
+    if (!section) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Section not found in this Project.");
+  }
+
+  private async requireSectionsInProject(workspaceId: string, projectId: string, sectionIds: string[]) {
+    const ids = [...new Set(sectionIds)];
+    const count = await this.workRepository.countSections({ projectId, sectionIds: ids, workspaceId });
+    if (count !== ids.length) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "One or more Sections were not found in this Project.");
+  }
+
+  private async requireWorkspaceMembers(workspaceId: string, userIds: string[]) {
+    const ids = [...new Set(userIds)];
+    if (!ids.length) return;
+    const count = await this.workRepository.countWorkspaceMembers({ userIds: ids, workspaceId });
+    if (count !== ids.length) {
+      throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "One or more assignees are not active members of this Workspace.");
+    }
   }
 }
