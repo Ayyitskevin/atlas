@@ -1,0 +1,346 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum WorkspaceRole {
+  OWNER
+  ADMIN
+  MEMBER
+  GUEST
+}
+
+enum ProjectRole {
+  PROJECT_ADMIN
+  EDITOR
+  COMMENTER
+  VIEWER
+}
+
+enum ProjectVisibility {
+  WORKSPACE
+  PRIVATE
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+  ARCHIVED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum NotificationStatus {
+  UNREAD
+  READ
+  ARCHIVED
+}
+
+model User {
+  id              String            @id @default(uuid()) @db.Uuid
+  email           String            @unique @db.Citext
+  name            String
+  passwordHash    String            @map("password_hash")
+  avatarUrl       String?           @map("avatar_url")
+  disabledAt      DateTime?         @map("disabled_at") @db.Timestamptz(6)
+  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt       DateTime?         @map("deleted_at") @db.Timestamptz(6)
+  sessions        Session[]
+  oauthAccounts   OAuthAccount[]
+  workspaceLinks  WorkspaceMember[]
+  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
+  createdProjects Project[]         @relation("ProjectCreator")
+  projectLinks    ProjectMember[]
+  assignedTasks   TaskAssignee[]
+  subtasks        Subtask[]         @relation("SubtaskAssignee")
+  comments        Comment[]
+  attachments     Attachment[]
+  activityEvents  ActivityEvent[]   @relation("ActivityActor")
+  notifications   Notification[]    @relation("NotificationRecipient")
+
+  @@index([deletedAt])
+  @@map("users")
+}
+
+model Session {
+  id               String    @id @default(uuid()) @db.Uuid
+  userId           String    @map("user_id") @db.Uuid
+  refreshTokenHash String    @map("refresh_token_hash")
+  tokenFamily      String    @map("token_family") @db.Uuid
+  ipAddress        String?   @map("ip_address")
+  userAgent        String?   @map("user_agent")
+  expiresAt        DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt        DateTime? @map("revoked_at") @db.Timestamptz(6)
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, revokedAt])
+  @@index([tokenFamily])
+  @@map("sessions")
+}
+
+model OAuthAccount {
+  id                String    @id @default(uuid()) @db.Uuid
+  userId            String    @map("user_id") @db.Uuid
+  provider          String
+  providerAccountId String    @map("provider_account_id")
+  accessToken       String?   @map("access_token")
+  refreshToken      String?   @map("refresh_token")
+  expiresAt         DateTime? @map("expires_at") @db.Timestamptz(6)
+  createdAt         DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt         DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user              User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("oauth_accounts")
+}
+
+model Workspace {
+  id            String            @id @default(uuid()) @db.Uuid
+  name          String
+  slug          String            @unique
+  ownerId       String            @map("owner_id") @db.Uuid
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime?         @map("deleted_at") @db.Timestamptz(6)
+  owner         User              @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members       WorkspaceMember[]
+  projects      Project[]
+  activity      ActivityEvent[]
+  notifications Notification[]
+
+  @@index([ownerId])
+  @@index([deletedAt])
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid()) @db.Uuid
+  workspaceId String        @map("workspace_id") @db.Uuid
+  userId      String        @map("user_id") @db.Uuid
+  role        WorkspaceRole @default(MEMBER)
+  invitedById String?       @map("invited_by_id") @db.Uuid
+  joinedAt    DateTime?     @map("joined_at") @db.Timestamptz(6)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime?     @map("deleted_at") @db.Timestamptz(6)
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@index([workspaceId, role])
+  @@map("workspace_members")
+}
+
+model Project {
+  id          String            @id @default(uuid()) @db.Uuid
+  workspaceId String            @map("workspace_id") @db.Uuid
+  name        String
+  description String?
+  visibility  ProjectVisibility @default(WORKSPACE)
+  createdById String            @map("created_by_id") @db.Uuid
+  archivedAt  DateTime?         @map("archived_at") @db.Timestamptz(6)
+  createdAt   DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime?         @map("deleted_at") @db.Timestamptz(6)
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User              @relation("ProjectCreator", fields: [createdById], references: [id])
+  members     ProjectMember[]
+  sections    Section[]
+  tasks       Task[]
+  activity    ActivityEvent[]
+
+  @@index([workspaceId, deletedAt])
+  @@index([workspaceId, visibility])
+  @@map("projects")
+}
+
+model ProjectMember {
+  id        String      @id @default(uuid()) @db.Uuid
+  projectId String      @map("project_id") @db.Uuid
+  userId    String      @map("user_id") @db.Uuid
+  role      ProjectRole @default(EDITOR)
+  createdAt DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime?   @map("deleted_at") @db.Timestamptz(6)
+  project   Project     @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  user      User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([projectId, userId])
+  @@index([userId])
+  @@map("project_members")
+}
+
+model Section {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  projectId   String    @map("project_id") @db.Uuid
+  name        String
+  position    Decimal   @db.Decimal(20, 10)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+
+  @@unique([projectId, position])
+  @@index([workspaceId, projectId, deletedAt])
+  @@map("sections")
+}
+
+model Task {
+  id            String          @id @default(uuid()) @db.Uuid
+  workspaceId   String          @map("workspace_id") @db.Uuid
+  projectId     String          @map("project_id") @db.Uuid
+  sectionId     String          @map("section_id") @db.Uuid
+  title         String
+  description   String?
+  status        TaskStatus      @default(TODO)
+  priority      TaskPriority    @default(MEDIUM)
+  dueDate       DateTime?       @map("due_date") @db.Date
+  position      Decimal         @db.Decimal(20, 10)
+  completedAt   DateTime?       @map("completed_at") @db.Timestamptz(6)
+  version       Int             @default(0)
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime?       @map("deleted_at") @db.Timestamptz(6)
+  project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  section       Section         @relation(fields: [sectionId], references: [id])
+  assignees     TaskAssignee[]
+  subtasks      Subtask[]
+  comments      Comment[]
+  attachments   Attachment[]
+  activity      ActivityEvent[]
+  notifications Notification[]
+
+  @@index([workspaceId, projectId, deletedAt])
+  @@index([workspaceId, sectionId, position])
+  @@index([workspaceId, status])
+  @@index([workspaceId, dueDate])
+  @@map("tasks")
+}
+
+model TaskAssignee {
+  id           String   @id @default(uuid()) @db.Uuid
+  workspaceId  String   @map("workspace_id") @db.Uuid
+  taskId       String   @map("task_id") @db.Uuid
+  userId       String   @map("user_id") @db.Uuid
+  assignedById String?  @map("assigned_by_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  task         Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, userId])
+  @@index([workspaceId, userId])
+  @@map("task_assignees")
+}
+
+model Subtask {
+  id          String     @id @default(uuid()) @db.Uuid
+  workspaceId String     @map("workspace_id") @db.Uuid
+  taskId      String     @map("task_id") @db.Uuid
+  title       String
+  status      TaskStatus @default(TODO)
+  assigneeId  String?    @map("assignee_id") @db.Uuid
+  position    Decimal    @db.Decimal(20, 10)
+  completedAt DateTime?  @map("completed_at") @db.Timestamptz(6)
+  version     Int        @default(0)
+  createdAt   DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime?  @map("deleted_at") @db.Timestamptz(6)
+  task        Task       @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignee    User?      @relation("SubtaskAssignee", fields: [assigneeId], references: [id])
+
+  @@index([workspaceId, taskId, deletedAt])
+  @@map("subtasks")
+}
+
+model Comment {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  taskId      String    @map("task_id") @db.Uuid
+  authorId    String    @map("author_id") @db.Uuid
+  body        String
+  editedAt    DateTime? @map("edited_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  task        Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  author      User      @relation(fields: [authorId], references: [id])
+
+  @@index([workspaceId, taskId, createdAt])
+  @@map("comments")
+}
+
+model Attachment {
+  id           String    @id @default(uuid()) @db.Uuid
+  workspaceId  String    @map("workspace_id") @db.Uuid
+  taskId       String    @map("task_id") @db.Uuid
+  uploadedById String    @map("uploaded_by_id") @db.Uuid
+  objectKey    String    @map("object_key")
+  fileName     String    @map("file_name")
+  mimeType     String    @map("mime_type")
+  sizeBytes    Int       @map("size_bytes")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+  task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy   User      @relation(fields: [uploadedById], references: [id])
+
+  @@index([workspaceId, taskId])
+  @@map("attachments")
+}
+
+model ActivityEvent {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  projectId   String?   @map("project_id") @db.Uuid
+  taskId      String?   @map("task_id") @db.Uuid
+  actorUserId String    @map("actor_user_id") @db.Uuid
+  eventType   String    @map("event_type")
+  entityType  String    @map("entity_type")
+  entityId    String    @map("entity_id") @db.Uuid
+  payload     Json
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project?  @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  task        Task?     @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  actor       User      @relation("ActivityActor", fields: [actorUserId], references: [id])
+
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, projectId, createdAt])
+  @@index([workspaceId, taskId, createdAt])
+  @@map("activity_events")
+}
+
+model Notification {
+  id          String             @id @default(uuid()) @db.Uuid
+  workspaceId String             @map("workspace_id") @db.Uuid
+  recipientId String             @map("recipient_id") @db.Uuid
+  taskId      String?            @map("task_id") @db.Uuid
+  type        String
+  title       String
+  body        String
+  status      NotificationStatus @default(UNREAD)
+  readAt      DateTime?          @map("read_at") @db.Timestamptz(6)
+  createdAt   DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  workspace   Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  recipient   User               @relation("NotificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  task        Task?              @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([workspaceId, recipientId, status, createdAt])
+  @@map("notifications")
+}
