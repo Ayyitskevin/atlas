@@ -1,10 +1,13 @@
 import type { FastifyReply, FastifyRequest } from "fastify";
+import { z } from "zod";
 
 import { loginRequestSchema, refreshRequestSchema, registerRequestSchema } from "@atlas/shared";
 
 import { requireAuth } from "../../shared/auth-context.js";
-import { parseBody } from "../../shared/validation.js";
+import { parseBody, parseParams } from "../../shared/validation.js";
 import { AuthService } from "./auth.service.js";
+
+const sessionParamsSchema = z.object({ sessionId: z.string().uuid() });
 
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -32,4 +35,13 @@ export class AuthController {
   logout = async (request: FastifyRequest) => this.authService.logout(await requireAuth(request));
 
   me = async (request: FastifyRequest) => this.authService.me(await requireAuth(request));
+
+  listSessions = async (request: FastifyRequest) => this.authService.listSessions(await requireAuth(request));
+
+  revokeSession = async (request: FastifyRequest) => {
+    const { sessionId } = parseParams(request, sessionParamsSchema);
+    return this.authService.revokeSession(await requireAuth(request), sessionId);
+  };
+
+  revokeOtherSessions = async (request: FastifyRequest) => this.authService.revokeOtherSessions(await requireAuth(request));
 }

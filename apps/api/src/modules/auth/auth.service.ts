@@ -40,12 +40,22 @@ export class AuthService {
 
   async refresh(input: RefreshRequest, context: Pick<AuthContext, "ip" | "userAgent">) {
     const session = await this.authRepository.findSessionByRefreshHash(hashToken(input.refreshToken));
-    if (!session || session.expiresAt < new Date() || session.user.deletedAt || session.user.disabledAt) {
+    if (!session) {
+      throw new AtlasHttpError(401, ATLAS_ERROR_CODES.UNAUTHORIZED, "Invalid refresh token.");
+    }
+
+    if (session.revokedAt) {
+      await this.authRepository.revokeTokenFamily({ tokenFamily: session.tokenFamily, userId: session.userId });
+      throw new AtlasHttpError(401, ATLAS_ERROR_CODES.UNAUTHORIZED, "Invalid refresh token.");
+    }
+
+    if (session.expiresAt < new Date() || session.user.deletedAt || session.user.disabledAt) {
+      await this.authRepository.revokeSession(session.id);
       throw new AtlasHttpError(401, ATLAS_ERROR_CODES.UNAUTHORIZED, "Invalid refresh token.");
     }
 
     await this.authRepository.revokeSession(session.id);
-    return this.createTokenPair(session.userId, context, session.tokenFamily as ReturnType<typeof randomUUID>);
+    return this.createTokenPair(session.userId, context, session.tokenFamily);
   }
 
   async logout(ctx: AuthContext) {
@@ -59,17 +69,36 @@ export class AuthService {
     return { user };
   }
 
-  private async createTokenPair(
-    userId: string,
-    context: Pick<AuthContext, "ip" | "userAgent">,
-    tokenFamily = randomUUID(),
-  ) {
+  async listSessions(ctx: AuthContext) {
+    const sessions = await this.authRepository.listActiveSessionsForUser(ctx.userId);
+    return {
+      items: sessions.map((session) => ({
+        ...session,
+        current: session.id === ctx.sessionId,
+      })),
+    };
+  }
+
+  async revokeSession(ctx: AuthContext, sessionId: string) {
+    const result = await this.authRepository.revokeSessionForUser({ sessionId, userId: ctx.userId });
+    if (result.count === 0) {
+      throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Session not found.");
+    }
+    return { ok: true };
+  }
+
+  async revokeOtherSessions(ctx: AuthContext) {
+    const result = await this.authRepository.revokeOtherSessions({ currentSessionId: ctx.sessionId, userId: ctx.userId });
+    return { revokedCount: result.count };
+  }
+
+  private async createTokenPair(userId: string, context: Pick<AuthContext, "ip" | "userAgent">, tokenFamily: string = randomUUID()) {
     const refreshToken = createOpaqueToken();
     const session = await this.authRepository.createSession({
       expiresAt: new Date(Date.now() + refreshTtlMs),
       ipAddress: context.ip,
       refreshTokenHash: hashToken(refreshToken),
-      tokenFamily: tokenFamily as ReturnType<typeof randomUUID>,
+      tokenFamily,
       userAgent: context.userAgent,
       userId,
     });

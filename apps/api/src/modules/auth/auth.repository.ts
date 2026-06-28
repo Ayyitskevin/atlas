@@ -32,7 +32,25 @@ export class AuthRepository {
   findSessionByRefreshHash(refreshTokenHash: string) {
     return this.prisma.session.findFirst({
       include: { user: true },
-      where: { refreshTokenHash, revokedAt: null },
+      where: { refreshTokenHash },
+    });
+  }
+
+  listActiveSessionsForUser(userId: string) {
+    return this.prisma.session.findMany({
+      orderBy: { createdAt: "desc" },
+      select: {
+        createdAt: true,
+        expiresAt: true,
+        id: true,
+        ipAddress: true,
+        userAgent: true,
+      },
+      where: {
+        expiresAt: { gt: new Date() },
+        revokedAt: null,
+        userId,
+      },
     });
   }
 
@@ -40,6 +58,27 @@ export class AuthRepository {
     return this.prisma.session.updateMany({
       data: { revokedAt: new Date() },
       where: { id: sessionId, revokedAt: null },
+    });
+  }
+
+  revokeSessionForUser(input: { sessionId: string; userId: string }) {
+    return this.prisma.session.updateMany({
+      data: { revokedAt: new Date() },
+      where: { id: input.sessionId, revokedAt: null, userId: input.userId },
+    });
+  }
+
+  revokeOtherSessions(input: { currentSessionId: string; userId: string }) {
+    return this.prisma.session.updateMany({
+      data: { revokedAt: new Date() },
+      where: { id: { not: input.currentSessionId }, revokedAt: null, userId: input.userId },
+    });
+  }
+
+  revokeTokenFamily(input: { tokenFamily: string; userId: string }) {
+    return this.prisma.session.updateMany({
+      data: { revokedAt: new Date() },
+      where: { revokedAt: null, tokenFamily: input.tokenFamily, userId: input.userId },
     });
   }
 }

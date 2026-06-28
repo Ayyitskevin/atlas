@@ -125,6 +125,98 @@ describe("API integration flow", () => {
     expect(afterLogout.statusCode).toBe(401);
   });
 
+  it("revokes a refresh token family when an old refresh token is reused", async () => {
+    const replayEmail = "atlas-refresh-replay-" + randomUUID() + "@example.com";
+    const register = await app!.inject({
+      method: "POST",
+      payload: { email: replayEmail, name: "Refresh Replay User", password: "integration-password" },
+      url: "/api/v1/auth/register",
+    });
+    expect(register.statusCode).toBe(201);
+    const firstPair = register.json<{ accessToken: string; refreshToken: string }>();
+
+    const refresh = await app!.inject({
+      method: "POST",
+      payload: { refreshToken: firstPair.refreshToken },
+      url: "/api/v1/auth/refresh",
+    });
+    expect(refresh.statusCode).toBe(200);
+    const secondPair = refresh.json<{ accessToken: string; refreshToken: string }>();
+
+    const reusedRefresh = await app!.inject({
+      method: "POST",
+      payload: { refreshToken: firstPair.refreshToken },
+      url: "/api/v1/auth/refresh",
+    });
+    expect(reusedRefresh.statusCode).toBe(401);
+
+    const revokedAccess = await app!.inject({
+      headers: authHeaders(secondPair.accessToken),
+      method: "GET",
+      url: "/api/v1/auth/me",
+    });
+    expect(revokedAccess.statusCode).toBe(401);
+
+    const revokedRefresh = await app!.inject({
+      method: "POST",
+      payload: { refreshToken: secondPair.refreshToken },
+      url: "/api/v1/auth/refresh",
+    });
+    expect(revokedRefresh.statusCode).toBe(401);
+  });
+
+  it("lists and revokes user sessions", async () => {
+    const sessionsEmail = "atlas-sessions-" + randomUUID() + "@example.com";
+    const register = await app!.inject({
+      method: "POST",
+      payload: { email: sessionsEmail, name: "Sessions User", password: "integration-password" },
+      url: "/api/v1/auth/register",
+    });
+    expect(register.statusCode).toBe(201);
+    const firstAccessToken = register.json<{ accessToken: string }>().accessToken;
+
+    const login = await app!.inject({
+      method: "POST",
+      payload: { email: sessionsEmail, password: "integration-password" },
+      url: "/api/v1/auth/login",
+    });
+    expect(login.statusCode).toBe(200);
+    const secondAccessToken = login.json<{ accessToken: string }>().accessToken;
+
+    const sessions = await app!.inject({
+      headers: authHeaders(firstAccessToken),
+      method: "GET",
+      url: "/api/v1/auth/sessions",
+    });
+    expect(sessions.statusCode).toBe(200);
+    const sessionItems = sessions.json<{ items: Array<{ current: boolean; id: string }> }>().items;
+    expect(sessionItems).toHaveLength(2);
+    const otherSession = sessionItems.find((item) => !item.current);
+    expect(otherSession).toBeDefined();
+
+    const revoke = await app!.inject({
+      headers: authHeaders(firstAccessToken),
+      method: "DELETE",
+      url: "/api/v1/auth/sessions/" + otherSession!.id,
+    });
+    expect(revoke.statusCode).toBe(200);
+
+    const revokedAccess = await app!.inject({
+      headers: authHeaders(secondAccessToken),
+      method: "GET",
+      url: "/api/v1/auth/me",
+    });
+    expect(revokedAccess.statusCode).toBe(401);
+
+    const remainingSessions = await app!.inject({
+      headers: authHeaders(firstAccessToken),
+      method: "GET",
+      url: "/api/v1/auth/sessions",
+    });
+    expect(remainingSessions.statusCode).toBe(200);
+    expect(remainingSessions.json<{ items: unknown[] }>().items).toHaveLength(1);
+  });
+
   it("rejects owner role invitations", async () => {
     const ownerInvite = await app!.inject({
       headers: authHeaders(accessToken),
