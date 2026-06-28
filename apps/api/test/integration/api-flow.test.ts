@@ -93,6 +93,48 @@ describe("API integration flow", () => {
     expect(comment.statusCode).toBe(201);
   }, 60_000);
 
+  it("invalidates access tokens after logout", async () => {
+    const logoutEmail = "atlas-logout-" + randomUUID() + "@example.com";
+    const register = await app!.inject({
+      method: "POST",
+      payload: { email: logoutEmail, name: "Logout User", password: "integration-password" },
+      url: "/api/v1/auth/register",
+    });
+    expect(register.statusCode).toBe(201);
+    const logoutToken = register.json<{ accessToken: string }>().accessToken;
+
+    const beforeLogout = await app!.inject({
+      headers: authHeaders(logoutToken),
+      method: "GET",
+      url: "/api/v1/auth/me",
+    });
+    expect(beforeLogout.statusCode).toBe(200);
+
+    const logout = await app!.inject({
+      headers: authHeaders(logoutToken),
+      method: "POST",
+      url: "/api/v1/auth/logout",
+    });
+    expect(logout.statusCode).toBe(200);
+
+    const afterLogout = await app!.inject({
+      headers: authHeaders(logoutToken),
+      method: "GET",
+      url: "/api/v1/auth/me",
+    });
+    expect(afterLogout.statusCode).toBe(401);
+  });
+
+  it("rejects owner role invitations", async () => {
+    const ownerInvite = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { email: "atlas-owner-invite-" + randomUUID() + "@example.com", role: "OWNER" },
+      url: "/api/v1/workspaces/" + workspaceId + "/invitations",
+    });
+    expect(ownerInvite.statusCode).toBe(400);
+  });
+
   it("rejects cross-project section references for create and move", async () => {
     const secondProject = await app!.inject({
       headers: authHeaders(accessToken),

@@ -29,7 +29,7 @@ export class AuthController {
       userAgent: request.headers["user-agent"],
     });
 
-  logout = async (request: FastifyRequest) => this.authService.logout(requireAuth(request));
+  logout = async (request: FastifyRequest) => this.authService.logout(await requireAuth(request));
 
-  me = async (request: FastifyRequest) => this.authService.me(requireAuth(request));
+  me = async (request: FastifyRequest) => this.authService.me(await requireAuth(request));
 }

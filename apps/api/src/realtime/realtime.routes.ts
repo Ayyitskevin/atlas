@@ -17,8 +17,8 @@ const subscribeMessageSchema = z.object({
 export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void> {
   const permissions = new PermissionsService(prisma);
 
-  app.get("/ws", { websocket: true }, (socket, request) => {
-    const ctx = requireAuth(request);
+  app.get("/ws", { websocket: true }, async (socket, request) => {
+    const ctx = await requireAuth(request);
     const cleanup = new Set<() => void>();
 
     socket.on("message", async (raw: Buffer) => {

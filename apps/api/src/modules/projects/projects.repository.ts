@@ -29,7 +29,7 @@ export class ProjectsRepository {
         OR: [
           { visibility: "WORKSPACE" },
           { members: { some: { deletedAt: null, userId: input.userId } } },
-          { workspace: { members: { some: { role: { in: ["OWNER", "ADMIN"] }, userId: input.userId } } } },
+          { workspace: { members: { some: { deletedAt: null, role: { in: ["OWNER", "ADMIN"] }, userId: input.userId } } } },
         ],
       },
     });

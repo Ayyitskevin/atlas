@@ -36,154 +36,154 @@ export class WorkController {
 
   createSection = async (request: FastifyRequest, reply: FastifyReply) => {
     const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
-    const result = await this.workService.createSection(requireAuth(request), workspaceId, projectId, parseBody(request, createSectionRequestSchema));
+    const result = await this.workService.createSection(await requireAuth(request), workspaceId, projectId, parseBody(request, createSectionRequestSchema));
     return reply.status(201).send(result);
   };
 
   listSections = async (request: FastifyRequest) => {
     const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
-    return this.workService.listSections(requireAuth(request), workspaceId, projectId, parseQuery(request, cursorPaginationQuerySchema));
+    return this.workService.listSections(await requireAuth(request), workspaceId, projectId, parseQuery(request, cursorPaginationQuerySchema));
   };
 
   updateSection = async (request: FastifyRequest) => {
     const { projectId, sectionId, workspaceId } = parseParams(request, sectionParamsSchema);
-    return this.workService.updateSection(requireAuth(request), workspaceId, projectId, sectionId, parseBody(request, updateSectionRequestSchema));
+    return this.workService.updateSection(await requireAuth(request), workspaceId, projectId, sectionId, parseBody(request, updateSectionRequestSchema));
   };
 
   deleteSection = async (request: FastifyRequest) => {
     const { projectId, sectionId, workspaceId } = parseParams(request, sectionParamsSchema);
-    return this.workService.deleteSection(requireAuth(request), workspaceId, projectId, sectionId);
+    return this.workService.deleteSection(await requireAuth(request), workspaceId, projectId, sectionId);
   };
 
   reorderSections = async (request: FastifyRequest) => {
     const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
-    return this.workService.reorderSections(requireAuth(request), workspaceId, projectId, parseBody(request, reorderSectionsRequestSchema));
+    return this.workService.reorderSections(await requireAuth(request), workspaceId, projectId, parseBody(request, reorderSectionsRequestSchema));
   };
 
   createTask = async (request: FastifyRequest, reply: FastifyReply) => {
     const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
-    const result = await this.workService.createTask(requireAuth(request), workspaceId, projectId, parseBody(request, createTaskRequestSchema));
+    const result = await this.workService.createTask(await requireAuth(request), workspaceId, projectId, parseBody(request, createTaskRequestSchema));
     return reply.status(201).send(result);
   };
 
   listTasks = async (request: FastifyRequest) => {
     const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
-    return this.workService.listTasks(requireAuth(request), workspaceId, projectId, parseQuery(request, cursorPaginationQuerySchema));
+    return this.workService.listTasks(await requireAuth(request), workspaceId, projectId, parseQuery(request, cursorPaginationQuerySchema));
   };
 
   getTask = async (request: FastifyRequest) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
-    return this.workService.getTask(requireAuth(request), workspaceId, taskId);
+    return this.workService.getTask(await requireAuth(request), workspaceId, taskId);
   };
 
   updateTask = async (request: FastifyRequest) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
-    return this.workService.updateTask(requireAuth(request), workspaceId, taskId, parseBody(request, updateTaskRequestSchema));
+    return this.workService.updateTask(await requireAuth(request), workspaceId, taskId, parseBody(request, updateTaskRequestSchema));
   };
 
   deleteTask = async (request: FastifyRequest) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
-    return this.workService.deleteTask(requireAuth(request), workspaceId, taskId);
+    return this.workService.deleteTask(await requireAuth(request), workspaceId, taskId);
   };
 
   moveTask = async (request: FastifyRequest) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
-    return this.workService.moveTask(requireAuth(request), workspaceId, taskId, parseBody(request, moveTaskRequestSchema));
+    return this.workService.moveTask(await requireAuth(request), workspaceId, taskId, parseBody(request, moveTaskRequestSchema));
   };
 
   assignTask = async (request: FastifyRequest) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
     const { userId } = parseBody(request, userBodySchema);
-    return this.workService.assignTask(requireAuth(request), workspaceId, taskId, userId);
+    return this.workService.assignTask(await requireAuth(request), workspaceId, taskId, userId);
   };
 
   unassignTask = async (request: FastifyRequest) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
     const { userId } = parseBody(request, userBodySchema);
-    return this.workService.unassignTask(requireAuth(request), workspaceId, taskId, userId);
+    return this.workService.unassignTask(await requireAuth(request), workspaceId, taskId, userId);
   };
 
   completeTask = async (request: FastifyRequest) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
-    return this.workService.completeTask(requireAuth(request), workspaceId, taskId);
+    return this.workService.completeTask(await requireAuth(request), workspaceId, taskId);
   };
 
   createSubtask = async (request: FastifyRequest, reply: FastifyReply) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
-    const result = await this.workService.createSubtask(requireAuth(request), workspaceId, taskId, parseBody(request, createSubtaskRequestSchema));
+    const result = await this.workService.createSubtask(await requireAuth(request), workspaceId, taskId, parseBody(request, createSubtaskRequestSchema));
     return reply.status(201).send(result);
   };
 
   listSubtasks = async (request: FastifyRequest) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
-    return this.workService.listSubtasks(requireAuth(request), workspaceId, taskId, parseQuery(request, cursorPaginationQuerySchema));
+    return this.workService.listSubtasks(await requireAuth(request), workspaceId, taskId, parseQuery(request, cursorPaginationQuerySchema));
   };
 
   updateSubtask = async (request: FastifyRequest) => {
     const { subtaskId, workspaceId } = parseParams(request, subtaskParamsSchema);
-    return this.workService.updateSubtask(requireAuth(request), workspaceId, subtaskId, parseBody(request, updateSubtaskRequestSchema));
+    return this.workService.updateSubtask(await requireAuth(request), workspaceId, subtaskId, parseBody(request, updateSubtaskRequestSchema));
   };
 
   deleteSubtask = async (request: FastifyRequest) => {
     const { subtaskId, workspaceId } = parseParams(request, subtaskParamsSchema);
-    return this.workService.deleteSubtask(requireAuth(request), workspaceId, subtaskId);
+    return this.workService.deleteSubtask(await requireAuth(request), workspaceId, subtaskId);
   };
 
   createComment = async (request: FastifyRequest, reply: FastifyReply) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
-    const result = await this.workService.createComment(requireAuth(request), workspaceId, taskId, parseBody(request, createCommentRequestSchema));
+    const result = await this.workService.createComment(await requireAuth(request), workspaceId, taskId, parseBody(request, createCommentRequestSchema));
     return reply.status(201).send(result);
   };
 
   listComments = async (request: FastifyRequest) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
-    return this.workService.listComments(requireAuth(request), workspaceId, taskId, parseQuery(request, cursorPaginationQuerySchema));
+    return this.workService.listComments(await requireAuth(request), workspaceId, taskId, parseQuery(request, cursorPaginationQuerySchema));
   };
 
   updateComment = async (request: FastifyRequest) => {
     const { commentId, workspaceId } = parseParams(request, commentParamsSchema);
-    return this.workService.updateComment(requireAuth(request), workspaceId, commentId, parseBody(request, updateCommentRequestSchema));
+    return this.workService.updateComment(await requireAuth(request), workspaceId, commentId, parseBody(request, updateCommentRequestSchema));
   };
 
   deleteComment = async (request: FastifyRequest) => {
     const { commentId, workspaceId } = parseParams(request, commentParamsSchema);
-    return this.workService.deleteComment(requireAuth(request), workspaceId, commentId);
+    return this.workService.deleteComment(await requireAuth(request), workspaceId, commentId);
   };
 
   listWorkspaceActivity = async (request: FastifyRequest) => {
     const { workspaceId } = parseParams(request, workspaceParamsSchema);
-    return this.workService.listActivity(requireAuth(request), workspaceId, parseQuery(request, activityQuerySchema));
+    return this.workService.listActivity(await requireAuth(request), workspaceId, parseQuery(request, activityQuerySchema));
   };
 
   listProjectActivity = async (request: FastifyRequest) => {
     const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
     const query = parseQuery(request, activityQuerySchema);
-    return this.workService.listActivity(requireAuth(request), workspaceId, { ...query, projectId });
+    return this.workService.listActivity(await requireAuth(request), workspaceId, { ...query, projectId });
   };
 
   listTaskActivity = async (request: FastifyRequest) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
     const query = parseQuery(request, activityQuerySchema);
-    return this.workService.listActivity(requireAuth(request), workspaceId, { ...query, taskId });
+    return this.workService.listActivity(await requireAuth(request), workspaceId, { ...query, taskId });
   };
 
   listNotifications = async (request: FastifyRequest) => {
     const { workspaceId } = parseParams(request, workspaceParamsSchema);
-    return this.workService.listNotifications(requireAuth(request), workspaceId, parseQuery(request, notificationQuerySchema));
+    return this.workService.listNotifications(await requireAuth(request), workspaceId, parseQuery(request, notificationQuerySchema));
   };
 
   markNotificationRead = async (request: FastifyRequest) => {
     const { notificationId, workspaceId } = parseParams(request, notificationParamsSchema);
-    return this.workService.markNotificationRead(requireAuth(request), workspaceId, notificationId);
+    return this.workService.markNotificationRead(await requireAuth(request), workspaceId, notificationId);
   };
 
   markAllNotificationsRead = async (request: FastifyRequest) => {
     const { workspaceId } = parseParams(request, workspaceParamsSchema);
-    return this.workService.markAllNotificationsRead(requireAuth(request), workspaceId);
+    return this.workService.markAllNotificationsRead(await requireAuth(request), workspaceId);
   };
 
   search = async (request: FastifyRequest) => {
     const { workspaceId } = parseParams(request, workspaceParamsSchema);
-    return this.workService.search(requireAuth(request), workspaceId, parseQuery(request, searchQuerySchema));
+    return this.workService.search(await requireAuth(request), workspaceId, parseQuery(request, searchQuerySchema));
   };
 }
