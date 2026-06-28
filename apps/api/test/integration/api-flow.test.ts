@@ -264,6 +264,123 @@ describe("API integration flow", () => {
     expect(crossProjectMove.statusCode).toBe(404);
   });
 
+  it("supports pending invitations, member changes, removal, and owner transfer", async () => {
+    const lifecycleWorkspace = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { name: "Lifecycle Workspace", slug: "lifecycle-" + randomUUID().slice(0, 8) },
+      url: "/api/v1/workspaces",
+    });
+    expect(lifecycleWorkspace.statusCode).toBe(201);
+    const lifecycleWorkspaceId = lifecycleWorkspace.json<{ id: string }>().id;
+
+    const firstEmail = "atlas-lifecycle-first-" + randomUUID() + "@example.com";
+    const firstRegister = await app!.inject({
+      method: "POST",
+      payload: { email: firstEmail, name: "Lifecycle First", password: "integration-password" },
+      url: "/api/v1/auth/register",
+    });
+    expect(firstRegister.statusCode).toBe(201);
+    const firstAccessToken = firstRegister.json<{ accessToken: string }>().accessToken;
+
+    const firstInvite = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { email: firstEmail, role: "GUEST" },
+      url: "/api/v1/workspaces/" + lifecycleWorkspaceId + "/invitations",
+    });
+    expect(firstInvite.statusCode).toBe(201);
+    const firstInviteBody = firstInvite.json<{ acceptToken: string; id: string }>();
+
+    const listInvitations = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + lifecycleWorkspaceId + "/invitations",
+    });
+    expect(listInvitations.statusCode).toBe(200);
+    expect(listInvitations.json<{ items: unknown[] }>().items).toHaveLength(1);
+
+    const resend = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + lifecycleWorkspaceId + "/invitations/" + firstInviteBody.id + "/resend",
+    });
+    expect(resend.statusCode).toBe(200);
+    const resentToken = resend.json<{ acceptToken: string }>().acceptToken;
+
+    const oldTokenAccept = await app!.inject({
+      headers: authHeaders(firstAccessToken),
+      method: "POST",
+      payload: { token: firstInviteBody.acceptToken },
+      url: "/api/v1/workspaces/invitations/accept",
+    });
+    expect(oldTokenAccept.statusCode).toBe(404);
+
+    const firstAccept = await app!.inject({
+      headers: authHeaders(firstAccessToken),
+      method: "POST",
+      payload: { token: resentToken },
+      url: "/api/v1/workspaces/invitations/accept",
+    });
+    expect(firstAccept.statusCode).toBe(200);
+
+    const updateMember = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: { role: "MEMBER" },
+      url: "/api/v1/workspaces/" + lifecycleWorkspaceId + "/members/" + firstAccept.json<{ member: { userId: string } }>().member.userId,
+    });
+    expect(updateMember.statusCode).toBe(200);
+
+    const removeMember = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + lifecycleWorkspaceId + "/members/" + firstAccept.json<{ member: { userId: string } }>().member.userId,
+    });
+    expect(removeMember.statusCode).toBe(200);
+
+    const secondEmail = "atlas-lifecycle-owner-" + randomUUID() + "@example.com";
+    const secondRegister = await app!.inject({
+      method: "POST",
+      payload: { email: secondEmail, name: "Lifecycle Owner", password: "integration-password" },
+      url: "/api/v1/auth/register",
+    });
+    expect(secondRegister.statusCode).toBe(201);
+    const secondAccessToken = secondRegister.json<{ accessToken: string }>().accessToken;
+
+    const secondInvite = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { email: secondEmail, role: "ADMIN" },
+      url: "/api/v1/workspaces/" + lifecycleWorkspaceId + "/invitations",
+    });
+    expect(secondInvite.statusCode).toBe(201);
+
+    const secondAccept = await app!.inject({
+      headers: authHeaders(secondAccessToken),
+      method: "POST",
+      payload: { token: secondInvite.json<{ acceptToken: string }>().acceptToken },
+      url: "/api/v1/workspaces/invitations/accept",
+    });
+    expect(secondAccept.statusCode).toBe(200);
+    const newOwnerId = secondAccept.json<{ member: { userId: string } }>().member.userId;
+
+    const transferOwner = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { userId: newOwnerId },
+      url: "/api/v1/workspaces/" + lifecycleWorkspaceId + "/owner-transfer",
+    });
+    expect(transferOwner.statusCode).toBe(200);
+
+    const removeOwner = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + lifecycleWorkspaceId + "/members/" + newOwnerId,
+    });
+    expect(removeOwner.statusCode).toBe(403);
+  }, 60_000);
+
   it("does not leak private project search or workspace activity to ordinary members", async () => {
     const memberRegister = await app!.inject({
       method: "POST",
@@ -280,6 +397,13 @@ describe("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/invitations",
     });
     expect(invite.statusCode).toBe(201);
+    const accept = await app!.inject({
+      headers: authHeaders(memberAccessToken),
+      method: "POST",
+      payload: { token: invite.json<{ acceptToken: string }>().acceptToken },
+      url: "/api/v1/workspaces/invitations/accept",
+    });
+    expect(accept.statusCode).toBe(200);
 
     const privateProject = await app!.inject({
       headers: authHeaders(accessToken),

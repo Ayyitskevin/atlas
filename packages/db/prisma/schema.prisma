@@ -47,27 +47,28 @@ enum NotificationStatus {
 }
 
 model User {
-  id              String            @id @default(uuid()) @db.Uuid
-  email           String            @unique @db.Citext
-  name            String
-  passwordHash    String            @map("password_hash")
-  avatarUrl       String?           @map("avatar_url")
-  disabledAt      DateTime?         @map("disabled_at") @db.Timestamptz(6)
-  createdAt       DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt       DateTime?         @map("deleted_at") @db.Timestamptz(6)
-  sessions        Session[]
-  oauthAccounts   OAuthAccount[]
-  workspaceLinks  WorkspaceMember[]
-  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
-  createdProjects Project[]         @relation("ProjectCreator")
-  projectLinks    ProjectMember[]
-  assignedTasks   TaskAssignee[]
-  subtasks        Subtask[]         @relation("SubtaskAssignee")
-  comments        Comment[]
-  attachments     Attachment[]
-  activityEvents  ActivityEvent[]   @relation("ActivityActor")
-  notifications   Notification[]    @relation("NotificationRecipient")
+  id                       String                @id @default(uuid()) @db.Uuid
+  email                    String                @unique @db.Citext
+  name                     String
+  passwordHash             String                @map("password_hash")
+  avatarUrl                String?               @map("avatar_url")
+  disabledAt               DateTime?             @map("disabled_at") @db.Timestamptz(6)
+  createdAt                DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt                DateTime?             @map("deleted_at") @db.Timestamptz(6)
+  sessions                 Session[]
+  oauthAccounts            OAuthAccount[]
+  workspaceLinks           WorkspaceMember[]
+  sentWorkspaceInvitations WorkspaceInvitation[] @relation("WorkspaceInvitationInviter")
+  ownedWorkspaces          Workspace[]           @relation("WorkspaceOwner")
+  createdProjects          Project[]             @relation("ProjectCreator")
+  projectLinks             ProjectMember[]
+  assignedTasks            TaskAssignee[]
+  subtasks                 Subtask[]             @relation("SubtaskAssignee")
+  comments                 Comment[]
+  attachments              Attachment[]
+  activityEvents           ActivityEvent[]       @relation("ActivityActor")
+  notifications            Notification[]        @relation("NotificationRecipient")
 
   @@index([deletedAt])
   @@map("users")
@@ -109,15 +110,16 @@ model OAuthAccount {
 }
 
 model Workspace {
-  id            String            @id @default(uuid()) @db.Uuid
+  id            String                @id @default(uuid()) @db.Uuid
   name          String
-  slug          String            @unique
-  ownerId       String            @map("owner_id") @db.Uuid
-  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt     DateTime?         @map("deleted_at") @db.Timestamptz(6)
-  owner         User              @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  slug          String                @unique
+  ownerId       String                @map("owner_id") @db.Uuid
+  createdAt     DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt     DateTime?             @map("deleted_at") @db.Timestamptz(6)
+  owner         User                  @relation("WorkspaceOwner", fields: [ownerId], references: [id])
   members       WorkspaceMember[]
+  invitations   WorkspaceInvitation[]
   projects      Project[]
   activity      ActivityEvent[]
   notifications Notification[]
@@ -144,6 +146,29 @@ model WorkspaceMember {
   @@index([userId])
   @@index([workspaceId, role])
   @@map("workspace_members")
+}
+
+model WorkspaceInvitation {
+  id           String        @id @default(uuid()) @db.Uuid
+  workspaceId  String        @map("workspace_id") @db.Uuid
+  email        String        @db.Citext
+  role         WorkspaceRole @default(MEMBER)
+  tokenHash    String        @unique @map("token_hash")
+  invitedById  String        @map("invited_by_id") @db.Uuid
+  acceptedById String?       @map("accepted_by_id") @db.Uuid
+  expiresAt    DateTime      @map("expires_at") @db.Timestamptz(6)
+  acceptedAt   DateTime?     @map("accepted_at") @db.Timestamptz(6)
+  declinedAt   DateTime?     @map("declined_at") @db.Timestamptz(6)
+  canceledAt   DateTime?     @map("canceled_at") @db.Timestamptz(6)
+  createdAt    DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace    Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  invitedBy    User          @relation("WorkspaceInvitationInviter", fields: [invitedById], references: [id])
+
+  @@index([workspaceId, email])
+  @@index([workspaceId, canceledAt, acceptedAt, declinedAt])
+  @@index([expiresAt])
+  @@map("workspace_invitations")
 }
 
 model Project {
