@@ -7,10 +7,15 @@ import swaggerUi from "@fastify/swagger-ui";
 import websocket from "@fastify/websocket";
 import Fastify, { type FastifyInstance } from "fastify";
 
-import { ATLAS_ERROR_CODES, ATLAS_PRODUCT_NAME } from "@atlas/shared";
+import { ATLAS_API_PREFIX, ATLAS_ERROR_CODES, ATLAS_PRODUCT_NAME } from "@atlas/shared";
 
 import { env } from "./config/env.js";
+import { registerAuthRoutes } from "./modules/auth/auth.routes.js";
 import { registerHealthRoutes } from "./modules/health/health.routes.js";
+import { registerProjectRoutes } from "./modules/projects/projects.routes.js";
+import { registerWorkRoutes } from "./modules/work/work.routes.js";
+import { registerWorkspaceRoutes } from "./modules/workspaces/workspaces.routes.js";
+import { AtlasHttpError } from "./shared/errors.js";
 
 export async function buildApp(): Promise<FastifyInstance> {
   const app = Fastify({
@@ -46,18 +51,23 @@ export async function buildApp(): Promise<FastifyInstance> {
     const atlasError = error as { statusCode?: unknown; message?: unknown };
     const statusCode = typeof atlasError.statusCode === "number" ? atlasError.statusCode : 500;
     const message = typeof atlasError.message === "string" ? atlasError.message : "Request failed.";
-    const code = statusCode === 404 ? ATLAS_ERROR_CODES.NOT_FOUND : ATLAS_ERROR_CODES.INTERNAL;
+    const code = error instanceof AtlasHttpError ? error.code : statusCode === 404 ? ATLAS_ERROR_CODES.NOT_FOUND : ATLAS_ERROR_CODES.INTERNAL;
+    const details = error instanceof AtlasHttpError ? error.details : {};
     return reply.status(statusCode).send({
       error: {
         code,
         message: statusCode === 500 ? "Internal server error." : message,
         requestId: request.id,
-        details: {},
+        details,
       },
     });
   });
 
   await app.register(registerHealthRoutes);
+  await app.register(registerAuthRoutes, { prefix: ATLAS_API_PREFIX });
+  await app.register(registerWorkspaceRoutes, { prefix: ATLAS_API_PREFIX });
+  await app.register(registerProjectRoutes, { prefix: ATLAS_API_PREFIX });
+  await app.register(registerWorkRoutes, { prefix: ATLAS_API_PREFIX });
 
   return app;
 }
