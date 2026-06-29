@@ -12,10 +12,13 @@ const ctx: AuthContext = {
   userId: "00000000-0000-0000-0000-000000000001",
 };
 
-function prismaWithWorkspaceRole(role: "OWNER" | "ADMIN" | "MEMBER" | "GUEST" | null): PrismaClient {
+function prismaWithWorkspaceRole(
+  role: "OWNER" | "ADMIN" | "MEMBER" | "GUEST" | null,
+  project: { id: string; visibility: "WORKSPACE" | "PRIVATE" } | null = { id: "project-1", visibility: "WORKSPACE" },
+): PrismaClient {
   return {
     project: {
-      findFirst: async () => ({ id: "project-1", visibility: "WORKSPACE" }),
+      findFirst: async () => project,
     },
     projectMember: {
       findFirst: async () => null,
@@ -46,5 +49,13 @@ describe("PermissionsService", () => {
     const service = new PermissionsService(prismaWithWorkspaceRole("ADMIN"));
 
     await expect(service.requireProjectRole(ctx, "workspace-1", "project-1", "PROJECT_ADMIN")).resolves.toBeUndefined();
+  });
+
+  it("rejects missing projects before the workspace admin shortcut", async () => {
+    const service = new PermissionsService(prismaWithWorkspaceRole("ADMIN", null));
+
+    await expect(service.requireProjectRole(ctx, "workspace-1", "missing-project", "PROJECT_ADMIN")).rejects.toMatchObject({
+      statusCode: 404,
+    });
   });
 });
