@@ -12,6 +12,7 @@ import { ATLAS_API_PREFIX, ATLAS_ERROR_CODES, ATLAS_PRODUCT_NAME } from "@atlas/
 import { env } from "./config/env.js";
 import { registerAuthRoutes } from "./modules/auth/auth.routes.js";
 import { registerHealthRoutes } from "./modules/health/health.routes.js";
+import { registerOutboxRoutes } from "./modules/outbox/outbox.routes.js";
 import { registerProjectRoutes } from "./modules/projects/projects.routes.js";
 import { registerWorkRoutes } from "./modules/work/work.routes.js";
 import { registerRealtimeRoutes } from "./realtime/realtime.routes.js";
@@ -69,6 +70,7 @@ export async function buildApp(): Promise<FastifyInstance> {
   await app.register(registerWorkspaceRoutes, { prefix: ATLAS_API_PREFIX });
   await app.register(registerProjectRoutes, { prefix: ATLAS_API_PREFIX });
   await app.register(registerWorkRoutes, { prefix: ATLAS_API_PREFIX });
+  await app.register(registerOutboxRoutes, { prefix: ATLAS_API_PREFIX });
   await app.register(registerRealtimeRoutes, { prefix: ATLAS_API_PREFIX });
 
   return app;
