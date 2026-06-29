@@ -26,11 +26,11 @@ describe("API integration flow", () => {
   let privateProjectId = "";
 
   beforeAll(async () => {
-    execFileSync(
-      "corepack",
-      ["pnpm", "--filter", "@atlas/db", "exec", "prisma", "migrate", "deploy", "--schema", "prisma/schema.prisma"],
-      { cwd: rootDir, env: process.env, stdio: "ignore" },
-    );
+    execFileSync("pnpm", ["--filter", "@atlas/db", "exec", "prisma", "migrate", "deploy", "--schema", "prisma/schema.prisma"], {
+      cwd: rootDir,
+      env: process.env,
+      stdio: "ignore",
+    });
     app = await buildApp();
   }, 60_000);
 
@@ -505,6 +505,7 @@ describe("API integration flow", () => {
 
   it("lets workspace admins inspect and replay failed outbox events", async () => {
     const eventId = randomUUID();
+    const occurredAt = new Date().toISOString();
     const failed = await prisma.domainEventOutbox.create({
       data: {
         attempts: 10,
@@ -519,7 +520,10 @@ describe("API integration flow", () => {
           eventId,
           eventType: "TaskUpdated",
           projectId,
+          occurredAt,
+          payload: { source: "integration-test" },
           taskId,
+          version: 3,
           workspaceId,
         },
       },
@@ -532,6 +536,13 @@ describe("API integration flow", () => {
     });
     expect(memberList.statusCode).toBe(403);
 
+    const memberDetail = await app!.inject({
+      headers: authHeaders(memberAccessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/outbox/" + failed.id,
+    });
+    expect(memberDetail.statusCode).toBe(403);
+
     const list = await app!.inject({
       headers: authHeaders(accessToken),
       method: "GET",
@@ -541,6 +552,32 @@ describe("API integration flow", () => {
     expect(list.json<{ items: Array<{ id: string; lastError: string | null; status: string }> }>().items).toContainEqual(
       expect.objectContaining({ id: failed.id, lastError: "Queue unavailable", status: "failed" }),
     );
+
+    const detail = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/outbox/" + failed.id,
+    });
+    expect(detail.statusCode).toBe(200);
+    expect(
+      detail.json<{
+        context: { entityId: string | null; entityType: string | null; occurredAt: string | null; projectId: string | null; taskId: string | null; version: number | null };
+        payload: { payload?: { source?: string }; workspaceId?: string };
+      }>(),
+    ).toMatchObject({
+      context: {
+        entityId: taskId,
+        entityType: "task",
+        occurredAt,
+        projectId,
+        taskId,
+        version: 3,
+      },
+      payload: {
+        payload: { source: "integration-test" },
+        workspaceId,
+      },
+    });
 
     const replay = await app!.inject({
       headers: authHeaders(accessToken),

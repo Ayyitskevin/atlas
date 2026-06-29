@@ -25,6 +25,21 @@ export const outboxEventResponseSchema = z.object({
   workspaceId: z.string().uuid().nullable(),
 });
 
+export const outboxEventContextSchema = z.object({
+  actorUserId: z.string().uuid().nullable(),
+  entityId: z.string().uuid().nullable(),
+  entityType: z.string().nullable(),
+  occurredAt: z.string().datetime().nullable(),
+  projectId: z.string().uuid().nullable(),
+  taskId: z.string().uuid().nullable(),
+  version: z.number().int().nonnegative().nullable(),
+});
+
+export const outboxEventDetailResponseSchema = outboxEventResponseSchema.extend({
+  context: outboxEventContextSchema,
+  payload: z.unknown(),
+});
+
 export const replayOutboxEventResponseSchema = z.object({
   event: outboxEventResponseSchema,
   replayQueued: z.boolean(),

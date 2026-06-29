@@ -251,6 +251,12 @@ Base path: `/api/v1`.
 
 - `GET /workspaces/:workspaceId/search?q=...&type=task,project`
 
+### Outbox Ops
+
+- `GET /workspaces/:workspaceId/outbox`
+- `GET /workspaces/:workspaceId/outbox/:outboxEventId`
+- `POST /workspaces/:workspaceId/outbox/:outboxEventId/replay`
+
 All list endpoints use cursor pagination:
 
 ```json
