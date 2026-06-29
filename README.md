@@ -12,6 +12,7 @@ The current phase is deliberately foundation-first: production-minded domain bou
 - Task comments, activity events, in-app notifications, and basic workspace search.
 - Realtime WebSocket broadcasts for task/comment/activity mutations.
 - Durable domain event outbox feeding BullMQ workers for notification fanout, search indexing hooks, and email stubs.
+- Workspace-admin outbox inspection and failed-event replay endpoints.
 - Task attachment metadata with S3-compatible signed upload/download URLs and local MinIO support.
 - Docker Compose local stack and Terraform scaffolding for staging-oriented infrastructure.
 
@@ -109,7 +110,7 @@ corepack pnpm typecheck
 corepack pnpm test
 ```
 
-GitHub Actions also runs Prisma generation, lint, typecheck, tests, and migration diff checks on pushes to `main` and pull requests.
+GitHub Actions also runs Prisma generation, lint, typecheck, tests, migration diff checks, and a Docker Compose API smoke test on pushes to `main` and pull requests.
 
 ## Project Direction
 

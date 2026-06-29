@@ -502,6 +502,63 @@ describe("API integration flow", () => {
     });
     expect(ownerPrivateActivity.statusCode).toBe(200);
   }, 60_000);
+
+  it("lets workspace admins inspect and replay failed outbox events", async () => {
+    const eventId = randomUUID();
+    const failed = await prisma.domainEventOutbox.create({
+      data: {
+        attempts: 10,
+        eventId,
+        eventType: "TaskUpdated",
+        failedAt: new Date(),
+        lastError: "Queue unavailable",
+        payload: {
+          actorUserId: "00000000-0000-0000-0000-000000000001",
+          entityId: taskId,
+          entityType: "task",
+          eventId,
+          eventType: "TaskUpdated",
+          projectId,
+          taskId,
+          workspaceId,
+        },
+      },
+    });
+
+    const memberList = await app!.inject({
+      headers: authHeaders(memberAccessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/outbox?status=failed",
+    });
+    expect(memberList.statusCode).toBe(403);
+
+    const list = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/outbox?status=failed",
+    });
+    expect(list.statusCode).toBe(200);
+    expect(list.json<{ items: Array<{ id: string; lastError: string | null; status: string }> }>().items).toContainEqual(
+      expect.objectContaining({ id: failed.id, lastError: "Queue unavailable", status: "failed" }),
+    );
+
+    const replay = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/outbox/" + failed.id + "/replay",
+    });
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json<{ event: { attempts: number; failedAt: string | null; status: string }; replayQueued: boolean }>()).toMatchObject({
+      event: { attempts: 0, failedAt: null, status: "pending" },
+      replayQueued: true,
+    });
+
+    const replayed = await prisma.domainEventOutbox.findUniqueOrThrow({ where: { id: failed.id } });
+    expect(replayed.attempts).toBe(0);
+    expect(replayed.failedAt).toBeNull();
+    expect(replayed.lastError).toBeNull();
+    expect(replayed.nextAttemptAt).toBeInstanceOf(Date);
+  });
 });
 
 function authHeaders(accessToken: string) {

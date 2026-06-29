@@ -8,6 +8,7 @@ export * from "./schemas/attachments.js";
 export * from "./schemas/auth.js";
 export * from "./schemas/comments.js";
 export * from "./schemas/notifications.js";
+export * from "./schemas/outbox.js";
 export * from "./schemas/projects.js";
 export * from "./schemas/search.js";
 export * from "./schemas/sections.js";

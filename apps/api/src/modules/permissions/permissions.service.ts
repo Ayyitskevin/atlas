@@ -39,8 +39,6 @@ export class PermissionsService {
 
   async requireProjectRole(ctx: AuthContext, workspaceId: string, projectId: string, minimum: ProjectRole): Promise<void> {
     const workspaceRole = await this.requireWorkspaceRole(ctx, workspaceId, "GUEST");
-    if (workspaceRole === "OWNER" || workspaceRole === "ADMIN") return;
-
     const project = await this.prisma.project.findFirst({
       where: { deletedAt: null, id: projectId, workspaceId },
       select: { id: true, visibility: true },
@@ -48,6 +46,8 @@ export class PermissionsService {
     if (!project) {
       throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project not found.");
     }
+
+    if (workspaceRole === "OWNER" || workspaceRole === "ADMIN") return;
 
     const effectiveRole = await this.projectRoleForUser(ctx.userId, workspaceRole, project.id, project.visibility);
     if (!effectiveRole || projectRank[effectiveRole] < projectRank[minimum]) {
