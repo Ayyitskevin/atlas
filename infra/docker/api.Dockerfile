@@ -17,4 +17,6 @@ RUN corepack enable && corepack pnpm install --frozen-lockfile
 
 COPY . .
 
+RUN corepack pnpm --filter @atlas/db exec prisma generate --schema prisma/schema.prisma
+
 EXPOSE 4000
