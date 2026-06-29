@@ -1,8 +1,31 @@
 # Atlas
 
-Atlas is a team project-management platform foundation: multi-tenant Workspaces, Projects, Sections, Tasks, comments, notifications, search, background jobs, and realtime task/comment updates.
+Atlas is an Asana-class team project-management app foundation for organizing work across Workspaces, Projects, Sections, Tasks, comments, activity, notifications, search, attachments, and realtime collaboration.
 
-This repository is a TypeScript monorepo with a Fastify API, Next.js App Router web shell, shared DTO/schema package, Prisma database package, Redis/BullMQ workers, Docker Compose local infrastructure, and Terraform scaffolding for staging.
+The current phase is deliberately foundation-first: production-minded domain boundaries, tenant isolation, RBAC, auth, REST/OpenAPI contracts, background jobs, realtime delivery, local infrastructure, and a usable web workflow shell. It is not trying to be a polished project-management UI yet.
+
+## What Works Today
+
+- Email/password auth with JWT access tokens, refresh rotation, live session checks, logout, and session revocation.
+- Multi-tenant Workspaces with member roles, invitations, role updates, member removal, and owner transfer.
+- Projects with workspace/private visibility, Sections, Tasks, one-level Subtasks, assignees, status, priority, due dates, ordering, and optimistic version checks.
+- Task comments, activity events, in-app notifications, and basic workspace search.
+- Realtime WebSocket broadcasts for task/comment/activity mutations.
+- Durable domain event outbox feeding BullMQ workers for notification fanout, search indexing hooks, and email stubs.
+- Task attachment metadata with S3-compatible signed upload/download URLs and local MinIO support.
+- Docker Compose local stack and Terraform scaffolding for staging-oriented infrastructure.
+
+## Stack
+
+- Monorepo: pnpm workspaces + Turborepo
+- API: Node.js, TypeScript, Fastify, REST, OpenAPI, Zod validation
+- Web: Next.js App Router, TypeScript, Tailwind
+- Data: PostgreSQL, Prisma, cursor pagination, soft deletes on core entities
+- Jobs/cache: Redis, BullMQ
+- Realtime: WebSockets
+- Object storage: S3-compatible storage with MinIO locally
+- Observability: pino structured logging and health/readiness endpoints
+- Infra: Docker Compose locally, Terraform modules for AWS-oriented staging
 
 ## Quickstart
 
@@ -12,6 +35,8 @@ corepack pnpm install
 cp .env.example .env
 docker compose up
 ```
+
+Then open http://localhost:3000, register a user, create a Workspace and Project, add Sections/Tasks, and open a second browser tab to see realtime updates.
 
 Local URLs:
 
@@ -37,6 +62,12 @@ corepack pnpm migrate
 corepack pnpm seed
 ```
 
+Run the API, web app, and workers in local development mode without Docker-managed app containers:
+
+```bash
+corepack pnpm dev
+```
+
 Run the dockerized E2E smoke test against a running API container:
 
 ```bash
@@ -59,9 +90,27 @@ infra/
 docs/
   architecture.md
   decisions/
+  notes/
 ```
 
 ## Documentation
 
 - [Architecture](docs/architecture.md)
 - [ADRs](docs/decisions)
+- [Notes](docs/notes)
+
+## Verification
+
+The expected baseline before pushing is:
+
+```bash
+corepack pnpm lint
+corepack pnpm typecheck
+corepack pnpm test
+```
+
+GitHub Actions also runs Prisma generation, lint, typecheck, tests, and migration diff checks on pushes to `main` and pull requests.
+
+## Project Direction
+
+Atlas should continue to grow in vertical slices: keep service-layer permission guards, strict workspace scoping, OpenAPI/Zod contracts, integration coverage, and Docker-first local reproducibility intact as new project-management features are added.

@@ -1,5 +1,6 @@
 {
   "name": "atlas",
+  "description": "Asana-class team project-management app foundation with Fastify, Next.js, Prisma, PostgreSQL, Redis, realtime updates, RBAC, and Docker local infrastructure.",
   "private": true,
   "version": "0.1.0",
   "packageManager": "pnpm@9.15.4",
