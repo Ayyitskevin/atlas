@@ -4,6 +4,7 @@ export * from "./errors.js";
 export * from "./events.js";
 export * from "./pagination.js";
 export * from "./schemas/activity.js";
+export * from "./schemas/attachments.js";
 export * from "./schemas/auth.js";
 export * from "./schemas/comments.js";
 export * from "./schemas/notifications.js";

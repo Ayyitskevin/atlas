@@ -3,6 +3,9 @@ import { z } from "zod";
 
 import {
   activityQuerySchema,
+  attachmentDownloadResponseSchema,
+  createAttachmentRequestSchema,
+  createAttachmentResponseSchema,
   createCommentRequestSchema,
   createSectionRequestSchema,
   createSubtaskRequestSchema,
@@ -31,6 +34,7 @@ const sectionParamsSchema = projectParamsSchema.extend({ sectionId: z.string().u
 const taskParamsSchema = workspaceParamsSchema.extend({ taskId: z.string().uuid() });
 const subtaskParamsSchema = workspaceParamsSchema.extend({ subtaskId: z.string().uuid() });
 const commentParamsSchema = workspaceParamsSchema.extend({ commentId: z.string().uuid() });
+const attachmentParamsSchema = workspaceParamsSchema.extend({ attachmentId: z.string().uuid() });
 const notificationParamsSchema = workspaceParamsSchema.extend({ notificationId: z.string().uuid() });
 const userBodySchema = z.object({ userId: z.string().uuid() });
 
@@ -62,6 +66,11 @@ export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
   app.get("/workspaces/:workspaceId/tasks/:taskId/comments", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Comments"] }) }, controller.listComments);
   app.patch("/workspaces/:workspaceId/comments/:commentId", { schema: openApiSchema({ body: updateCommentRequestSchema, params: commentParamsSchema, tags: ["Comments"] }) }, controller.updateComment);
   app.delete("/workspaces/:workspaceId/comments/:commentId", { schema: openApiSchema({ params: commentParamsSchema, tags: ["Comments"] }) }, controller.deleteComment);
+
+  app.post("/workspaces/:workspaceId/tasks/:taskId/attachments", { schema: openApiSchema({ body: createAttachmentRequestSchema, params: taskParamsSchema, response: { 201: createAttachmentResponseSchema }, tags: ["Attachments"] }) }, controller.createAttachment);
+  app.get("/workspaces/:workspaceId/tasks/:taskId/attachments", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Attachments"] }) }, controller.listAttachments);
+  app.get("/workspaces/:workspaceId/attachments/:attachmentId/download", { schema: openApiSchema({ params: attachmentParamsSchema, response: { 200: attachmentDownloadResponseSchema }, tags: ["Attachments"] }) }, controller.getAttachmentDownload);
+  app.delete("/workspaces/:workspaceId/attachments/:attachmentId", { schema: openApiSchema({ params: attachmentParamsSchema, tags: ["Attachments"] }) }, controller.deleteAttachment);
 
   app.get("/workspaces/:workspaceId/activity", { schema: openApiSchema({ params: workspaceParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listWorkspaceActivity);
   app.get("/workspaces/:workspaceId/projects/:projectId/activity", { schema: openApiSchema({ params: projectParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listProjectActivity);

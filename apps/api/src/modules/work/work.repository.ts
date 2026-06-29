@@ -211,6 +211,37 @@ export class WorkRepository {
     return this.prisma.comment.update({ data: { deletedAt: new Date() }, where: { id: commentId } });
   }
 
+  createAttachment(input: {
+    fileName: string;
+    mimeType: string;
+    objectKey: string;
+    sizeBytes: number;
+    taskId: string;
+    uploadedById: string;
+    workspaceId: string;
+  }) {
+    return this.prisma.attachment.create({ data: input });
+  }
+
+  listAttachments(input: { cursor?: string; limit: number; taskId: string; workspaceId: string }) {
+    return this.prisma.attachment.findMany({
+      ...paginationArgs(input),
+      orderBy: { createdAt: "desc" },
+      where: { deletedAt: null, taskId: input.taskId, workspaceId: input.workspaceId },
+    });
+  }
+
+  findAttachment(workspaceId: string, attachmentId: string) {
+    return this.prisma.attachment.findFirst({ where: { deletedAt: null, id: attachmentId, workspaceId } });
+  }
+
+  softDeleteAttachment(input: { attachmentId: string; workspaceId: string }) {
+    return this.prisma.attachment.updateMany({
+      data: { deletedAt: new Date() },
+      where: { deletedAt: null, id: input.attachmentId, workspaceId: input.workspaceId },
+    });
+  }
+
   listActivity(input: { cursor?: string; limit: number; projectId?: string; taskId?: string; workspaceId: string }) {
     return this.prisma.activityEvent.findMany({
       ...paginationArgs(input),

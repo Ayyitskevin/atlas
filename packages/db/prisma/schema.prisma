@@ -325,7 +325,9 @@ model Attachment {
   task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
   uploadedBy   User      @relation(fields: [uploadedById], references: [id])
 
+  @@unique([workspaceId, objectKey])
   @@index([workspaceId, taskId])
+  @@index([workspaceId, uploadedById])
   @@map("attachments")
 }
 

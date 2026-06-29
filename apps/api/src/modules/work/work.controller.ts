@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   activityQuerySchema,
+  createAttachmentRequestSchema,
   createCommentRequestSchema,
   createSectionRequestSchema,
   createSubtaskRequestSchema,
@@ -28,6 +29,7 @@ const sectionParamsSchema = projectParamsSchema.extend({ sectionId: z.string().u
 const taskParamsSchema = workspaceParamsSchema.extend({ taskId: z.string().uuid() });
 const subtaskParamsSchema = workspaceParamsSchema.extend({ subtaskId: z.string().uuid() });
 const commentParamsSchema = workspaceParamsSchema.extend({ commentId: z.string().uuid() });
+const attachmentParamsSchema = workspaceParamsSchema.extend({ attachmentId: z.string().uuid() });
 const notificationParamsSchema = workspaceParamsSchema.extend({ notificationId: z.string().uuid() });
 const userBodySchema = z.object({ userId: z.string().uuid() });
 
@@ -148,6 +150,27 @@ export class WorkController {
   deleteComment = async (request: FastifyRequest) => {
     const { commentId, workspaceId } = parseParams(request, commentParamsSchema);
     return this.workService.deleteComment(await requireAuth(request), workspaceId, commentId);
+  };
+
+  createAttachment = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
+    const result = await this.workService.createAttachment(await requireAuth(request), workspaceId, taskId, parseBody(request, createAttachmentRequestSchema));
+    return reply.status(201).send(result);
+  };
+
+  listAttachments = async (request: FastifyRequest) => {
+    const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
+    return this.workService.listAttachments(await requireAuth(request), workspaceId, taskId, parseQuery(request, cursorPaginationQuerySchema));
+  };
+
+  getAttachmentDownload = async (request: FastifyRequest) => {
+    const { attachmentId, workspaceId } = parseParams(request, attachmentParamsSchema);
+    return this.workService.getAttachmentDownload(await requireAuth(request), workspaceId, attachmentId);
+  };
+
+  deleteAttachment = async (request: FastifyRequest) => {
+    const { attachmentId, workspaceId } = parseParams(request, attachmentParamsSchema);
+    return this.workService.deleteAttachment(await requireAuth(request), workspaceId, attachmentId);
   };
 
   listWorkspaceActivity = async (request: FastifyRequest) => {

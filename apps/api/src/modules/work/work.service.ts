@@ -1,6 +1,7 @@
 import {
   ATLAS_ERROR_CODES,
   type ActivityQuery,
+  type CreateAttachmentRequest,
   type CreateCommentRequest,
   type CreateSectionRequest,
   type CreateSubtaskRequest,
@@ -19,6 +20,7 @@ import {
 import type { AuthContext } from "../../shared/auth-context.js";
 import { AtlasHttpError } from "../../shared/errors.js";
 import { pageFromLimit } from "../../shared/pagination.js";
+import { createAttachmentObjectKey, createDownloadInstructions, createUploadInstructions } from "../../storage/object-storage.js";
 import { PermissionsService } from "../permissions/permissions.service.js";
 import { defaultListPosition } from "./position.js";
 import { WorkRepository } from "./work.repository.js";
@@ -292,6 +294,53 @@ export class WorkService {
     if (!comment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Comment not found.");
     if (comment.authorId !== ctx.userId) await this.permissions.requireTaskRole(ctx, workspaceId, comment.taskId, "EDITOR");
     await this.workRepository.softDeleteComment(commentId);
+    return { ok: true };
+  }
+
+  async createAttachment(ctx: AuthContext, workspaceId: string, taskId: string, input: CreateAttachmentRequest) {
+    const task = await this.getTask(ctx, workspaceId, taskId);
+    await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "COMMENTER");
+    const objectKey = createAttachmentObjectKey({ fileName: input.fileName, taskId, workspaceId });
+    const attachment = await this.workRepository.createAttachment({
+      fileName: input.fileName,
+      mimeType: input.mimeType,
+      objectKey,
+      sizeBytes: input.sizeBytes,
+      taskId,
+      uploadedById: ctx.userId,
+      workspaceId,
+    });
+    await this.workRepository.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: attachment.id,
+      entityType: "attachment",
+      eventType: "AttachmentAdded",
+      payload: { attachmentId: attachment.id, fileName: attachment.fileName, sizeBytes: attachment.sizeBytes },
+      projectId: task.projectId,
+      taskId,
+      workspaceId,
+    });
+    return { attachment, upload: await createUploadInstructions({ mimeType: attachment.mimeType, objectKey: attachment.objectKey }) };
+  }
+
+  async listAttachments(ctx: AuthContext, workspaceId: string, taskId: string, query: CursorPaginationQuery) {
+    await this.permissions.requireTaskRole(ctx, workspaceId, taskId, "VIEWER");
+    return pageFromLimit(await this.workRepository.listAttachments({ ...query, taskId, workspaceId }), query.limit);
+  }
+
+  async getAttachmentDownload(ctx: AuthContext, workspaceId: string, attachmentId: string) {
+    const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
+    if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
+    await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, "VIEWER");
+    return { attachment, download: await createDownloadInstructions(attachment.objectKey) };
+  }
+
+  async deleteAttachment(ctx: AuthContext, workspaceId: string, attachmentId: string) {
+    const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
+    if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
+    const requiredRole = attachment.uploadedById === ctx.userId ? "COMMENTER" : "EDITOR";
+    await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, requiredRole);
+    await this.workRepository.softDeleteAttachment({ attachmentId, workspaceId });
     return { ok: true };
   }
 

@@ -93,6 +93,44 @@ describe("API integration flow", () => {
     });
     expect(comment.statusCode).toBe(201);
 
+    const attachment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { fileName: "brief.pdf", mimeType: "application/pdf", sizeBytes: 2048 },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/attachments",
+    });
+    expect(attachment.statusCode).toBe(201);
+    const attachmentBody = attachment.json<{ attachment: { id: string; objectKey: string }; upload: { method: string; objectKey: string; url: string } }>();
+    expect(attachmentBody.attachment.objectKey).toContain("workspaces/" + workspaceId + "/tasks/" + taskId + "/");
+    expect(attachmentBody.upload.method).toBe("PUT");
+    expect(attachmentBody.upload.objectKey).toBe(attachmentBody.attachment.objectKey);
+    expect(attachmentBody.upload.url).toContain("X-Amz-Signature");
+
+    const attachments = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/attachments",
+    });
+    expect(attachments.statusCode).toBe(200);
+    expect(attachments.json<{ items: unknown[] }>().items.length).toBeGreaterThan(0);
+
+    const download = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id + "/download",
+    });
+    expect(download.statusCode).toBe(200);
+    const downloadBody = download.json<{ download: { method: string; url: string } }>();
+    expect(downloadBody.download.method).toBe("GET");
+    expect(downloadBody.download.url).toContain("X-Amz-Signature");
+
+    const deleteAttachment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id,
+    });
+    expect(deleteAttachment.statusCode).toBe(200);
+
     const outboxAfter = await prisma.domainEventOutbox.count();
     expect(outboxAfter).toBeGreaterThan(outboxBefore);
   }, 60_000);

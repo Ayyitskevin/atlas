@@ -45,6 +45,14 @@ services:
     volumes:
       - minio-data:/data
 
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["mc alias set local http://minio:9000 atlas atlas-password && mc mb --ignore-existing local/atlas-local && mc anonymous set none local/atlas-local"]
+
   migrate:
     build:
       context: .
@@ -70,8 +78,8 @@ services:
         condition: service_completed_successfully
       redis:
         condition: service_healthy
-      minio:
-        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
     env_file: .env.example
     environment:
       DATABASE_URL: postgresql://atlas:atlas@postgres:5432/atlas

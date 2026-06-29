@@ -46,6 +46,7 @@
     "REDIS_URL",
     "S3_BUCKET",
     "S3_ENDPOINT",
+    "S3_PUBLIC_ENDPOINT",
     "WEB_ORIGIN",
     "ATLAS_E2E_DOCKER",
     "ATLAS_E2E_BASE_URL",
