@@ -110,7 +110,7 @@ corepack pnpm typecheck
 corepack pnpm test
 ```
 
-GitHub Actions also runs Prisma generation, lint, typecheck, tests, and migration diff checks on pushes to `main` and pull requests.
+GitHub Actions also runs Prisma generation, lint, typecheck, tests, migration diff checks, and a Docker Compose API smoke test on pushes to `main` and pull requests.
 
 ## Project Direction
 
