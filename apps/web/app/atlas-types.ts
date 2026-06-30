@@ -25,6 +25,7 @@ export type Project = {
 export type Section = {
   id: string;
   name: string;
+  position?: number | string;
 };
 
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "ARCHIVED";

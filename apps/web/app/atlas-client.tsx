@@ -3,6 +3,8 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { api, clearSession, errorMessage, storeSession } from "./atlas-api";
+import { BoardPanel } from "./board-panel";
+import { moveItemById, nextTaskPosition, sectionPositionPayload } from "./board-utils";
 import { formatEventType, slugify } from "./atlas-format";
 import { OutboxPanel } from "./outbox-panel";
 import { realtimeEventTouchesProject, realtimeEventTouchesTask, type RealtimeDomainEvent } from "./realtime-utils";
@@ -340,6 +342,74 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
       );
       await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
       formElement.reset();
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
+  }
+
+  async function renameSection(sectionId: string, name: string) {
+    if (!auth || !selectedWorkspaceId || !selectedProjectId) return;
+    try {
+      setMessage("");
+      await api<Section>(
+        "/workspaces/" + selectedWorkspaceId + "/projects/" + selectedProjectId + "/sections/" + sectionId,
+        { body: JSON.stringify({ name }), method: "PATCH" },
+        auth.accessToken,
+      );
+      await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
+  }
+
+  async function deleteSection(sectionId: string) {
+    if (!auth || !selectedWorkspaceId || !selectedProjectId) return;
+    try {
+      setMessage("");
+      await api<{ ok: boolean }>(
+        "/workspaces/" + selectedWorkspaceId + "/projects/" + selectedProjectId + "/sections/" + sectionId,
+        { method: "DELETE" },
+        auth.accessToken,
+      );
+      await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
+  }
+
+  async function moveSection(sectionId: string, direction: -1 | 1) {
+    if (!auth || !selectedWorkspaceId || !selectedProjectId) return;
+    const nextSections = moveItemById(sections, sectionId, direction);
+    if (nextSections === sections) return;
+    try {
+      setMessage("");
+      await api<{ ok: boolean }>(
+        "/workspaces/" + selectedWorkspaceId + "/projects/" + selectedProjectId + "/sections/reorder",
+        { body: JSON.stringify({ sections: sectionPositionPayload(nextSections) }), method: "POST" },
+        auth.accessToken,
+      );
+      setSections(nextSections);
+      await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
+  }
+
+  async function moveTaskToSection(task: Task, sectionId: string) {
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || task.sectionId === sectionId) return;
+    try {
+      setMessage("");
+      const moved = await api<Task>(
+        "/workspaces/" + selectedWorkspaceId + "/tasks/" + task.id + "/move",
+        {
+          body: JSON.stringify({ position: nextTaskPosition(tasks, sectionId), sectionId, version: task.version }),
+          method: "POST",
+        },
+        auth.accessToken,
+      );
+      replaceTask(moved);
+      await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId);
     } catch (error) {
       setMessage(errorMessage(error));
     }
@@ -1069,56 +1139,19 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
             </div>
           </aside>
 
-          <section className="grid content-start gap-4 rounded-lg border border-slate-200 bg-white p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold uppercase text-slate-500">{selectedProject?.name ?? "Tasks"}</h2>
-              <form className="flex gap-2" onSubmit={createSection}>
-                <input className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm" name="name" placeholder="Section" required />
-                <button className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium" type="submit">
-                  Add
-                </button>
-              </form>
-            </div>
-
-            <form className="grid gap-2 md:grid-cols-[1fr_180px_auto]" onSubmit={createTask}>
-              <input className="rounded-md border border-slate-300 px-3 py-2 text-sm" name="title" placeholder="Task title" required />
-              <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" name="sectionId">
-                {sections.map((section) => (
-                  <option key={section.id} value={section.id}>
-                    {section.name}
-                  </option>
-                ))}
-              </select>
-              <button className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white" type="submit">
-                Add task
-              </button>
-            </form>
-
-            <div className="grid gap-4 md:grid-cols-3">
-              {sections.map((section) => (
-                <div className="min-h-48 rounded-lg border border-slate-200 bg-slate-50 p-3" key={section.id}>
-                  <h3 className="mb-3 text-sm font-semibold text-slate-700">{section.name}</h3>
-                  <div className="grid gap-2">
-                    {tasks
-                      .filter((task) => task.sectionId === section.id)
-                      .map((task) => (
-                        <button
-                          className={`rounded-md border px-3 py-2 text-left text-sm ${
-                            task.id === selectedTaskId ? "border-slate-950 bg-white" : "border-slate-200 bg-white"
-                          }`}
-                          key={task.id}
-                          onClick={() => void chooseTask(task.id)}
-                          type="button"
-                        >
-                          <span className="block font-medium text-slate-900">{task.title}</span>
-                          <span className="text-xs text-slate-500">{task.status}</span>
-                        </button>
-                      ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
+          <BoardPanel
+            onChooseTask={chooseTask}
+            onCreateSection={createSection}
+            onCreateTask={createTask}
+            onDeleteSection={deleteSection}
+            onMoveSection={moveSection}
+            onMoveTask={moveTaskToSection}
+            onRenameSection={renameSection}
+            projectName={selectedProject?.name}
+            sections={sections}
+            selectedTaskId={selectedTaskId}
+            tasks={tasks}
+          />
 
           <TaskDetailPanel
             attachmentStatus={attachmentStatus}
