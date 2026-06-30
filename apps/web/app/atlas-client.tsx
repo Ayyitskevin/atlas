@@ -7,6 +7,7 @@ import { ActivityPanel } from "./activity-panel";
 import { BoardPanel } from "./board-panel";
 import { moveItemById, nextTaskPosition, sectionPositionPayload } from "./board-utils";
 import { slugify } from "./atlas-format";
+import { InviteAcceptancePanel } from "./invite-acceptance-panel";
 import { MyWorkPanel } from "./my-work-panel";
 import { NotificationsPanel } from "./notifications-panel";
 import { OutboxPanel } from "./outbox-panel";
@@ -32,6 +33,7 @@ import { WorkspaceDashboardPanel } from "./workspace-dashboard-panel";
 import { WorkspaceSearchPanel } from "./workspace-search-panel";
 import { WorkspaceAdminPanel } from "./workspace-admin-panel";
 import type {
+  AcceptWorkspaceInvitationResponse,
   Attachment,
   AttachmentDownloadResponse,
   AuthPair,
@@ -50,7 +52,13 @@ import type {
   Workspace,
 } from "./atlas-types";
 
-export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" | "register" }) {
+export function AtlasClient({
+  initialInviteToken = "",
+  initialMode = "login",
+}: {
+  initialInviteToken?: string;
+  initialMode?: "login" | "register";
+}) {
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [auth, setAuth] = useState<AuthPair | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -66,6 +74,8 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [message, setMessage] = useState("");
+  const [invitationToken, setInvitationToken] = useState(initialInviteToken);
+  const [invitationMessage, setInvitationMessage] = useState(initialInviteToken ? "Invitation link loaded." : "");
 
   const selectedWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === selectedWorkspaceId),
@@ -162,6 +172,12 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
     setAuth(storedAuth);
     void hydrate(storedAuth);
   }, []);
+
+  useEffect(() => {
+    if (!initialInviteToken) return;
+    setInvitationToken(initialInviteToken);
+    setInvitationMessage("Invitation link loaded.");
+  }, [initialInviteToken]);
 
   useEffect(() => {
     if (!auth?.accessToken || !selectedWorkspaceId) return;
@@ -317,6 +333,34 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
       formElement.reset();
     } catch (error) {
       setMessage(errorMessage(error));
+    }
+  }
+
+  async function acceptInvitation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!auth) {
+      setInvitationMessage("Log in or register with the invited email before accepting.");
+      return;
+    }
+
+    const form = new FormData(event.currentTarget);
+    const token = String(form.get("token") ?? "").trim();
+    if (!token) return;
+
+    try {
+      setInvitationMessage("Accepting invitation...");
+      const result = await api<AcceptWorkspaceInvitationResponse>(
+        "/workspaces/invitations/accept",
+        { body: JSON.stringify({ token }), method: "POST" },
+        auth.accessToken,
+      );
+      const workspacePage = await api<Page<Workspace>>("/workspaces", {}, auth.accessToken);
+      setWorkspaces(workspacePage.items);
+      setInvitationToken("");
+      await chooseWorkspace(auth.accessToken, result.member.workspaceId);
+      setInvitationMessage("Invitation accepted.");
+    } catch (error) {
+      setInvitationMessage(errorMessage(error));
     }
   }
 
@@ -977,6 +1021,7 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
               <input className="rounded-md border border-slate-300 px-3 py-2" name="password" required type="password" />
             </label>
             {message ? <p className="text-sm text-red-700">{message}</p> : null}
+            {invitationMessage ? <p className="text-sm text-slate-600">{invitationMessage}</p> : null}
             <button className="rounded-md bg-slate-950 px-4 py-2 font-semibold text-white" type="submit">
               {mode === "register" ? "Register" : "Log in"}
             </button>
@@ -1010,6 +1055,13 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
         </header>
 
         {message ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p> : null}
+
+        <InviteAcceptancePanel
+          onAcceptInvitation={acceptInvitation}
+          onTokenChange={setInvitationToken}
+          statusMessage={invitationMessage}
+          token={invitationToken}
+        />
 
         <WorkspaceDashboardPanel
           activities={activities}

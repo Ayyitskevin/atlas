@@ -41,6 +41,7 @@ export function WorkspaceAdminPanel({
   const currentMember = members.find((member) => member.userId === currentUserId);
   const canManage = currentMember?.role === "ADMIN" || currentMember?.role === "OWNER";
   const canTransferOwner = currentMember?.role === "OWNER";
+  const invitePath = acceptToken ? "/invite?token=" + encodeURIComponent(acceptToken) : "";
 
   return (
     <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
@@ -184,6 +185,10 @@ export function WorkspaceAdminPanel({
             <div className="grid gap-2 rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-600">
               <p className="font-medium text-slate-700">Latest accept token</p>
               <code className="break-all rounded-md bg-slate-100 px-2 py-1 text-slate-700">{acceptToken}</code>
+              <p className="font-medium text-slate-700">Invite link</p>
+              <a className="break-all rounded-md bg-slate-100 px-2 py-1 font-medium text-slate-700" href={invitePath}>
+                {invitePath}
+              </a>
             </div>
           ) : null}
 

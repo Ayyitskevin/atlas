@@ -177,6 +177,10 @@ export type WorkspaceInvitationWithToken = WorkspaceInvitation & {
   status: "PENDING";
 };
 
+export type AcceptWorkspaceInvitationResponse = {
+  member: WorkspaceMember;
+};
+
 export type ResendWorkspaceInvitationResponse = {
   acceptToken: string;
   ok: boolean;
