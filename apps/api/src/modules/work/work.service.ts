@@ -8,6 +8,7 @@ import {
   type CreateTaskRequest,
   type CursorPaginationQuery,
   type MoveTaskRequest,
+  type MyWorkQuery,
   type NotificationQuery,
   type ReorderSectionsRequest,
   type SearchQuery,
@@ -110,6 +111,14 @@ export class WorkService {
   async listTasks(ctx: AuthContext, workspaceId: string, projectId: string, query: CursorPaginationQuery) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "VIEWER");
     return pageFromLimit(await this.workRepository.listTasks({ ...query, projectId, workspaceId }), query.limit);
+  }
+
+  async listMyWork(ctx: AuthContext, workspaceId: string, query: MyWorkQuery) {
+    await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
+    return pageFromLimit(
+      await this.workRepository.listMyWork({ ...query, userId: ctx.userId, workspaceId }),
+      query.limit,
+    );
   }
 
   async getTask(ctx: AuthContext, workspaceId: string, taskId: string) {

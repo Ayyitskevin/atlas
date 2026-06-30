@@ -219,6 +219,30 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       expect.objectContaining({ userId: currentUser.id }),
     );
 
+    const myDoneWork = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/my-work?due=any&limit=10&status=done",
+    });
+    expect(myDoneWork.statusCode).toBe(200);
+    expect(
+      myDoneWork.json<{ items: Array<{ id: string; project: { id: string; name: string; visibility: string }; status: string }> }>().items,
+    ).toContainEqual(
+      expect.objectContaining({
+        id: taskId,
+        project: expect.objectContaining({ id: projectId, name: "Integration Project", visibility: "WORKSPACE" }),
+        status: "DONE",
+      }),
+    );
+
+    const myOpenWork = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/my-work?due=any&limit=10",
+    });
+    expect(myOpenWork.statusCode).toBe(200);
+    expect(myOpenWork.json<{ items: Array<{ id: string }> }>().items).not.toContainEqual(expect.objectContaining({ id: taskId }));
+
     const unassignTask = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",

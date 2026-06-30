@@ -10,6 +10,7 @@ import {
   createTaskRequestSchema,
   cursorPaginationQuerySchema,
   moveTaskRequestSchema,
+  myWorkQuerySchema,
   notificationQuerySchema,
   reorderSectionsRequestSchema,
   searchQuerySchema,
@@ -71,6 +72,11 @@ export class WorkController {
   listTasks = async (request: FastifyRequest) => {
     const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
     return this.workService.listTasks(await requireAuth(request), workspaceId, projectId, parseQuery(request, cursorPaginationQuerySchema));
+  };
+
+  listMyWork = async (request: FastifyRequest) => {
+    const { workspaceId } = parseParams(request, workspaceParamsSchema);
+    return this.workService.listMyWork(await requireAuth(request), workspaceId, parseQuery(request, myWorkQuerySchema));
   };
 
   getTask = async (request: FastifyRequest) => {

@@ -61,6 +61,13 @@ export type Task = {
   version: number;
 };
 
+export type MyWorkDueFilter = "any" | "overdue" | "today" | "next7" | "unscheduled";
+export type MyWorkStatusFilter = "all" | "done" | "open";
+
+export type MyWorkTask = Task & {
+  project: Pick<Project, "id" | "name" | "visibility">;
+};
+
 export type Subtask = {
   assigneeId: string | null;
   completedAt?: string | null;

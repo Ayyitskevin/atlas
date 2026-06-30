@@ -12,6 +12,7 @@ import {
   createTaskRequestSchema,
   cursorPaginationQuerySchema,
   moveTaskRequestSchema,
+  myWorkQuerySchema,
   notificationQuerySchema,
   reorderSectionsRequestSchema,
   searchQuerySchema,
@@ -49,6 +50,7 @@ export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
 
   app.post("/workspaces/:workspaceId/projects/:projectId/tasks", { schema: openApiSchema({ body: createTaskRequestSchema, params: projectParamsSchema, tags: ["Tasks"] }) }, controller.createTask);
   app.get("/workspaces/:workspaceId/projects/:projectId/tasks", { schema: openApiSchema({ params: projectParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Tasks"] }) }, controller.listTasks);
+  app.get("/workspaces/:workspaceId/my-work", { schema: openApiSchema({ params: workspaceParamsSchema, querystring: myWorkQuerySchema, tags: ["Tasks"] }) }, controller.listMyWork);
   app.get("/workspaces/:workspaceId/tasks/:taskId", { schema: openApiSchema({ params: taskParamsSchema, tags: ["Tasks"] }) }, controller.getTask);
   app.patch("/workspaces/:workspaceId/tasks/:taskId", { schema: openApiSchema({ body: updateTaskRequestSchema, params: taskParamsSchema, tags: ["Tasks"] }) }, controller.updateTask);
   app.delete("/workspaces/:workspaceId/tasks/:taskId", { schema: openApiSchema({ params: taskParamsSchema, tags: ["Tasks"] }) }, controller.deleteTask);

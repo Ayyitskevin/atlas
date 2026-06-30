@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { taskPrioritySchema, taskStatusSchema } from "../domain.js";
+import { cursorPaginationQuerySchema } from "../pagination.js";
 
 export const createTaskRequestSchema = z.object({
   assigneeIds: z.array(z.string().uuid()).default([]),
@@ -28,6 +29,17 @@ export const moveTaskRequestSchema = z.object({
   version: z.number().int().nonnegative(),
 });
 
+export const myWorkStatusFilterSchema = z.enum(["open", "done", "all"]);
+export const myWorkDueFilterSchema = z.enum(["any", "overdue", "today", "next7", "unscheduled"]);
+
+export const myWorkQuerySchema = cursorPaginationQuerySchema.extend({
+  due: myWorkDueFilterSchema.default("any"),
+  status: myWorkStatusFilterSchema.default("open"),
+});
+
 export type CreateTaskRequest = z.infer<typeof createTaskRequestSchema>;
 export type UpdateTaskRequest = z.infer<typeof updateTaskRequestSchema>;
 export type MoveTaskRequest = z.infer<typeof moveTaskRequestSchema>;
+export type MyWorkDueFilter = z.infer<typeof myWorkDueFilterSchema>;
+export type MyWorkQuery = z.infer<typeof myWorkQuerySchema>;
+export type MyWorkStatusFilter = z.infer<typeof myWorkStatusFilterSchema>;

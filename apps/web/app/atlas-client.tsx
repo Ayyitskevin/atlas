@@ -6,11 +6,13 @@ import { api, clearSession, errorMessage, storeSession } from "./atlas-api";
 import { BoardPanel } from "./board-panel";
 import { moveItemById, nextTaskPosition, sectionPositionPayload } from "./board-utils";
 import { formatEventType, slugify } from "./atlas-format";
+import { MyWorkPanel } from "./my-work-panel";
 import { OutboxPanel } from "./outbox-panel";
 import { ProjectPanel } from "./project-panel";
 import { realtimeEventTouchesProject, realtimeEventTouchesTask, type RealtimeDomainEvent } from "./realtime-utils";
 import { TaskDetailPanel } from "./task-detail-panel";
 import { useActivity } from "./use-activity";
+import { useMyWork } from "./use-my-work";
 import { useNotifications } from "./use-notifications";
 import { useOutbox } from "./use-outbox";
 import { useRealtime } from "./use-realtime";
@@ -23,6 +25,7 @@ import type {
   AuthPair,
   Comment,
   CreateAttachmentResponse,
+  MyWorkTask,
   Page,
   Project,
   ProjectVisibility,
@@ -66,6 +69,17 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
     selectedProjectId,
     selectedTaskId,
   );
+  const {
+    changeMyWorkDueFilter,
+    changeMyWorkStatusFilter,
+    clearMyWork,
+    loadMyWork,
+    myWorkDueFilter,
+    myWorkStatus,
+    myWorkStatusFilter,
+    myWorkTasks,
+    refreshMyWork,
+  } = useMyWork(auth, selectedWorkspaceId);
   const {
     clearNotifications,
     loadNotifications,
@@ -141,6 +155,7 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
     if (!auth?.accessToken || !selectedWorkspaceId) return;
     const refreshes: Promise<void>[] = [
       loadNotifications(auth.accessToken, selectedWorkspaceId, notificationFilter),
+      loadMyWork(auth.accessToken, selectedWorkspaceId, myWorkStatusFilter, myWorkDueFilter),
       loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId),
     ];
 
@@ -193,6 +208,7 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
         clearProjectState();
         clearTaskDetailState();
         clearNotifications();
+        clearMyWork();
         clearSearch();
         clearActivity();
         clearWorkspaceAdminState();
@@ -258,13 +274,15 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
     clearTaskDetailState();
     clearWorkspaceAdminState();
     clearOutboxState();
+    clearMyWork();
     clearSearch();
     clearActivity();
     setActivityScope("project");
     try {
       await loadNotifications(accessToken, workspaceId, notificationFilter);
-      const [projectPage, members] = await Promise.all([
+      const [projectPage, , members] = await Promise.all([
         api<Page<Project>>(`/workspaces/${workspaceId}/projects`, {}, accessToken),
+        loadMyWork(accessToken, workspaceId, myWorkStatusFilter, myWorkDueFilter),
         loadWorkspaceMembers(accessToken, workspaceId),
       ]);
       setProjects(projectPage.items);
@@ -510,6 +528,12 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
       loadSubtasks(auth.accessToken, selectedWorkspaceId, taskId),
       loadAttachments(auth.accessToken, selectedWorkspaceId, taskId),
     ]);
+  }
+
+  async function openMyWorkTask(task: MyWorkTask) {
+    if (!auth || !selectedWorkspaceId) return;
+    await chooseProject(auth.accessToken, selectedWorkspaceId, task.projectId);
+    await chooseTask(task.id);
   }
 
   async function loadComments(accessToken: string, workspaceId: string, taskId: string) {
@@ -856,6 +880,7 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
     setAttachments([]);
     setAttachmentStatus("");
     clearNotifications();
+    clearMyWork();
     clearWorkspaceAdminState();
     clearOutboxState();
     clearSearch();
@@ -926,6 +951,18 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
         </header>
 
         {message ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p> : null}
+
+        <MyWorkPanel
+          dueFilter={myWorkDueFilter}
+          onDueFilterChange={changeMyWorkDueFilter}
+          onOpenTask={openMyWorkTask}
+          onRefresh={refreshMyWork}
+          onStatusFilterChange={changeMyWorkStatusFilter}
+          statusFilter={myWorkStatusFilter}
+          statusMessage={myWorkStatus}
+          tasks={myWorkTasks}
+          workspaceSelected={Boolean(selectedWorkspaceId)}
+        />
 
         <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">

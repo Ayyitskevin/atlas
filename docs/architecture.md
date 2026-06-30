@@ -213,6 +213,7 @@ Base path: `/api/v1`.
 
 - `POST /workspaces/:workspaceId/projects/:projectId/tasks`
 - `GET /workspaces/:workspaceId/projects/:projectId/tasks`
+- `GET /workspaces/:workspaceId/my-work`
 - `GET /workspaces/:workspaceId/tasks/:taskId`
 - `PATCH /workspaces/:workspaceId/tasks/:taskId`
 - `DELETE /workspaces/:workspaceId/tasks/:taskId`

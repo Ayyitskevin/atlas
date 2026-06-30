@@ -1,0 +1,25 @@
+import { describe, expect, it } from "vitest";
+
+import { myWorkDueDateWhere, myWorkStatusWhere } from "../../src/modules/work/my-work-filters.js";
+
+const now = new Date("2026-06-30T15:45:00.000Z");
+
+describe("my work filters", () => {
+  it("builds status filters for assigned-task views", () => {
+    expect(myWorkStatusWhere("open")).toEqual({ status: { not: "DONE" } });
+    expect(myWorkStatusWhere("done")).toEqual({ status: "DONE" });
+    expect(myWorkStatusWhere("all")).toEqual({});
+  });
+
+  it("builds UTC due-date windows", () => {
+    expect(myWorkDueDateWhere("overdue", now)).toEqual({ dueDate: { lt: new Date("2026-06-30T00:00:00.000Z") } });
+    expect(myWorkDueDateWhere("today", now)).toEqual({
+      dueDate: { gte: new Date("2026-06-30T00:00:00.000Z"), lt: new Date("2026-07-01T00:00:00.000Z") },
+    });
+    expect(myWorkDueDateWhere("next7", now)).toEqual({
+      dueDate: { gte: new Date("2026-06-30T00:00:00.000Z"), lt: new Date("2026-07-08T00:00:00.000Z") },
+    });
+    expect(myWorkDueDateWhere("unscheduled", now)).toEqual({ dueDate: null });
+    expect(myWorkDueDateWhere("any", now)).toEqual({});
+  });
+});

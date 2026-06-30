@@ -1,7 +1,9 @@
 import type { Prisma, PrismaClient, TaskPriority, TaskStatus } from "@atlas/db";
+import type { MyWorkDueFilter, MyWorkStatusFilter } from "@atlas/shared";
 
 import { realtimeHub } from "../../realtime/realtime.hub.js";
 import { paginationArgs } from "../../shared/pagination.js";
+import { myWorkDueDateWhere, myWorkStatusWhere } from "./my-work-filters.js";
 import { completedAtForStatusTransition } from "./task-state.js";
 
 export class WorkRepository {
@@ -96,6 +98,32 @@ export class WorkRepository {
       include: { assignees: true },
       orderBy: [{ sectionId: "asc" }, { position: "asc" }],
       where: { deletedAt: null, projectId: input.projectId, workspaceId: input.workspaceId },
+    });
+  }
+
+  listMyWork(input: {
+    cursor?: string;
+    due: MyWorkDueFilter;
+    limit: number;
+    status: MyWorkStatusFilter;
+    userId: string;
+    workspaceId: string;
+  }) {
+    return this.prisma.task.findMany({
+      ...paginationArgs(input),
+      include: {
+        assignees: true,
+        project: { select: { id: true, name: true, visibility: true } },
+      },
+      orderBy: [{ dueDate: { nulls: "last", sort: "asc" } }, { updatedAt: "desc" }, { id: "asc" }],
+      where: {
+        ...myWorkStatusWhere(input.status),
+        ...myWorkDueDateWhere(input.due),
+        assignees: { some: { userId: input.userId, workspaceId: input.workspaceId } },
+        deletedAt: null,
+        project: this.accessibleProjectWhere(input.userId, input.workspaceId),
+        workspaceId: input.workspaceId,
+      },
     });
   }
 
