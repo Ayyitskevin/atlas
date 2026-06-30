@@ -7,17 +7,20 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@atlas/db";
 
-import { buildApp } from "../../src/app.js";
-import { dispatchOutboxEvent } from "../../src/jobs/outbox.js";
-import { closeDomainSideEffectQueues } from "../../src/jobs/queues.js";
-
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
+const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
 
-describe("API integration flow", () => {
+type AtlasApp = Awaited<ReturnType<typeof import("../../src/app.js").buildApp>>;
+type CloseDomainSideEffectQueues = typeof import("../../src/jobs/queues.js").closeDomainSideEffectQueues;
+type DispatchOutboxEvent = typeof import("../../src/jobs/outbox.js").dispatchOutboxEvent;
+
+describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
   const email = "atlas-" + randomUUID() + "@example.com";
   const memberEmail = "atlas-member-" + randomUUID() + "@example.com";
-  let app: Awaited<ReturnType<typeof buildApp>> | undefined;
+  let app: AtlasApp | undefined;
   let accessToken = "";
+  let closeDomainSideEffectQueues: CloseDomainSideEffectQueues | undefined;
+  let dispatchOutboxEvent: DispatchOutboxEvent | undefined;
   let memberAccessToken = "";
   let workspaceId = "";
   let projectId = "";
@@ -33,12 +36,19 @@ describe("API integration flow", () => {
       env: process.env,
       stdio: "ignore",
     });
+    const [{ buildApp }, outboxModule, queuesModule] = await Promise.all([
+      import("../../src/app.js"),
+      import("../../src/jobs/outbox.js"),
+      import("../../src/jobs/queues.js"),
+    ]);
+    closeDomainSideEffectQueues = queuesModule.closeDomainSideEffectQueues;
+    dispatchOutboxEvent = outboxModule.dispatchOutboxEvent;
     app = await buildApp();
   }, 60_000);
 
   afterAll(async () => {
     if (app) await app.close();
-    await closeDomainSideEffectQueues();
+    if (closeDomainSideEffectQueues) await closeDomainSideEffectQueues();
     await prisma.$disconnect();
   });
 
@@ -815,7 +825,7 @@ describe("API integration flow", () => {
       },
     });
 
-    await dispatchOutboxEvent(success, async () => undefined);
+    await dispatchOutboxEvent!(success, async () => undefined);
 
     const processed = await prisma.domainEventOutbox.findUniqueOrThrow({
       include: { attemptsLog: { orderBy: { attemptNumber: "asc" } } },
@@ -843,7 +853,7 @@ describe("API integration flow", () => {
       },
     });
 
-    await dispatchOutboxEvent(failed, async () => {
+    await dispatchOutboxEvent!(failed, async () => {
       throw new Error("Queue unavailable");
     });
 

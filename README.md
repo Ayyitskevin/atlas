@@ -75,6 +75,8 @@ Run the dockerized E2E smoke test against a running API container:
 ATLAS_E2E_DOCKER=1 ATLAS_E2E_BASE_URL=http://localhost:4000 corepack pnpm --filter @atlas/api exec vitest run test/e2e
 ```
 
+API integration tests require `DATABASE_URL` to point at a reachable PostgreSQL database. When `DATABASE_URL` is unset, `pnpm test` still runs the DB-free unit and web suites and reports the integration flow as skipped. GitHub Actions sets `DATABASE_URL` and runs the full suite.
+
 ## Repository Layout
 
 ```text
