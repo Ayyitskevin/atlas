@@ -3,10 +3,12 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 
 import { api, clearSession, errorMessage, storeSession } from "./atlas-api";
+import { ActivityPanel } from "./activity-panel";
 import { BoardPanel } from "./board-panel";
 import { moveItemById, nextTaskPosition, sectionPositionPayload } from "./board-utils";
-import { formatEventType, slugify } from "./atlas-format";
+import { slugify } from "./atlas-format";
 import { MyWorkPanel } from "./my-work-panel";
+import { NotificationsPanel } from "./notifications-panel";
 import { OutboxPanel } from "./outbox-panel";
 import { ProjectMembersPanel } from "./project-members-panel";
 import { ProjectPanel } from "./project-panel";
@@ -27,6 +29,7 @@ import { useRealtime } from "./use-realtime";
 import { useWorkspaceAdmin } from "./use-workspace-admin";
 import { useWorkspaceSearch } from "./use-workspace-search";
 import { WorkspaceDashboardPanel } from "./workspace-dashboard-panel";
+import { WorkspaceSearchPanel } from "./workspace-search-panel";
 import { WorkspaceAdminPanel } from "./workspace-admin-panel";
 import type {
   Attachment,
@@ -1036,203 +1039,37 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
           workspaceSelected={Boolean(selectedWorkspaceId)}
         />
 
-        <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold uppercase text-slate-500">Search</h2>
-              <p className="text-sm text-slate-600">{selectedWorkspace?.name ?? "Workspace"}</p>
-            </div>
-            {searchStatus ? <p className="text-sm font-medium text-slate-600">{searchStatus}</p> : null}
-          </div>
-          <form className="grid gap-2 md:grid-cols-[minmax(0,1fr)_auto]" onSubmit={searchWorkspace}>
-            <input
-              aria-label="Search workspace"
-              className="rounded-md border border-slate-300 px-3 py-2 text-sm"
-              disabled={!selectedWorkspaceId}
-              onChange={(event) => setSearchQuery(event.target.value)}
-              placeholder="Search projects and tasks"
-              value={searchQuery}
-            />
-            <button
-              className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50"
-              disabled={!selectedWorkspaceId || !searchQuery.trim()}
-              type="submit"
-            >
-              Search
-            </button>
-          </form>
+        <WorkspaceSearchPanel
+          onOpenResult={openSearchResult}
+          onQueryChange={setSearchQuery}
+          onSearch={searchWorkspace}
+          query={searchQuery}
+          results={searchResults}
+          statusMessage={searchStatus}
+          workspace={selectedWorkspace}
+          workspaceSelected={Boolean(selectedWorkspaceId)}
+        />
 
-          {searchResults.length ? (
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {searchResults.map((result) =>
-                result.type === "project" ? (
-                  <button
-                    className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm"
-                    key={`project-${result.project.id}`}
-                    onClick={() => void openSearchResult(result)}
-                    type="button"
-                  >
-                    <span className="block font-medium text-slate-900">{result.project.name}</span>
-                    <span className="text-xs text-slate-500">{result.project.visibility.toLowerCase()} project</span>
-                  </button>
-                ) : (
-                  <button
-                    className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-left text-sm"
-                    key={`task-${result.task.id}`}
-                    onClick={() => void openSearchResult(result)}
-                    type="button"
-                  >
-                    <span className="block font-medium text-slate-900">{result.task.title}</span>
-                    <span className="text-xs text-slate-500">Task {result.task.status.toLowerCase()}</span>
-                  </button>
-                ),
-              )}
-            </div>
-          ) : null}
-        </section>
+        <NotificationsPanel
+          filter={notificationFilter}
+          notifications={notifications}
+          onFilterChange={setNotificationFilter}
+          onMarkAllRead={markAllNotificationsRead}
+          onMarkRead={markNotificationRead}
+          onOpenTask={chooseTask}
+          tasks={tasks}
+          unreadCount={unreadCount}
+          workspaceSelected={Boolean(selectedWorkspaceId)}
+        />
 
-        <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold uppercase text-slate-500">Notifications</h2>
-              <p className="text-sm text-slate-600">{unreadCount} unread</p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2 text-sm">
-              <div className="inline-flex overflow-hidden rounded-md border border-slate-300">
-                <button
-                  className={`px-3 py-2 font-medium ${notificationFilter === "unread" ? "bg-slate-950 text-white" : "bg-white text-slate-700"}`}
-                  onClick={() => setNotificationFilter("unread")}
-                  type="button"
-                >
-                  Unread
-                </button>
-                <button
-                  className={`border-l border-slate-300 px-3 py-2 font-medium ${notificationFilter === "all" ? "bg-slate-950 text-white" : "bg-white text-slate-700"}`}
-                  onClick={() => setNotificationFilter("all")}
-                  type="button"
-                >
-                  All
-                </button>
-              </div>
-              <button
-                className="rounded-md border border-slate-300 px-3 py-2 font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                disabled={!selectedWorkspaceId || unreadCount === 0}
-                onClick={() => void markAllNotificationsRead()}
-                type="button"
-              >
-                Mark all read
-              </button>
-            </div>
-          </div>
-
-          <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-            {notifications.length ? (
-              notifications.map((notification) => {
-                const canOpenTask = Boolean(notification.taskId && tasks.some((task) => task.id === notification.taskId));
-                return (
-                  <article
-                    className={`rounded-md border px-3 py-2 text-sm ${notification.status === "UNREAD" ? "border-slate-300 bg-slate-50" : "border-slate-200 bg-white"}`}
-                    key={notification.id}
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <p className="font-medium text-slate-900">{notification.title}</p>
-                        <p className="mt-1 text-slate-600">{notification.body}</p>
-                        <time className="mt-2 block text-xs text-slate-500">{new Date(notification.createdAt).toLocaleString()}</time>
-                      </div>
-                      <span
-                        className={`shrink-0 rounded-md px-2 py-1 text-xs font-medium ${
-                          notification.status === "UNREAD" ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-600"
-                        }`}
-                      >
-                        {notification.status.toLowerCase()}
-                      </span>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {canOpenTask ? (
-                        <button
-                          className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700"
-                          onClick={() => notification.taskId && void chooseTask(notification.taskId)}
-                          type="button"
-                        >
-                          Open task
-                        </button>
-                      ) : null}
-                      {notification.status === "UNREAD" ? (
-                        <button
-                          className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700"
-                          onClick={() => void markNotificationRead(notification.id)}
-                          type="button"
-                        >
-                          Mark read
-                        </button>
-                      ) : null}
-                    </div>
-                  </article>
-                );
-              })
-            ) : (
-              <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
-                {notificationFilter === "unread" ? "No unread notifications." : "No notifications yet."}
-              </p>
-            )}
-          </div>
-        </section>
-
-        <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-sm font-semibold uppercase text-slate-500">Activity</h2>
-              <p className="text-sm text-slate-600">{activityScope}</p>
-            </div>
-            <div className="inline-flex overflow-hidden rounded-md border border-slate-300 text-sm">
-              <button
-                className={`px-3 py-2 font-medium ${activityScope === "workspace" ? "bg-slate-950 text-white" : "bg-white text-slate-700"}`}
-                onClick={() => setActivityScope("workspace")}
-                type="button"
-              >
-                Workspace
-              </button>
-              <button
-                className={`border-l border-slate-300 px-3 py-2 font-medium ${activityScope === "project" ? "bg-slate-950 text-white" : "bg-white text-slate-700"}`}
-                disabled={!selectedProjectId}
-                onClick={() => setActivityScope("project")}
-                type="button"
-              >
-                Project
-              </button>
-              <button
-                className={`border-l border-slate-300 px-3 py-2 font-medium ${activityScope === "task" ? "bg-slate-950 text-white" : "bg-white text-slate-700"}`}
-                disabled={!selectedTaskId}
-                onClick={() => setActivityScope("task")}
-                type="button"
-              >
-                Task
-              </button>
-            </div>
-          </div>
-
-          {activityStatus ? <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{activityStatus}</p> : null}
-
-          {activities.length ? (
-            <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-              {activities.map((activity) => (
-                <article className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm" key={activity.id}>
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <p className="font-medium text-slate-900">{formatEventType(activity.eventType)}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        {activity.entityType}
-                        {activity.taskId ? " · task" : activity.projectId ? " · project" : ""}
-                      </p>
-                    </div>
-                    <time className="shrink-0 text-xs text-slate-500">{new Date(activity.createdAt).toLocaleString()}</time>
-                  </div>
-                </article>
-              ))}
-            </div>
-          ) : null}
-        </section>
+        <ActivityPanel
+          activities={activities}
+          onScopeChange={setActivityScope}
+          scope={activityScope}
+          selectedProjectId={selectedProjectId}
+          selectedTaskId={selectedTaskId}
+          statusMessage={activityStatus}
+        />
 
         <WorkspaceAdminPanel
           acceptToken={workspaceAdminToken}
