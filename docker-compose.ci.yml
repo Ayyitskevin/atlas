@@ -1,0 +1,6 @@
+# CI runs built images directly; docker-compose.yml keeps bind mounts for local development.
+services:
+  api:
+    volumes: !reset []
+  migrate:
+    volumes: !reset []
