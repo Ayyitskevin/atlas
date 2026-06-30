@@ -8,6 +8,9 @@
     "dev": "tsx watch src/main.ts",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
+    "test:e2e": "vitest run test/e2e",
+    "test:integration": "node ./scripts/require-env.mjs DATABASE_URL && vitest run test/integration",
+    "test:unit": "vitest run test/unit",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "worker": "tsx watch src/worker.ts"
   },

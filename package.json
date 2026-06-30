@@ -15,6 +15,9 @@
     "migrate": "pnpm --filter @atlas/db migrate",
     "seed": "pnpm --filter @atlas/db seed",
     "test": "turbo run test",
+    "test:e2e": "pnpm --filter @atlas/api test:e2e",
+    "test:integration": "pnpm --filter @atlas/api test:integration",
+    "test:unit": "turbo run test:unit",
     "typecheck": "turbo run typecheck"
   },
   "devDependencies": {

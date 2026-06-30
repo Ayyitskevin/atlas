@@ -27,6 +27,12 @@
       ],
       "outputs": []
     },
+    "test:unit": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": []
+    },
     "typecheck": {
       "dependsOn": [
         "^build"

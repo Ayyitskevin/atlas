@@ -8,6 +8,7 @@
     "dev": "next dev",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",
+    "test:unit": "vitest run",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

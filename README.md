@@ -59,6 +59,8 @@ POSTGRES_HOST_PORT=55432 REDIS_HOST_PORT=6380 MINIO_API_HOST_PORT=9100 MINIO_CON
 corepack pnpm lint
 corepack pnpm typecheck
 corepack pnpm test
+corepack pnpm test:unit
+DATABASE_URL=postgresql://atlas:atlas@localhost:5432/atlas corepack pnpm test:integration
 corepack pnpm migrate
 corepack pnpm seed
 ```
@@ -72,10 +74,10 @@ corepack pnpm dev
 Run the dockerized E2E smoke test against a running API container:
 
 ```bash
-ATLAS_E2E_DOCKER=1 ATLAS_E2E_BASE_URL=http://localhost:4000 corepack pnpm --filter @atlas/api exec vitest run test/e2e
+ATLAS_E2E_DOCKER=1 ATLAS_E2E_BASE_URL=http://localhost:4000 corepack pnpm test:e2e
 ```
 
-API integration tests require `DATABASE_URL` to point at a reachable PostgreSQL database. When `DATABASE_URL` is unset, `pnpm test` still runs the DB-free unit and web suites and reports the integration flow as skipped. GitHub Actions sets `DATABASE_URL` and runs the full suite.
+API integration tests require `DATABASE_URL` to point at a reachable PostgreSQL database. When `DATABASE_URL` is unset, `pnpm test` still runs the DB-free unit and web suites and reports the integration flow as skipped. Use `pnpm test:integration` when you want the DB-backed flow to be mandatory; GitHub Actions runs `pnpm test:unit` and `pnpm test:integration` separately.
 
 ## Repository Layout
 
@@ -109,10 +111,11 @@ The expected baseline before pushing is:
 ```bash
 corepack pnpm lint
 corepack pnpm typecheck
-corepack pnpm test
+corepack pnpm test:unit
+corepack pnpm test:integration
 ```
 
-GitHub Actions also runs Prisma generation, lint, typecheck, build, tests, migration diff checks, and a Docker Compose API smoke test on pushes to `main` and pull requests.
+GitHub Actions also runs Prisma generation, lint, typecheck, build, unit tests, DB-backed integration tests, migration diff checks, and a Docker Compose API smoke test on pushes to `main` and pull requests.
 
 ## Project Direction
 
