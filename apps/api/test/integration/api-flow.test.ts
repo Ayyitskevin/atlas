@@ -28,11 +28,11 @@ describe("API integration flow", () => {
   let privateProjectId = "";
 
   beforeAll(async () => {
-    execFileSync(
-      "corepack",
-      ["pnpm", "--filter", "@atlas/db", "exec", "prisma", "migrate", "deploy", "--schema", "prisma/schema.prisma"],
-      { cwd: rootDir, env: process.env, stdio: "ignore" },
-    );
+    execFileSync("pnpm", ["--filter", "@atlas/db", "exec", "prisma", "migrate", "deploy", "--schema", "prisma/schema.prisma"], {
+      cwd: rootDir,
+      env: process.env,
+      stdio: "ignore",
+    });
     app = await buildApp();
   }, 60_000);
 
@@ -861,6 +861,7 @@ describe("API integration flow", () => {
 
   it("lets workspace admins inspect and replay failed outbox events", async () => {
     const eventId = randomUUID();
+    const occurredAt = new Date().toISOString();
     const failed = await prisma.domainEventOutbox.create({
       data: {
         attempts: 10,
@@ -875,7 +876,10 @@ describe("API integration flow", () => {
           eventId,
           eventType: "TaskUpdated",
           projectId,
+          occurredAt,
+          payload: { source: "integration-test" },
           taskId,
+          version: 3,
           workspaceId,
         },
       },
@@ -925,20 +929,38 @@ describe("API integration flow", () => {
     expect(detail.statusCode).toBe(200);
     expect(
       detail.json<{
-        event: {
-          attemptHistory: Array<{ attemptNumber: number; error: string | null; status: string }>;
-          canReplay: boolean;
-          deadLettered: boolean;
-          id: string;
-          payload: { taskId: string; workspaceId: string };
+        attemptHistory: Array<{ attemptNumber: number; error: string | null; status: string }>;
+        canReplay: boolean;
+        context: {
+          entityId: string | null;
+          entityType: string | null;
+          occurredAt: string | null;
+          projectId: string | null;
+          taskId: string | null;
+          version: number | null;
         };
-      }>().event,
+        deadLettered: boolean;
+        id: string;
+        payload: { payload?: { source?: string }; taskId?: string; workspaceId?: string };
+      }>(),
     ).toMatchObject({
       attemptHistory: [expect.objectContaining({ attemptNumber: 10, error: "Queue unavailable", status: "failed" })],
       canReplay: true,
+      context: {
+        entityId: taskId,
+        entityType: "task",
+        occurredAt,
+        projectId,
+        taskId,
+        version: 3,
+      },
       deadLettered: true,
       id: failed.id,
-      payload: { taskId, workspaceId },
+      payload: {
+        payload: { source: "integration-test" },
+        taskId,
+        workspaceId,
+      },
     });
 
     const replay = await app!.inject({

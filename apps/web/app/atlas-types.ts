@@ -199,13 +199,20 @@ export type OutboxAttempt = {
   status: "failed" | "succeeded";
 };
 
-export type OutboxEventDetail = OutboxEvent & {
-  attemptHistory: OutboxAttempt[];
-  payload: Record<string, unknown>;
+export type OutboxEventContext = {
+  actorUserId: string | null;
+  entityId: string | null;
+  entityType: string | null;
+  occurredAt: string | null;
+  projectId: string | null;
+  taskId: string | null;
+  version: number | null;
 };
 
-export type OutboxEventDetailResponse = {
-  event: OutboxEventDetail;
+export type OutboxEventDetail = OutboxEvent & {
+  attemptHistory: OutboxAttempt[];
+  context: OutboxEventContext;
+  payload: Record<string, unknown>;
 };
 
 export type ReplayOutboxEventResponse = {

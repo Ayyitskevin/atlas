@@ -3,7 +3,7 @@
 import { useState } from "react";
 
 import { api, errorMessage } from "./atlas-api";
-import type { AuthPair, OutboxEvent, OutboxEventDetail, OutboxEventDetailResponse, OutboxStatus, Page, ReplayOutboxEventResponse } from "./atlas-types";
+import type { AuthPair, OutboxEvent, OutboxEventDetail, OutboxStatus, Page, ReplayOutboxEventResponse } from "./atlas-types";
 
 export function useOutbox(auth: AuthPair | null, selectedWorkspaceId: string) {
   const [outboxEvents, setOutboxEvents] = useState<OutboxEvent[]>([]);
@@ -64,12 +64,12 @@ export function useOutbox(auth: AuthPair | null, selectedWorkspaceId: string) {
     try {
       setOutboxDetail(null);
       setOutboxMessage("Loading event detail...");
-      const result = await api<OutboxEventDetailResponse>(
+      const result = await api<OutboxEventDetail>(
         "/workspaces/" + selectedWorkspaceId + "/outbox/" + eventId,
         {},
         auth.accessToken,
       );
-      setOutboxDetail(result.event);
+      setOutboxDetail(result);
       setOutboxMessage("");
     } catch (error) {
       setOutboxDetail(null);

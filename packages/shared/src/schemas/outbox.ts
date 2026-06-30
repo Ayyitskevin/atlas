@@ -39,13 +39,20 @@ export const outboxAttemptResponseSchema = z.object({
   status: outboxAttemptStatusSchema,
 });
 
-export const outboxEventPayloadSchema = z.record(z.unknown());
+export const outboxEventContextSchema = z.object({
+  actorUserId: z.string().uuid().nullable(),
+  entityId: z.string().uuid().nullable(),
+  entityType: z.string().nullable(),
+  occurredAt: z.string().datetime().nullable(),
+  projectId: z.string().uuid().nullable(),
+  taskId: z.string().uuid().nullable(),
+  version: z.number().int().nonnegative().nullable(),
+});
 
-export const outboxEventDetailResponseSchema = z.object({
-  event: outboxEventResponseSchema.extend({
-    attemptHistory: outboxAttemptResponseSchema.array(),
-    payload: outboxEventPayloadSchema,
-  }),
+export const outboxEventDetailResponseSchema = outboxEventResponseSchema.extend({
+  attemptHistory: outboxAttemptResponseSchema.array(),
+  context: outboxEventContextSchema,
+  payload: z.record(z.unknown()),
 });
 
 export const replayOutboxEventResponseSchema = z.object({
