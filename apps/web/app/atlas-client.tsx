@@ -26,6 +26,7 @@ import { useProjectMembers } from "./use-project-members";
 import { useRealtime } from "./use-realtime";
 import { useWorkspaceAdmin } from "./use-workspace-admin";
 import { useWorkspaceSearch } from "./use-workspace-search";
+import { WorkspaceDashboardPanel } from "./workspace-dashboard-panel";
 import { WorkspaceAdminPanel } from "./workspace-admin-panel";
 import type {
   Attachment,
@@ -1006,6 +1007,22 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
         </header>
 
         {message ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p> : null}
+
+        <WorkspaceDashboardPanel
+          activities={activities}
+          myWorkTasks={myWorkTasks}
+          notifications={notifications}
+          onChooseProject={(projectId) => (auth ? chooseProject(auth.accessToken, selectedWorkspaceId, projectId) : Promise.resolve())}
+          onCreateProject={createProject}
+          onCreateTask={createTask}
+          onOpenTask={openMyWorkTask}
+          projects={projects}
+          sections={sections}
+          selectedProject={selectedProject}
+          tasks={tasks}
+          workspace={selectedWorkspace}
+          workspaceMembers={workspaceMembers}
+        />
 
         <MyWorkPanel
           dueFilter={myWorkDueFilter}

@@ -9,6 +9,7 @@ The current phase is deliberately foundation-first: production-minded domain bou
 - Email/password auth with JWT access tokens, refresh rotation, live session checks, logout, and session revocation.
 - Multi-tenant Workspaces with member roles, invitations, role updates, member removal, and owner transfer.
 - Projects with workspace/private visibility, explicit project-member roles, Sections, Tasks, one-level Subtasks, assignees, status, priority, due dates, ordering, optimistic version checks, and a cross-project My Work view.
+- Workspace dashboard with project/task quick actions, project/member counts, recent notifications, activity, and assigned-work summary.
 - Task comments, scoped activity feeds, in-app notifications with a web inbox, and workspace search in the web shell.
 - Realtime WebSocket broadcasts for project/member/task/comment/activity mutations.
 - Durable domain event outbox feeding BullMQ workers for notification fanout, search indexing hooks, and email stubs.
