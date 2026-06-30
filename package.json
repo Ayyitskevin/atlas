@@ -17,6 +17,7 @@
     "test": "turbo run test",
     "test:e2e": "pnpm --filter @atlas/api test:e2e",
     "test:integration": "pnpm --filter @atlas/api test:integration",
+    "test:integration:local": "node ./scripts/test-integration-local.mjs",
     "test:unit": "turbo run test:unit",
     "typecheck": "turbo run typecheck"
   },
