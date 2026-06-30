@@ -847,6 +847,89 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     });
     expect(memberPrivateActivity.statusCode).toBe(403);
 
+    const memberUser = await prisma.user.findUniqueOrThrow({ where: { email: memberEmail } });
+    const ownerUser = await prisma.user.findUniqueOrThrow({ where: { email } });
+
+    const projectMembersBefore = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + privateProjectId + "/members",
+    });
+    expect(projectMembersBefore.statusCode).toBe(200);
+    expect(projectMembersBefore.json<{ items: Array<{ role: string; userId: string }> }>().items).toContainEqual(
+      expect.objectContaining({ role: "PROJECT_ADMIN", userId: ownerUser.id }),
+    );
+
+    const removeLastProjectAdmin = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + privateProjectId + "/members/" + ownerUser.id,
+    });
+    expect(removeLastProjectAdmin.statusCode).toBe(403);
+
+    const addProjectMember = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { role: "VIEWER", userId: memberUser.id },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + privateProjectId + "/members",
+    });
+    expect(addProjectMember.statusCode).toBe(201);
+    expect(addProjectMember.json<{ role: string; userId: string }>()).toMatchObject({ role: "VIEWER", userId: memberUser.id });
+    await expectProjectMemberLifecycleEvent(workspaceId, "ProjectMemberAdded", privateProjectId, memberUser.id, { role: "VIEWER" });
+
+    const duplicateProjectMember = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { role: "EDITOR", userId: memberUser.id },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + privateProjectId + "/members",
+    });
+    expect(duplicateProjectMember.statusCode).toBe(409);
+
+    const memberPrivateProjectAfterAdd = await app!.inject({
+      headers: authHeaders(memberAccessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + privateProjectId,
+    });
+    expect(memberPrivateProjectAfterAdd.statusCode).toBe(200);
+
+    const memberPrivateSearchAfterAdd = await app!.inject({
+      headers: authHeaders(memberAccessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/search?q=" + encodeURIComponent(secretTitle),
+    });
+    expect(memberPrivateSearchAfterAdd.statusCode).toBe(200);
+    expect(memberPrivateSearchAfterAdd.json<{ items: Array<{ task: { id: string }; type: string }> }>().items).toContainEqual(
+      expect.objectContaining({ task: expect.objectContaining({ id: privateTaskId }), type: "task" }),
+    );
+
+    const updateProjectMember = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: { role: "COMMENTER" },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + privateProjectId + "/members/" + memberUser.id,
+    });
+    expect(updateProjectMember.statusCode).toBe(200);
+    expect(updateProjectMember.json<{ role: string; userId: string }>()).toMatchObject({ role: "COMMENTER", userId: memberUser.id });
+    await expectProjectMemberLifecycleEvent(workspaceId, "ProjectMemberUpdated", privateProjectId, memberUser.id, {
+      previousRole: "VIEWER",
+      role: "COMMENTER",
+    });
+
+    const removeProjectMember = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + privateProjectId + "/members/" + memberUser.id,
+    });
+    expect(removeProjectMember.statusCode).toBe(200);
+    await expectProjectMemberLifecycleEvent(workspaceId, "ProjectMemberRemoved", privateProjectId, memberUser.id, { role: "COMMENTER" });
+
+    const memberPrivateProjectAfterRemove = await app!.inject({
+      headers: authHeaders(memberAccessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + privateProjectId,
+    });
+    expect(memberPrivateProjectAfterRemove.statusCode).toBe(403);
+
     const ownerPrivateActivity = await app!.inject({
       headers: authHeaders(accessToken),
       method: "GET",
@@ -1087,6 +1170,42 @@ async function expectProjectLifecycleEvent(workspaceId: string, eventType: strin
     eventType,
     occurredAt: expect.any(String),
     payload: expect.objectContaining(payload),
+    projectId,
+    taskId: null,
+    version: 0,
+    workspaceId,
+  });
+}
+
+async function expectProjectMemberLifecycleEvent(
+  workspaceId: string,
+  eventType: string,
+  projectId: string,
+  userId: string,
+  payload: Record<string, unknown>,
+) {
+  const activity = await prisma.activityEvent.findFirst({
+    orderBy: { createdAt: "desc" },
+    where: { entityType: "project_member", eventType, projectId, workspaceId },
+  });
+  expect(activity).toMatchObject({
+    actorUserId: expect.any(String),
+    entityType: "project_member",
+    eventType,
+    projectId,
+    taskId: null,
+    workspaceId,
+  });
+
+  const outbox = await prisma.domainEventOutbox.findUnique({ where: { eventId: activity!.id } });
+  expect(outbox).toMatchObject({ eventType });
+  expect(outbox?.payload).toMatchObject({
+    entityId: activity!.entityId,
+    entityType: "project_member",
+    eventId: activity!.id,
+    eventType,
+    occurredAt: expect.any(String),
+    payload: expect.objectContaining({ userId, ...payload }),
     projectId,
     taskId: null,
     version: 0,

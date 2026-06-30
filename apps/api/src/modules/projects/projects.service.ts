@@ -1,9 +1,12 @@
 import {
   ATLAS_ERROR_CODES,
+  type AddProjectMemberRequest,
   type CreateProjectRequest,
   type CursorPaginationQuery,
+  type UpdateProjectMemberRequest,
   type UpdateProjectRequest,
 } from "@atlas/shared";
+import type { ProjectRole } from "@atlas/db";
 
 import type { AuthContext } from "../../shared/auth-context.js";
 import { AtlasHttpError } from "../../shared/errors.js";
@@ -91,6 +94,80 @@ export class ProjectsService {
     });
     return project;
   }
+
+  async listMembers(ctx: AuthContext, workspaceId: string, projectId: string) {
+    await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "VIEWER");
+    return { items: await this.projectsRepository.listMembers(workspaceId, projectId) };
+  }
+
+  async addMember(ctx: AuthContext, workspaceId: string, projectId: string, input: AddProjectMemberRequest) {
+    await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "PROJECT_ADMIN");
+    const workspaceMember = await this.projectsRepository.findActiveWorkspaceMember({ userId: input.userId, workspaceId });
+    if (!workspaceMember) {
+      throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "User must be an active member of this Workspace.");
+    }
+
+    const existing = await this.projectsRepository.findActiveMember({ projectId, userId: input.userId });
+    if (existing) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "User is already a Project member.");
+
+    const member = await this.projectsRepository.addMember({ ...input, projectId });
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: member.id,
+      entityType: "project_member",
+      eventType: "ProjectMemberAdded",
+      payload: projectMemberPayload(member),
+      projectId,
+      workspaceId,
+    });
+    return member;
+  }
+
+  async updateMember(ctx: AuthContext, workspaceId: string, projectId: string, userId: string, input: UpdateProjectMemberRequest) {
+    await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "PROJECT_ADMIN");
+    const member = await this.projectsRepository.findActiveMember({ projectId, userId });
+    if (!member) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project member not found.");
+    await this.ensureProjectAdminCanChange(projectId, member.role as ProjectRole, input.role as ProjectRole);
+
+    const updated = await this.projectsRepository.updateMemberRole({ projectId, role: input.role as ProjectRole, userId });
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: updated.id,
+      entityType: "project_member",
+      eventType: "ProjectMemberUpdated",
+      payload: projectMemberPayload(updated, member.role),
+      projectId,
+      workspaceId,
+    });
+    return updated;
+  }
+
+  async removeMember(ctx: AuthContext, workspaceId: string, projectId: string, userId: string) {
+    await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "PROJECT_ADMIN");
+    const member = await this.projectsRepository.findActiveMember({ projectId, userId });
+    if (!member) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project member not found.");
+    await this.ensureProjectAdminCanChange(projectId, member.role as ProjectRole, null);
+
+    const removed = await this.projectsRepository.removeMember({ projectId, userId });
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: removed.id,
+      entityType: "project_member",
+      eventType: "ProjectMemberRemoved",
+      payload: projectMemberPayload(removed),
+      projectId,
+      workspaceId,
+    });
+    return { ok: true };
+  }
+
+  private async ensureProjectAdminCanChange(projectId: string, currentRole: ProjectRole, nextRole: ProjectRole | null) {
+    if (currentRole !== "PROJECT_ADMIN" || nextRole === "PROJECT_ADMIN") return;
+    const projectAdminCount = await this.projectsRepository.countProjectAdmins(projectId);
+    if (projectAdminCount <= 1) {
+      throw new AtlasHttpError(403, ATLAS_ERROR_CODES.FORBIDDEN, "Projects must keep at least one Project admin.");
+    }
+  }
 }
 
 function projectPayload(project: { archivedAt?: Date | null; description?: string | null; name: string; visibility: string }) {
@@ -99,5 +176,21 @@ function projectPayload(project: { archivedAt?: Date | null; description?: strin
     description: project.description ?? null,
     name: project.name,
     visibility: project.visibility,
+  };
+}
+
+function projectMemberPayload(
+  member: {
+    role: string;
+    user: { email: string; id: string; name: string };
+    userId: string;
+  },
+  previousRole?: string,
+) {
+  return {
+    previousRole: previousRole ?? null,
+    role: member.role,
+    user: member.user,
+    userId: member.userId,
   };
 }

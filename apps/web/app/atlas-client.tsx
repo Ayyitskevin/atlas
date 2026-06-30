@@ -8,13 +8,21 @@ import { moveItemById, nextTaskPosition, sectionPositionPayload } from "./board-
 import { formatEventType, slugify } from "./atlas-format";
 import { MyWorkPanel } from "./my-work-panel";
 import { OutboxPanel } from "./outbox-panel";
+import { ProjectMembersPanel } from "./project-members-panel";
 import { ProjectPanel } from "./project-panel";
-import { realtimeEventTouchesProject, realtimeEventTouchesProjectList, realtimeEventTouchesTask, type RealtimeDomainEvent } from "./realtime-utils";
+import {
+  realtimeEventTouchesProject,
+  realtimeEventTouchesProjectList,
+  realtimeEventTouchesProjectMembers,
+  realtimeEventTouchesTask,
+  type RealtimeDomainEvent,
+} from "./realtime-utils";
 import { TaskDetailPanel } from "./task-detail-panel";
 import { useActivity } from "./use-activity";
 import { useMyWork } from "./use-my-work";
 import { useNotifications } from "./use-notifications";
 import { useOutbox } from "./use-outbox";
+import { useProjectMembers } from "./use-project-members";
 import { useRealtime } from "./use-realtime";
 import { useWorkspaceAdmin } from "./use-workspace-admin";
 import { useWorkspaceSearch } from "./use-workspace-search";
@@ -121,6 +129,16 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
     workspaceInvitations,
     workspaceMembers,
   } = useWorkspaceAdmin(auth, selectedWorkspaceId, user?.id);
+  const {
+    addProjectMember,
+    clearProjectMemberState,
+    loadProjectMembers,
+    projectMembers,
+    projectMembersMessage,
+    refreshProjectMembers,
+    removeProjectMember,
+    updateProjectMemberRole,
+  } = useProjectMembers(auth, selectedWorkspaceId, selectedProjectId);
   const { clearSearch, openSearchResult, searchQuery, searchResults, searchStatus, searchWorkspace, setSearchQuery } =
     useWorkspaceSearch({ auth, chooseProject, chooseTask, selectedWorkspaceId, setMessage });
   const realtimeStatus = useRealtime({
@@ -154,11 +172,12 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
   async function handleRealtimeEvent(event: RealtimeDomainEvent) {
     if (!auth?.accessToken || !selectedWorkspaceId) return;
     const selectedProjectWasDeleted = event.eventType === "ProjectDeleted" && event.projectId === selectedProjectId;
+    const selectedProjectMembershipChanged = realtimeEventTouchesProjectMembers(event, selectedProjectId);
     const refreshes: Promise<void>[] = [
       loadNotifications(auth.accessToken, selectedWorkspaceId, notificationFilter),
       loadMyWork(auth.accessToken, selectedWorkspaceId, myWorkStatusFilter, myWorkDueFilter),
     ];
-    if (!selectedProjectWasDeleted) {
+    if (!selectedProjectWasDeleted && !selectedProjectMembershipChanged) {
       refreshes.push(loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId));
     }
 
@@ -168,6 +187,10 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
 
     if (realtimeEventTouchesProject(event, selectedProjectId)) {
       refreshes.push(loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId));
+    }
+
+    if (realtimeEventTouchesProjectMembers(event, selectedProjectId)) {
+      refreshes.push(refreshProjectMembers());
     }
 
     if (realtimeEventTouchesTask(event, selectedTaskId)) {
@@ -191,6 +214,7 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
       setSelectedProjectId("");
       setSelectedTaskId("");
       clearBoardState();
+      clearProjectMemberState();
       clearTaskDetailState();
       clearActivity();
       if (projectPage.items[0]) await chooseProject(accessToken, workspaceId, projectPage.items[0].id);
@@ -208,6 +232,7 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
   function clearProjectState() {
     setProjects([]);
     clearBoardState();
+    clearProjectMemberState();
   }
 
   function clearTaskDetailState() {
@@ -236,6 +261,7 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
         clearSearch();
         clearActivity();
         clearWorkspaceAdminState();
+        clearProjectMemberState();
         clearOutboxState();
       }
     } catch (error) {
@@ -297,6 +323,7 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
     clearProjectState();
     clearTaskDetailState();
     clearWorkspaceAdminState();
+    clearProjectMemberState();
     clearOutboxState();
     clearMyWork();
     clearSearch();
@@ -322,6 +349,7 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
       clearTaskDetailState();
       setSelectedProjectId("");
       setSelectedTaskId("");
+      clearProjectMemberState();
       setMessage(errorMessage(error));
     }
   }
@@ -400,6 +428,7 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
         setSelectedProjectId("");
         setSelectedTaskId("");
         clearBoardState();
+        clearProjectMemberState();
         clearTaskDetailState();
         clearActivity();
         if (remainingProjects[0]) await chooseProject(auth.accessToken, selectedWorkspaceId, remainingProjects[0].id);
@@ -413,6 +442,7 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
     setSelectedProjectId(projectId);
     setSelectedTaskId("");
     clearBoardState();
+    clearProjectMemberState();
     clearTaskDetailState();
     clearActivity();
     if (activityScope === "task") setActivityScope("project");
@@ -430,6 +460,7 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
     const [sectionPage, taskPage] = await Promise.all([
       api<Page<Section>>(`/workspaces/${workspaceId}/projects/${projectId}/sections`, {}, accessToken),
       api<Page<Task>>(`/workspaces/${workspaceId}/projects/${projectId}/tasks`, {}, accessToken),
+      loadProjectMembers(accessToken, workspaceId, projectId),
     ]);
     setSections(sectionPage.items);
     setTasks(taskPage.items);
@@ -1200,6 +1231,18 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
           onUpdateMemberRole={updateWorkspaceMemberRole}
           statusMessage={workspaceAdminMessage}
           workspace={selectedWorkspace}
+        />
+
+        <ProjectMembersPanel
+          currentUserId={user?.id}
+          members={projectMembers}
+          onAddMember={addProjectMember}
+          onRefresh={refreshProjectMembers}
+          onRemoveMember={removeProjectMember}
+          onUpdateMemberRole={updateProjectMemberRole}
+          project={selectedProject}
+          statusMessage={projectMembersMessage}
+          workspaceMembers={workspaceMembers}
         />
 
         <OutboxPanel

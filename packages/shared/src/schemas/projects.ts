@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { projectVisibilitySchema } from "../domain.js";
+import { projectRoleSchema, projectVisibilitySchema } from "../domain.js";
 
 export const createProjectRequestSchema = z.object({
   description: z.string().max(4000).optional(),
@@ -10,5 +10,16 @@ export const createProjectRequestSchema = z.object({
 
 export const updateProjectRequestSchema = createProjectRequestSchema.partial();
 
+export const addProjectMemberRequestSchema = z.object({
+  role: projectRoleSchema.default("EDITOR"),
+  userId: z.string().uuid(),
+});
+
+export const updateProjectMemberRequestSchema = z.object({
+  role: projectRoleSchema,
+});
+
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
+export type AddProjectMemberRequest = z.infer<typeof addProjectMemberRequestSchema>;
+export type UpdateProjectMemberRequest = z.infer<typeof updateProjectMemberRequestSchema>;

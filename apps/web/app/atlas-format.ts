@@ -30,6 +30,10 @@ export function workspaceRoleLabel(value: string) {
   return value.replace(/_/g, " ").toLowerCase();
 }
 
+export function projectRoleLabel(value: string) {
+  return value.replace(/_/g, " ").toLowerCase();
+}
+
 export function invitationStatus(invitation: {
   acceptedAt?: string | null;
   canceledAt?: string | null;

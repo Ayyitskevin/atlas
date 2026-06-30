@@ -4,6 +4,7 @@ import {
   parseRealtimeMessage,
   realtimeEventTouchesProject,
   realtimeEventTouchesProjectList,
+  realtimeEventTouchesProjectMembers,
   realtimeEventTouchesTask,
   realtimeReconnectDelay,
   realtimeSubscriptions,
@@ -86,7 +87,10 @@ describe("realtime utilities", () => {
     expect(realtimeEventTouchesProject(taskEvent, "project-1")).toBe(true);
     expect(realtimeEventTouchesProject(commentEvent, "project-1")).toBe(false);
     expect(realtimeEventTouchesProjectList({ eventType: "ProjectUpdated", projectId: "project-1", taskId: null } as RealtimeDomainEvent)).toBe(true);
+    expect(realtimeEventTouchesProjectList({ eventType: "ProjectMemberAdded", projectId: "project-1", taskId: null } as RealtimeDomainEvent)).toBe(true);
     expect(realtimeEventTouchesProjectList(taskEvent)).toBe(false);
+    expect(realtimeEventTouchesProjectMembers({ eventType: "ProjectMemberUpdated", projectId: "project-1", taskId: null } as RealtimeDomainEvent, "project-1")).toBe(true);
+    expect(realtimeEventTouchesProjectMembers({ eventType: "ProjectMemberUpdated", projectId: "project-2", taskId: null } as RealtimeDomainEvent, "project-1")).toBe(false);
     expect(realtimeEventTouchesTask(commentEvent, "task-1")).toBe(true);
     expect(realtimeEventTouchesTask(commentEvent, "task-2")).toBe(false);
   });

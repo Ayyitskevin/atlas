@@ -24,7 +24,17 @@ export type Project = {
   visibility: ProjectVisibility;
 };
 
+export type ProjectRole = "COMMENTER" | "EDITOR" | "PROJECT_ADMIN" | "VIEWER";
 export type ProjectVisibility = "PRIVATE" | "WORKSPACE";
+
+export type ProjectMember = {
+  createdAt?: string;
+  id: string;
+  projectId: string;
+  role: ProjectRole;
+  user: User;
+  userId: string;
+};
 
 export type Section = {
   id: string;

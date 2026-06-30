@@ -200,6 +200,10 @@ Base path: `/api/v1`.
 - `PATCH /workspaces/:workspaceId/projects/:projectId`
 - `POST /workspaces/:workspaceId/projects/:projectId/archive`
 - `DELETE /workspaces/:workspaceId/projects/:projectId`
+- `GET /workspaces/:workspaceId/projects/:projectId/members`
+- `POST /workspaces/:workspaceId/projects/:projectId/members`
+- `PATCH /workspaces/:workspaceId/projects/:projectId/members/:userId`
+- `DELETE /workspaces/:workspaceId/projects/:projectId/members/:userId`
 
 ### Sections
 
@@ -334,6 +338,9 @@ Initial domain event types:
 - `ProjectUpdated`
 - `ProjectArchived`
 - `ProjectDeleted`
+- `ProjectMemberAdded`
+- `ProjectMemberUpdated`
+- `ProjectMemberRemoved`
 - `SectionCreated`
 - `SectionsReordered`
 - `TaskCreated`

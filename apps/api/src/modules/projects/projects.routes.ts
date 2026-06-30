@@ -1,7 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
-import { createProjectRequestSchema, cursorPaginationQuerySchema, updateProjectRequestSchema } from "@atlas/shared";
+import {
+  addProjectMemberRequestSchema,
+  createProjectRequestSchema,
+  cursorPaginationQuerySchema,
+  updateProjectMemberRequestSchema,
+  updateProjectRequestSchema,
+} from "@atlas/shared";
 import { prisma } from "@atlas/db";
 
 import { openApiSchema } from "../../shared/zod-openapi.js";
@@ -13,6 +19,7 @@ import { ProjectsService } from "./projects.service.js";
 
 const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
 const projectParamsSchema = workspaceParamsSchema.extend({ projectId: z.string().uuid() });
+const projectMemberParamsSchema = projectParamsSchema.extend({ userId: z.string().uuid() });
 
 export async function registerProjectRoutes(app: FastifyInstance): Promise<void> {
   const controller = new ProjectsController(
@@ -48,5 +55,25 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     "/workspaces/:workspaceId/projects/:projectId",
     { schema: openApiSchema({ params: projectParamsSchema, tags: ["Projects"] }) },
     controller.delete,
+  );
+  app.get(
+    "/workspaces/:workspaceId/projects/:projectId/members",
+    { schema: openApiSchema({ params: projectParamsSchema, tags: ["Projects"] }) },
+    controller.listMembers,
+  );
+  app.post(
+    "/workspaces/:workspaceId/projects/:projectId/members",
+    { schema: openApiSchema({ body: addProjectMemberRequestSchema, params: projectParamsSchema, tags: ["Projects"] }) },
+    controller.addMember,
+  );
+  app.patch(
+    "/workspaces/:workspaceId/projects/:projectId/members/:userId",
+    { schema: openApiSchema({ body: updateProjectMemberRequestSchema, params: projectMemberParamsSchema, tags: ["Projects"] }) },
+    controller.updateMember,
+  );
+  app.delete(
+    "/workspaces/:workspaceId/projects/:projectId/members/:userId",
+    { schema: openApiSchema({ params: projectMemberParamsSchema, tags: ["Projects"] }) },
+    controller.removeMember,
   );
 }

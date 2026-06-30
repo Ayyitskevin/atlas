@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { dateInputValue, formatBytes, formatEventType, invitationStatus, taskStatusLabel, workspaceRoleLabel } from "./atlas-format";
+import { dateInputValue, formatBytes, formatEventType, invitationStatus, projectRoleLabel, taskStatusLabel, workspaceRoleLabel } from "./atlas-format";
 
 describe("atlas format helpers", () => {
   it("formats byte counts for attachment metadata", () => {
@@ -12,7 +12,8 @@ describe("atlas format helpers", () => {
   it("formats event and status labels", () => {
     expect(formatEventType("TaskCompleted")).toBe("Task Completed");
     expect(taskStatusLabel("IN_PROGRESS")).toBe("in progress");
-    expect(workspaceRoleLabel("PROJECT_ADMIN")).toBe("project admin");
+    expect(workspaceRoleLabel("OWNER")).toBe("owner");
+    expect(projectRoleLabel("PROJECT_ADMIN")).toBe("project admin");
   });
 
   it("derives invitation status from lifecycle timestamps", () => {

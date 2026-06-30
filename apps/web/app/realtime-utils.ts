@@ -35,7 +35,17 @@ const projectRefreshEvents = new Set([
   "TaskUpdated",
 ]);
 
-const projectListRefreshEvents = new Set(["ProjectArchived", "ProjectCreated", "ProjectDeleted", "ProjectUpdated"]);
+const projectMemberRefreshEvents = new Set(["ProjectMemberAdded", "ProjectMemberRemoved", "ProjectMemberUpdated"]);
+
+const projectListRefreshEvents = new Set([
+  "ProjectArchived",
+  "ProjectCreated",
+  "ProjectDeleted",
+  "ProjectMemberAdded",
+  "ProjectMemberRemoved",
+  "ProjectMemberUpdated",
+  "ProjectUpdated",
+]);
 
 export function parseRealtimeMessage(raw: string): RealtimeMessage {
   let data: unknown;
@@ -104,6 +114,10 @@ export function realtimeEventTouchesProject(event: RealtimeDomainEvent, selected
 
 export function realtimeEventTouchesProjectList(event: RealtimeDomainEvent) {
   return projectListRefreshEvents.has(event.eventType);
+}
+
+export function realtimeEventTouchesProjectMembers(event: RealtimeDomainEvent, selectedProjectId: string) {
+  return Boolean(selectedProjectId && event.projectId === selectedProjectId && projectMemberRefreshEvents.has(event.eventType));
 }
 
 export function realtimeEventTouchesTask(event: RealtimeDomainEvent, selectedTaskId: string) {
