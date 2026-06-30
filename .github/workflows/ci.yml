@@ -49,6 +49,7 @@ jobs:
       - run: pnpm --filter @atlas/db exec prisma generate --schema prisma/schema.prisma
       - run: pnpm lint
       - run: pnpm typecheck
+      - run: pnpm build
       - run: pnpm test
       - run: pnpm --filter @atlas/db exec prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script
 

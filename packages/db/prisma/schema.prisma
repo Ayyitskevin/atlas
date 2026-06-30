@@ -354,22 +354,39 @@ model ActivityEvent {
 }
 
 model DomainEventOutbox {
-  id            String    @id @default(uuid()) @db.Uuid
-  eventId       String    @unique @map("event_id") @db.Uuid
-  eventType     String    @map("event_type")
+  id            String                      @id @default(uuid()) @db.Uuid
+  eventId       String                      @unique @map("event_id") @db.Uuid
+  eventType     String                      @map("event_type")
   payload       Json
-  attempts      Int       @default(0)
-  nextAttemptAt DateTime? @map("next_attempt_at") @db.Timestamptz(6)
-  lockedAt      DateTime? @map("locked_at") @db.Timestamptz(6)
-  processedAt   DateTime? @map("processed_at") @db.Timestamptz(6)
-  failedAt      DateTime? @map("failed_at") @db.Timestamptz(6)
-  lastError     String?   @map("last_error")
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  attempts      Int                         @default(0)
+  nextAttemptAt DateTime?                   @map("next_attempt_at") @db.Timestamptz(6)
+  lockedAt      DateTime?                   @map("locked_at") @db.Timestamptz(6)
+  processedAt   DateTime?                   @map("processed_at") @db.Timestamptz(6)
+  failedAt      DateTime?                   @map("failed_at") @db.Timestamptz(6)
+  lastError     String?                     @map("last_error")
+  createdAt     DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(6)
+  attemptsLog   DomainEventOutboxAttempt[]
 
   @@index([processedAt, failedAt, nextAttemptAt])
   @@index([eventType])
   @@map("domain_event_outbox")
+}
+
+model DomainEventOutboxAttempt {
+  id            String            @id @default(uuid()) @db.Uuid
+  outboxEventId String            @map("outbox_event_id") @db.Uuid
+  attemptNumber Int               @map("attempt_number")
+  status        String
+  startedAt     DateTime          @map("started_at") @db.Timestamptz(6)
+  finishedAt    DateTime          @map("finished_at") @db.Timestamptz(6)
+  error         String?
+  createdAt     DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  outboxEvent   DomainEventOutbox @relation(fields: [outboxEventId], references: [id], onDelete: Cascade)
+
+  @@unique([outboxEventId, attemptNumber])
+  @@index([outboxEventId, createdAt])
+  @@map("domain_event_outbox_attempts")
 }
 
 model Notification {

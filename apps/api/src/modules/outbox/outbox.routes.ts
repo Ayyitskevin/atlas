@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
 import { prisma } from "@atlas/db";
-import { outboxQuerySchema, replayOutboxEventResponseSchema } from "@atlas/shared";
+import { outboxEventDetailResponseSchema, outboxQuerySchema, replayOutboxEventResponseSchema } from "@atlas/shared";
 
 import { openApiSchema } from "../../shared/zod-openapi.js";
 import { PermissionsService } from "../permissions/permissions.service.js";
@@ -17,5 +17,6 @@ export async function registerOutboxRoutes(app: FastifyInstance): Promise<void> 
   const controller = new OutboxController(new OutboxService(new OutboxRepository(prisma), new PermissionsService(prisma)));
 
   app.get("/workspaces/:workspaceId/outbox", { schema: openApiSchema({ params: workspaceParamsSchema, querystring: outboxQuerySchema, tags: ["Outbox"] }) }, controller.list);
+  app.get("/workspaces/:workspaceId/outbox/:outboxEventId", { schema: openApiSchema({ params: outboxParamsSchema, response: { 200: outboxEventDetailResponseSchema }, tags: ["Outbox"] }) }, controller.get);
   app.post("/workspaces/:workspaceId/outbox/:outboxEventId/replay", { schema: openApiSchema({ params: outboxParamsSchema, response: { 200: replayOutboxEventResponseSchema }, tags: ["Outbox"] }) }, controller.replay);
 }

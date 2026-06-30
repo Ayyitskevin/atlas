@@ -9,10 +9,10 @@ The current phase is deliberately foundation-first: production-minded domain bou
 - Email/password auth with JWT access tokens, refresh rotation, live session checks, logout, and session revocation.
 - Multi-tenant Workspaces with member roles, invitations, role updates, member removal, and owner transfer.
 - Projects with workspace/private visibility, Sections, Tasks, one-level Subtasks, assignees, status, priority, due dates, ordering, and optimistic version checks.
-- Task comments, activity events, in-app notifications, and basic workspace search.
+- Task comments, scoped activity feeds, in-app notifications with a web inbox, and workspace search in the web shell.
 - Realtime WebSocket broadcasts for task/comment/activity mutations.
 - Durable domain event outbox feeding BullMQ workers for notification fanout, search indexing hooks, and email stubs.
-- Workspace-admin outbox inspection and failed-event replay endpoints.
+- Workspace-admin outbox inspection/detail, dispatch attempt history, and failed-event replay endpoints.
 - Task attachment metadata with S3-compatible signed upload/download URLs and local MinIO support.
 - Docker Compose local stack and Terraform scaffolding for staging-oriented infrastructure.
 
@@ -110,7 +110,7 @@ corepack pnpm typecheck
 corepack pnpm test
 ```
 
-GitHub Actions also runs Prisma generation, lint, typecheck, tests, migration diff checks, and a Docker Compose API smoke test on pushes to `main` and pull requests.
+GitHub Actions also runs Prisma generation, lint, typecheck, build, tests, migration diff checks, and a Docker Compose API smoke test on pushes to `main` and pull requests.
 
 ## Project Direction
 

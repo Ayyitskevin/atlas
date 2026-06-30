@@ -18,6 +18,11 @@ export class OutboxController {
     return this.outboxService.list(await requireAuth(request), workspaceId, parseQuery(request, outboxQuerySchema));
   };
 
+  get = async (request: FastifyRequest) => {
+    const { outboxEventId, workspaceId } = parseParams(request, outboxParamsSchema);
+    return this.outboxService.get(await requireAuth(request), workspaceId, outboxEventId);
+  };
+
   replay = async (request: FastifyRequest) => {
     const { outboxEventId, workspaceId } = parseParams(request, outboxParamsSchema);
     return this.outboxService.replay(await requireAuth(request), workspaceId, outboxEventId);
