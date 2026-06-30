@@ -11,7 +11,9 @@ export const outboxQuerySchema = cursorPaginationQuerySchema.extend({
 
 export const outboxEventResponseSchema = z.object({
   attempts: z.number().int().nonnegative(),
+  canReplay: z.boolean(),
   createdAt: z.string().datetime(),
+  deadLettered: z.boolean(),
   eventId: z.string().uuid(),
   eventType: z.string(),
   failedAt: z.string().datetime().nullable(),
@@ -25,6 +27,18 @@ export const outboxEventResponseSchema = z.object({
   workspaceId: z.string().uuid().nullable(),
 });
 
+export const outboxAttemptStatusSchema = z.enum(["succeeded", "failed"]);
+
+export const outboxAttemptResponseSchema = z.object({
+  attemptNumber: z.number().int().positive(),
+  createdAt: z.string().datetime(),
+  error: z.string().nullable(),
+  finishedAt: z.string().datetime(),
+  id: z.string().uuid(),
+  startedAt: z.string().datetime(),
+  status: outboxAttemptStatusSchema,
+});
+
 export const outboxEventContextSchema = z.object({
   actorUserId: z.string().uuid().nullable(),
   entityId: z.string().uuid().nullable(),
@@ -36,8 +50,9 @@ export const outboxEventContextSchema = z.object({
 });
 
 export const outboxEventDetailResponseSchema = outboxEventResponseSchema.extend({
+  attemptHistory: outboxAttemptResponseSchema.array(),
   context: outboxEventContextSchema,
-  payload: z.unknown(),
+  payload: z.record(z.unknown()),
 });
 
 export const replayOutboxEventResponseSchema = z.object({

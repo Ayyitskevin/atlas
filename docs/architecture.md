@@ -251,10 +251,10 @@ Base path: `/api/v1`.
 
 - `GET /workspaces/:workspaceId/search?q=...&type=task,project`
 
-### Outbox Ops
+### Outbox Admin
 
-- `GET /workspaces/:workspaceId/outbox`
-- `GET /workspaces/:workspaceId/outbox/:outboxEventId`
+- `GET /workspaces/:workspaceId/outbox?status=failed|pending|processed|locked|all`
+- `GET /workspaces/:workspaceId/outbox/:outboxEventId` returns raw payload, operator context, replay state, and recent dispatch attempt history
 - `POST /workspaces/:workspaceId/outbox/:outboxEventId/replay`
 
 All list endpoints use cursor pagination:

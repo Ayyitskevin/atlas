@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 
 import type { DomainEventOutbox } from "@atlas/db";
 
-import type { OutboxRepository } from "../../src/modules/outbox/outbox.repository.js";
+import type { OutboxEventDetail, OutboxRepository } from "../../src/modules/outbox/outbox.repository.js";
 import { OutboxService } from "../../src/modules/outbox/outbox.service.js";
 import type { PermissionsService } from "../../src/modules/permissions/permissions.service.js";
 import type { AuthContext } from "../../src/shared/auth-context.js";
@@ -53,6 +53,7 @@ describe("OutboxService", () => {
         payload: { source: "unit-test" },
         workspaceId,
       },
+      attemptHistory: [],
       status: "failed",
       workspaceId,
     });
@@ -87,13 +88,15 @@ describe("OutboxService", () => {
         actorUserId: "not-a-uuid",
         workspaceId,
       },
+      attemptHistory: [],
     });
   });
 });
 
-function serviceFor(event: DomainEventOutbox): OutboxService {
+function serviceFor(event: OutboxEventDetail): OutboxService {
   return new OutboxService(
     {
+      findDetailById: async () => event,
       findById: async () => event,
       list: async () => [event],
       replayFailed: async () => event,
@@ -104,9 +107,10 @@ function serviceFor(event: DomainEventOutbox): OutboxService {
   );
 }
 
-function outboxEvent(input: { payload: DomainEventOutbox["payload"] }): DomainEventOutbox {
+function outboxEvent(input: { payload: DomainEventOutbox["payload"] }): OutboxEventDetail {
   const now = new Date();
   return {
+    attemptsLog: [],
     attempts: 10,
     createdAt: now,
     eventId: randomUUID(),

@@ -61,3 +61,7 @@ export async function enqueueDomainSideEffects(event: MutationEventJob): Promise
     emailStubQueue.add(event.eventType, event),
   ]);
 }
+
+export async function closeDomainSideEffectQueues(): Promise<void> {
+  await Promise.all([notificationFanoutQueue.close(), searchIndexQueue.close(), emailStubQueue.close()]);
+}

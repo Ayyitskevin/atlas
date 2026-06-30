@@ -8,6 +8,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { prisma } from "@atlas/db";
 
 import { buildApp } from "../../src/app.js";
+import { dispatchOutboxEvent } from "../../src/jobs/outbox.js";
+import { closeDomainSideEffectQueues } from "../../src/jobs/queues.js";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 
@@ -36,6 +38,7 @@ describe("API integration flow", () => {
 
   afterAll(async () => {
     if (app) await app.close();
+    await closeDomainSideEffectQueues();
     await prisma.$disconnect();
   });
 
@@ -131,8 +134,158 @@ describe("API integration flow", () => {
     });
     expect(deleteAttachment.statusCode).toBe(200);
 
+    const attachmentsAfterDelete = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/attachments",
+    });
+    expect(attachmentsAfterDelete.statusCode).toBe(200);
+    expect(attachmentsAfterDelete.json<{ items: Array<{ id: string }> }>().items).not.toContainEqual(
+      expect.objectContaining({ id: attachmentBody.attachment.id }),
+    );
+
     const outboxAfter = await prisma.domainEventOutbox.count();
     expect(outboxAfter).toBeGreaterThan(outboxBefore);
+  }, 60_000);
+
+  it("updates task details, assignments, subtasks, and comments", async () => {
+    const currentUser = await prisma.user.findUniqueOrThrow({ where: { email } });
+
+    const currentTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId,
+    });
+    expect(currentTask.statusCode).toBe(200);
+    const currentTaskBody = currentTask.json<{ version: number }>();
+
+    const updateTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: {
+        description: "Updated from the detail panel contract.",
+        dueDate: "2026-07-02",
+        priority: "HIGH",
+        status: "IN_PROGRESS",
+        title: "Updated integration task",
+        version: currentTaskBody.version,
+      },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId,
+    });
+    expect(updateTask.statusCode).toBe(200);
+    const updateTaskBody = updateTask.json<{ description: string; dueDate: string | null; priority: string; status: string; title: string; version: number }>();
+    expect(updateTaskBody).toMatchObject({
+      description: "Updated from the detail panel contract.",
+      priority: "HIGH",
+      status: "IN_PROGRESS",
+      title: "Updated integration task",
+    });
+    expect(updateTaskBody.dueDate?.startsWith("2026-07-02")).toBe(true);
+    expect(updateTaskBody.version).toBe(currentTaskBody.version + 1);
+
+    const completeTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/complete",
+    });
+    expect(completeTask.statusCode).toBe(200);
+    expect(completeTask.json<{ status: string }>().status).toBe("DONE");
+
+    const assignTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { userId: currentUser.id },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/assign",
+    });
+    expect(assignTask.statusCode).toBe(200);
+
+    const assignedTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId,
+    });
+    expect(assignedTask.statusCode).toBe(200);
+    expect(assignedTask.json<{ assignees: Array<{ userId: string }> }>().assignees).toContainEqual(
+      expect.objectContaining({ userId: currentUser.id }),
+    );
+
+    const unassignTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { userId: currentUser.id },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/unassign",
+    });
+    expect(unassignTask.statusCode).toBe(200);
+
+    const createSubtask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { title: "Detail panel subtask" },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/subtasks",
+    });
+    expect(createSubtask.statusCode).toBe(201);
+    const subtaskBody = createSubtask.json<{ id: string; version: number }>();
+
+    const updateSubtask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: { status: "DONE", version: subtaskBody.version },
+      url: "/api/v1/workspaces/" + workspaceId + "/subtasks/" + subtaskBody.id,
+    });
+    expect(updateSubtask.statusCode).toBe(200);
+    expect(updateSubtask.json<{ status: string }>().status).toBe("DONE");
+
+    const deleteSubtask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/subtasks/" + subtaskBody.id,
+    });
+    expect(deleteSubtask.statusCode).toBe(200);
+
+    const subtasksAfterDelete = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/subtasks",
+    });
+    expect(subtasksAfterDelete.statusCode).toBe(200);
+    expect(subtasksAfterDelete.json<{ items: Array<{ id: string }> }>().items).not.toContainEqual(
+      expect.objectContaining({ id: subtaskBody.id }),
+    );
+
+    const detailComment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { body: "Detail comment" },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/comments",
+    });
+    expect(detailComment.statusCode).toBe(201);
+    const detailCommentBody = detailComment.json<{ id: string }>();
+
+    const updateComment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: { body: "Edited detail comment" },
+      url: "/api/v1/workspaces/" + workspaceId + "/comments/" + detailCommentBody.id,
+    });
+    expect(updateComment.statusCode).toBe(200);
+    expect(updateComment.json<{ body: string; editedAt: string | null }>()).toMatchObject({ body: "Edited detail comment" });
+
+    const deleteComment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/comments/" + detailCommentBody.id,
+    });
+    expect(deleteComment.statusCode).toBe(200);
+
+    const commentsAfterDelete = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/comments",
+    });
+    expect(commentsAfterDelete.statusCode).toBe(200);
+    expect(commentsAfterDelete.json<{ items: Array<{ id: string }> }>().items).not.toContainEqual(
+      expect.objectContaining({ id: detailCommentBody.id }),
+    );
   }, 60_000);
 
   it("invalidates access tokens after logout", async () => {
@@ -205,6 +358,77 @@ describe("API integration flow", () => {
       url: "/api/v1/auth/refresh",
     });
     expect(revokedRefresh.statusCode).toBe(401);
+  });
+
+  it("lists and marks notifications read", async () => {
+    const currentUser = await prisma.user.findUniqueOrThrow({ where: { email } });
+    const unread = await prisma.notification.create({
+      data: {
+        body: "A task needs your attention.",
+        recipientId: currentUser.id,
+        taskId,
+        title: "Task updated",
+        type: "task.updated",
+        workspaceId,
+      },
+    });
+
+    const unreadList = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/notifications?unreadOnly=true",
+    });
+    expect(unreadList.statusCode).toBe(200);
+    expect(unreadList.json<{ items: Array<{ id: string; status: string; taskId: string | null }> }>().items).toContainEqual(
+      expect.objectContaining({ id: unread.id, status: "UNREAD", taskId }),
+    );
+
+    const markRead = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/notifications/" + unread.id + "/read",
+    });
+    expect(markRead.statusCode).toBe(200);
+
+    const read = await prisma.notification.findUniqueOrThrow({ where: { id: unread.id } });
+    expect(read.status).toBe("READ");
+    expect(read.readAt).toBeInstanceOf(Date);
+
+    const secondUnread = await prisma.notification.create({
+      data: {
+        body: "Another task needs your attention.",
+        recipientId: currentUser.id,
+        taskId,
+        title: "Another task updated",
+        type: "task.updated",
+        workspaceId,
+      },
+    });
+
+    const markAllRead = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/notifications/read-all",
+    });
+    expect(markAllRead.statusCode).toBe(200);
+
+    const remainingUnread = await prisma.notification.count({
+      where: { recipientId: currentUser.id, status: "UNREAD", workspaceId },
+    });
+    expect(remainingUnread).toBe(0);
+
+    const allList = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/notifications?limit=50",
+    });
+    expect(allList.statusCode).toBe(200);
+    expect(allList.json<{ items: Array<{ id: string; status: string }> }>().items).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: unread.id, status: "READ" }),
+        expect.objectContaining({ id: secondUnread.id, status: "READ" }),
+      ]),
+    );
   });
 
   it("lists and revokes user sessions", async () => {
@@ -342,6 +566,35 @@ describe("API integration flow", () => {
     expect(listInvitations.statusCode).toBe(200);
     expect(listInvitations.json<{ items: unknown[] }>().items).toHaveLength(1);
 
+    const canceledEmail = "atlas-lifecycle-cancel-" + randomUUID() + "@example.com";
+    const canceledInvite = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { email: canceledEmail, role: "MEMBER" },
+      url: "/api/v1/workspaces/" + lifecycleWorkspaceId + "/invitations",
+    });
+    expect(canceledInvite.statusCode).toBe(201);
+
+    const cancelInvite = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url:
+        "/api/v1/workspaces/" +
+        lifecycleWorkspaceId +
+        "/invitations/" +
+        canceledInvite.json<{ id: string }>().id +
+        "/cancel",
+    });
+    expect(cancelInvite.statusCode).toBe(200);
+
+    const afterCancelInvitations = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + lifecycleWorkspaceId + "/invitations",
+    });
+    expect(afterCancelInvitations.statusCode).toBe(200);
+    expect(afterCancelInvitations.json<{ items: Array<{ email: string }> }>().items.some((item) => item.email === canceledEmail)).toBe(false);
+
     const resend = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
@@ -472,6 +725,33 @@ describe("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/projects/" + privateProjectId + "/tasks",
     });
     expect(privateTask.statusCode).toBe(201);
+    const privateTaskId = privateTask.json<{ id: string }>().id;
+
+    const ownerTaskSearch = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/search?q=" + encodeURIComponent(secretTitle) + "&type=task",
+    });
+    expect(ownerTaskSearch.statusCode).toBe(200);
+    expect(ownerTaskSearch.json<{ items: Array<{ task: { id: string; projectId: string; title: string }; type: string }> }>().items).toContainEqual(
+      expect.objectContaining({
+        task: expect.objectContaining({ id: privateTaskId, projectId: privateProjectId, title: secretTitle }),
+        type: "task",
+      }),
+    );
+
+    const ownerProjectSearch = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/search?q=" + encodeURIComponent("Private Integration Project") + "&type=project",
+    });
+    expect(ownerProjectSearch.statusCode).toBe(200);
+    expect(ownerProjectSearch.json<{ items: Array<{ project: { id: string; name: string }; type: string }> }>().items).toContainEqual(
+      expect.objectContaining({
+        project: expect.objectContaining({ id: privateProjectId, name: "Private Integration Project" }),
+        type: "project",
+      }),
+    );
 
     const memberSearch = await app!.inject({
       headers: authHeaders(memberAccessToken),
@@ -501,7 +781,83 @@ describe("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/projects/" + privateProjectId + "/activity",
     });
     expect(ownerPrivateActivity.statusCode).toBe(200);
+    expect(ownerPrivateActivity.json<{ items: Array<{ eventType: string; projectId: string | null; taskId: string | null }> }>().items).toContainEqual(
+      expect.objectContaining({ eventType: "TaskCreated", projectId: privateProjectId, taskId: privateTaskId }),
+    );
+
+    const ownerTaskActivity = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + privateTaskId + "/activity",
+    });
+    expect(ownerTaskActivity.statusCode).toBe(200);
+    expect(ownerTaskActivity.json<{ items: Array<{ eventType: string; projectId: string | null; taskId: string | null }> }>().items).toContainEqual(
+      expect.objectContaining({ eventType: "TaskCreated", projectId: privateProjectId, taskId: privateTaskId }),
+    );
   }, 60_000);
+
+  it("records outbox dispatch attempt history", async () => {
+    const successEventId = randomUUID();
+    const success = await prisma.domainEventOutbox.create({
+      data: {
+        eventId: successEventId,
+        eventType: "TaskUpdated",
+        payload: {
+          actorUserId: "00000000-0000-0000-0000-000000000001",
+          entityId: taskId,
+          entityType: "task",
+          eventId: successEventId,
+          eventType: "TaskUpdated",
+          projectId,
+          taskId,
+          workspaceId,
+        },
+      },
+    });
+
+    await dispatchOutboxEvent(success, async () => undefined);
+
+    const processed = await prisma.domainEventOutbox.findUniqueOrThrow({
+      include: { attemptsLog: { orderBy: { attemptNumber: "asc" } } },
+      where: { id: success.id },
+    });
+    expect(processed.processedAt).toBeInstanceOf(Date);
+    expect(processed.attemptsLog).toHaveLength(1);
+    expect(processed.attemptsLog[0]).toMatchObject({ attemptNumber: 1, error: null, status: "succeeded" });
+
+    const failedEventId = randomUUID();
+    const failed = await prisma.domainEventOutbox.create({
+      data: {
+        eventId: failedEventId,
+        eventType: "TaskUpdated",
+        payload: {
+          actorUserId: "00000000-0000-0000-0000-000000000001",
+          entityId: taskId,
+          entityType: "task",
+          eventId: failedEventId,
+          eventType: "TaskUpdated",
+          projectId,
+          taskId,
+          workspaceId,
+        },
+      },
+    });
+
+    await dispatchOutboxEvent(failed, async () => {
+      throw new Error("Queue unavailable");
+    });
+
+    const failedAttempt = await prisma.domainEventOutbox.findUniqueOrThrow({
+      include: { attemptsLog: { orderBy: { attemptNumber: "asc" } } },
+      where: { id: failed.id },
+    });
+    expect(failedAttempt.attempts).toBe(1);
+    expect(failedAttempt.failedAt).toBeNull();
+    expect(failedAttempt.lastError).toBe("Queue unavailable");
+    expect(failedAttempt.nextAttemptAt).toBeInstanceOf(Date);
+    expect(failedAttempt.attemptsLog).toHaveLength(1);
+    expect(failedAttempt.attemptsLog[0]).toMatchObject({ attemptNumber: 1, error: "Queue unavailable", status: "failed" });
+  });
 
   it("lets workspace admins inspect and replay failed outbox events", async () => {
     const eventId = randomUUID();
@@ -529,6 +885,18 @@ describe("API integration flow", () => {
       },
     });
 
+    const failedAttemptStartedAt = new Date(Date.now() - 1000);
+    await prisma.domainEventOutboxAttempt.create({
+      data: {
+        attemptNumber: 10,
+        error: "Queue unavailable",
+        finishedAt: new Date(),
+        outboxEventId: failed.id,
+        startedAt: failedAttemptStartedAt,
+        status: "failed",
+      },
+    });
+
     const memberList = await app!.inject({
       headers: authHeaders(memberAccessToken),
       method: "GET",
@@ -549,8 +917,8 @@ describe("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/outbox?status=failed",
     });
     expect(list.statusCode).toBe(200);
-    expect(list.json<{ items: Array<{ id: string; lastError: string | null; status: string }> }>().items).toContainEqual(
-      expect.objectContaining({ id: failed.id, lastError: "Queue unavailable", status: "failed" }),
+    expect(list.json<{ items: Array<{ canReplay: boolean; deadLettered: boolean; id: string; lastError: string | null; status: string }> }>().items).toContainEqual(
+      expect.objectContaining({ canReplay: true, deadLettered: true, id: failed.id, lastError: "Queue unavailable", status: "failed" }),
     );
 
     const detail = await app!.inject({
@@ -561,10 +929,23 @@ describe("API integration flow", () => {
     expect(detail.statusCode).toBe(200);
     expect(
       detail.json<{
-        context: { entityId: string | null; entityType: string | null; occurredAt: string | null; projectId: string | null; taskId: string | null; version: number | null };
-        payload: { payload?: { source?: string }; workspaceId?: string };
+        attemptHistory: Array<{ attemptNumber: number; error: string | null; status: string }>;
+        canReplay: boolean;
+        context: {
+          entityId: string | null;
+          entityType: string | null;
+          occurredAt: string | null;
+          projectId: string | null;
+          taskId: string | null;
+          version: number | null;
+        };
+        deadLettered: boolean;
+        id: string;
+        payload: { payload?: { source?: string }; taskId?: string; workspaceId?: string };
       }>(),
     ).toMatchObject({
+      attemptHistory: [expect.objectContaining({ attemptNumber: 10, error: "Queue unavailable", status: "failed" })],
+      canReplay: true,
       context: {
         entityId: taskId,
         entityType: "task",
@@ -573,8 +954,11 @@ describe("API integration flow", () => {
         taskId,
         version: 3,
       },
+      deadLettered: true,
+      id: failed.id,
       payload: {
         payload: { source: "integration-test" },
+        taskId,
         workspaceId,
       },
     });
@@ -585,16 +969,21 @@ describe("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/outbox/" + failed.id + "/replay",
     });
     expect(replay.statusCode).toBe(200);
-    expect(replay.json<{ event: { attempts: number; failedAt: string | null; status: string }; replayQueued: boolean }>()).toMatchObject({
-      event: { attempts: 0, failedAt: null, status: "pending" },
+    expect(replay.json<{ event: { attempts: number; canReplay: boolean; deadLettered: boolean; failedAt: string | null; status: string }; replayQueued: boolean }>()).toMatchObject({
+      event: { attempts: 0, canReplay: false, deadLettered: false, failedAt: null, status: "pending" },
       replayQueued: true,
     });
 
-    const replayed = await prisma.domainEventOutbox.findUniqueOrThrow({ where: { id: failed.id } });
+    const replayed = await prisma.domainEventOutbox.findUniqueOrThrow({
+      include: { attemptsLog: { orderBy: { attemptNumber: "desc" } } },
+      where: { id: failed.id },
+    });
     expect(replayed.attempts).toBe(0);
     expect(replayed.failedAt).toBeNull();
     expect(replayed.lastError).toBeNull();
     expect(replayed.nextAttemptAt).toBeInstanceOf(Date);
+    expect(replayed.attemptsLog).toHaveLength(1);
+    expect(replayed.attemptsLog[0]).toMatchObject({ attemptNumber: 10, status: "failed" });
   });
 });
 

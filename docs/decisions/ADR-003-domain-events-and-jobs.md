@@ -33,4 +33,4 @@ The event model gives Atlas an auditable mutation trail and lets notifications, 
 - Mutation services must produce events consistently.
 - Tests need to verify both state changes and emitted events for critical paths.
 - Some read models, especially search and notifications, are eventually consistent.
-- Dead-letter inspection and replay tooling are deferred but the queue topology must support them from day one.
+- Workspace-admin dead-letter inspection, recent dispatch attempt history, and failed-event replay are part of the foundation; deeper per-queue delivery diagnostics can be added later.

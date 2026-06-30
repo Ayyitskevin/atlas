@@ -1,4 +1,4 @@
-import type { DomainEventOutbox, Prisma, PrismaClient } from "@atlas/db";
+import type { DomainEventOutbox, DomainEventOutboxAttempt, Prisma, PrismaClient } from "@atlas/db";
 
 import { paginationArgs } from "../../shared/pagination.js";
 
@@ -21,6 +21,21 @@ export class OutboxRepository {
 
   findById(workspaceId: string, outboxEventId: string) {
     return this.prisma.domainEventOutbox.findFirst({
+      where: {
+        id: outboxEventId,
+        ...this.workspaceWhere(workspaceId),
+      },
+    });
+  }
+
+  findDetailById(workspaceId: string, outboxEventId: string) {
+    return this.prisma.domainEventOutbox.findFirst({
+      include: {
+        attemptsLog: {
+          orderBy: { attemptNumber: "desc" },
+          take: 10,
+        },
+      },
       where: {
         id: outboxEventId,
         ...this.workspaceWhere(workspaceId),
@@ -74,6 +89,8 @@ export class OutboxRepository {
     };
   }
 }
+
+export type OutboxEventDetail = DomainEventOutbox & { attemptsLog: DomainEventOutboxAttempt[] };
 
 export function outboxStatus(event: DomainEventOutbox): Exclude<OutboxEventStatus, "all"> {
   if (event.processedAt) return "processed";
