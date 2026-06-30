@@ -158,6 +158,44 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     expect(outboxAfter).toBeGreaterThan(outboxBefore);
   }, 60_000);
 
+  it("records project lifecycle activity and outbox events", async () => {
+    const name = "Project Lifecycle " + randomUUID().slice(0, 8);
+    const project = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { description: "Lifecycle event coverage", name, visibility: "WORKSPACE" },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects",
+    });
+    expect(project.statusCode).toBe(201);
+    const lifecycleProjectId = project.json<{ id: string }>().id;
+    await expectProjectLifecycleEvent(workspaceId, "ProjectCreated", lifecycleProjectId, { name, visibility: "WORKSPACE" });
+
+    const update = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: { description: "Updated lifecycle event coverage", name: name + " Updated", visibility: "PRIVATE" },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + lifecycleProjectId,
+    });
+    expect(update.statusCode).toBe(200);
+    await expectProjectLifecycleEvent(workspaceId, "ProjectUpdated", lifecycleProjectId, { name: name + " Updated", visibility: "PRIVATE" });
+
+    const archive = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + lifecycleProjectId + "/archive",
+    });
+    expect(archive.statusCode).toBe(200);
+    await expectProjectLifecycleEvent(workspaceId, "ProjectArchived", lifecycleProjectId, { name: name + " Updated", visibility: "PRIVATE" });
+
+    const deleteProject = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + lifecycleProjectId,
+    });
+    expect(deleteProject.statusCode).toBe(200);
+    await expectProjectLifecycleEvent(workspaceId, "ProjectDeleted", lifecycleProjectId, { name: name + " Updated", visibility: "PRIVATE" });
+  }, 60_000);
+
   it("updates task details, assignments, subtasks, and comments", async () => {
     const currentUser = await prisma.user.findUniqueOrThrow({ where: { email } });
 
@@ -1023,4 +1061,35 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
 
 function authHeaders(accessToken: string) {
   return { authorization: "Bearer " + accessToken };
+}
+
+async function expectProjectLifecycleEvent(workspaceId: string, eventType: string, projectId: string, payload: { name: string; visibility: string }) {
+  const activity = await prisma.activityEvent.findFirst({
+    orderBy: { createdAt: "desc" },
+    where: { entityId: projectId, entityType: "project", eventType, projectId, workspaceId },
+  });
+  expect(activity).toMatchObject({
+    actorUserId: expect.any(String),
+    entityId: projectId,
+    entityType: "project",
+    eventType,
+    projectId,
+    taskId: null,
+    workspaceId,
+  });
+
+  const outbox = await prisma.domainEventOutbox.findUnique({ where: { eventId: activity!.id } });
+  expect(outbox).toMatchObject({ eventType });
+  expect(outbox?.payload).toMatchObject({
+    entityId: projectId,
+    entityType: "project",
+    eventId: activity!.id,
+    eventType,
+    occurredAt: expect.any(String),
+    payload: expect.objectContaining(payload),
+    projectId,
+    taskId: null,
+    version: 0,
+    workspaceId,
+  });
 }

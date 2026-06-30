@@ -9,7 +9,7 @@ import { formatEventType, slugify } from "./atlas-format";
 import { MyWorkPanel } from "./my-work-panel";
 import { OutboxPanel } from "./outbox-panel";
 import { ProjectPanel } from "./project-panel";
-import { realtimeEventTouchesProject, realtimeEventTouchesTask, type RealtimeDomainEvent } from "./realtime-utils";
+import { realtimeEventTouchesProject, realtimeEventTouchesProjectList, realtimeEventTouchesTask, type RealtimeDomainEvent } from "./realtime-utils";
 import { TaskDetailPanel } from "./task-detail-panel";
 import { useActivity } from "./use-activity";
 import { useMyWork } from "./use-my-work";
@@ -153,11 +153,18 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
 
   async function handleRealtimeEvent(event: RealtimeDomainEvent) {
     if (!auth?.accessToken || !selectedWorkspaceId) return;
+    const selectedProjectWasDeleted = event.eventType === "ProjectDeleted" && event.projectId === selectedProjectId;
     const refreshes: Promise<void>[] = [
       loadNotifications(auth.accessToken, selectedWorkspaceId, notificationFilter),
       loadMyWork(auth.accessToken, selectedWorkspaceId, myWorkStatusFilter, myWorkDueFilter),
-      loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId),
     ];
+    if (!selectedProjectWasDeleted) {
+      refreshes.push(loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId));
+    }
+
+    if (realtimeEventTouchesProjectList(event)) {
+      refreshes.push(refreshProjectsForRealtime(auth.accessToken, selectedWorkspaceId));
+    }
 
     if (realtimeEventTouchesProject(event, selectedProjectId)) {
       refreshes.push(loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId));
@@ -174,6 +181,23 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
     }
 
     await Promise.all(refreshes);
+  }
+
+  async function refreshProjectsForRealtime(accessToken: string, workspaceId: string) {
+    const projectPage = await api<Page<Project>>(`/workspaces/${workspaceId}/projects`, {}, accessToken);
+    setProjects(projectPage.items);
+
+    if (selectedProjectId && !projectPage.items.some((project) => project.id === selectedProjectId)) {
+      setSelectedProjectId("");
+      setSelectedTaskId("");
+      clearBoardState();
+      clearTaskDetailState();
+      clearActivity();
+      if (projectPage.items[0]) await chooseProject(accessToken, workspaceId, projectPage.items[0].id);
+      return;
+    }
+
+    if (!selectedProjectId && projectPage.items[0]) await chooseProject(accessToken, workspaceId, projectPage.items[0].id);
   }
 
   function clearBoardState() {

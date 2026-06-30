@@ -24,6 +24,7 @@ import {
 import { prisma } from "@atlas/db";
 
 import { openApiSchema } from "../../shared/zod-openapi.js";
+import { DomainEventsRepository } from "../events/domain-events.repository.js";
 import { PermissionsService } from "../permissions/permissions.service.js";
 import { WorkController } from "./work.controller.js";
 import { WorkRepository } from "./work.repository.js";
@@ -40,7 +41,9 @@ const notificationParamsSchema = workspaceParamsSchema.extend({ notificationId: 
 const userBodySchema = z.object({ userId: z.string().uuid() });
 
 export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
-  const controller = new WorkController(new WorkService(new WorkRepository(prisma), new PermissionsService(prisma)));
+  const controller = new WorkController(
+    new WorkService(new WorkRepository(prisma), new DomainEventsRepository(prisma), new PermissionsService(prisma)),
+  );
 
   app.post("/workspaces/:workspaceId/projects/:projectId/sections", { schema: openApiSchema({ body: createSectionRequestSchema, params: projectParamsSchema, tags: ["Sections"] }) }, controller.createSection);
   app.get("/workspaces/:workspaceId/projects/:projectId/sections", { schema: openApiSchema({ params: projectParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Sections"] }) }, controller.listSections);

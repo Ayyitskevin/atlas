@@ -35,6 +35,8 @@ const projectRefreshEvents = new Set([
   "TaskUpdated",
 ]);
 
+const projectListRefreshEvents = new Set(["ProjectArchived", "ProjectCreated", "ProjectDeleted", "ProjectUpdated"]);
+
 export function parseRealtimeMessage(raw: string): RealtimeMessage {
   let data: unknown;
   try {
@@ -98,6 +100,10 @@ export function realtimeReconnectDelay(attempt: number) {
 
 export function realtimeEventTouchesProject(event: RealtimeDomainEvent, selectedProjectId: string) {
   return Boolean(selectedProjectId && event.projectId === selectedProjectId && projectRefreshEvents.has(event.eventType));
+}
+
+export function realtimeEventTouchesProjectList(event: RealtimeDomainEvent) {
+  return projectListRefreshEvents.has(event.eventType);
 }
 
 export function realtimeEventTouchesTask(event: RealtimeDomainEvent, selectedTaskId: string) {

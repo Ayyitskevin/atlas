@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   parseRealtimeMessage,
   realtimeEventTouchesProject,
+  realtimeEventTouchesProjectList,
   realtimeEventTouchesTask,
   realtimeReconnectDelay,
   realtimeSubscriptions,
@@ -84,6 +85,8 @@ describe("realtime utilities", () => {
 
     expect(realtimeEventTouchesProject(taskEvent, "project-1")).toBe(true);
     expect(realtimeEventTouchesProject(commentEvent, "project-1")).toBe(false);
+    expect(realtimeEventTouchesProjectList({ eventType: "ProjectUpdated", projectId: "project-1", taskId: null } as RealtimeDomainEvent)).toBe(true);
+    expect(realtimeEventTouchesProjectList(taskEvent)).toBe(false);
     expect(realtimeEventTouchesTask(commentEvent, "task-1")).toBe(true);
     expect(realtimeEventTouchesTask(commentEvent, "task-2")).toBe(false);
   });

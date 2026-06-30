@@ -331,7 +331,9 @@ Initial domain event types:
 - `WorkspaceCreated`
 - `MemberInvited`
 - `ProjectCreated`
+- `ProjectUpdated`
 - `ProjectArchived`
+- `ProjectDeleted`
 - `SectionCreated`
 - `SectionsReordered`
 - `TaskCreated`

@@ -5,6 +5,7 @@ import { createProjectRequestSchema, cursorPaginationQuerySchema, updateProjectR
 import { prisma } from "@atlas/db";
 
 import { openApiSchema } from "../../shared/zod-openapi.js";
+import { DomainEventsRepository } from "../events/domain-events.repository.js";
 import { PermissionsService } from "../permissions/permissions.service.js";
 import { ProjectsController } from "./projects.controller.js";
 import { ProjectsRepository } from "./projects.repository.js";
@@ -14,7 +15,9 @@ const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
 const projectParamsSchema = workspaceParamsSchema.extend({ projectId: z.string().uuid() });
 
 export async function registerProjectRoutes(app: FastifyInstance): Promise<void> {
-  const controller = new ProjectsController(new ProjectsService(new ProjectsRepository(prisma), new PermissionsService(prisma)));
+  const controller = new ProjectsController(
+    new ProjectsService(new ProjectsRepository(prisma), new DomainEventsRepository(prisma), new PermissionsService(prisma)),
+  );
 
   app.post(
     "/workspaces/:workspaceId/projects",

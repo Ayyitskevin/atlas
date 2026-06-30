@@ -22,6 +22,7 @@ import type { AuthContext } from "../../shared/auth-context.js";
 import { AtlasHttpError } from "../../shared/errors.js";
 import { pageFromLimit } from "../../shared/pagination.js";
 import { createAttachmentObjectKey, createDownloadInstructions, createUploadInstructions } from "../../storage/object-storage.js";
+import { DomainEventsRepository } from "../events/domain-events.repository.js";
 import { PermissionsService } from "../permissions/permissions.service.js";
 import { defaultListPosition } from "./position.js";
 import { WorkRepository } from "./work.repository.js";
@@ -29,6 +30,7 @@ import { WorkRepository } from "./work.repository.js";
 export class WorkService {
   constructor(
     private readonly workRepository: WorkRepository,
+    private readonly events: DomainEventsRepository,
     private readonly permissions: PermissionsService,
   ) {}
 
@@ -40,7 +42,7 @@ export class WorkService {
       projectId,
       workspaceId,
     });
-    await this.workRepository.recordActivity({
+    await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: section.id,
       entityType: "section",
@@ -74,7 +76,7 @@ export class WorkService {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
     await this.requireSectionsInProject(workspaceId, projectId, input.sections.map((section) => section.id));
     await this.workRepository.reorderSections({ projectId, sections: input.sections, workspaceId });
-    await this.workRepository.recordActivity({
+    await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: projectId,
       entityType: "project",
@@ -95,7 +97,7 @@ export class WorkService {
       projectId,
       workspaceId,
     });
-    await this.workRepository.recordActivity({
+    await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: task.id,
       entityType: "task",
@@ -145,7 +147,7 @@ export class WorkService {
     });
     if (!count) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.STALE_VERSION, "Task has changed since it was loaded.");
     const updated = await this.workRepository.findTask(workspaceId, taskId);
-    await this.workRepository.recordActivity({
+    await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: taskId,
       entityType: "task",
@@ -169,7 +171,7 @@ export class WorkService {
     await this.requireSectionInProject(workspaceId, task.projectId, input.sectionId);
     const count = await this.workRepository.moveTask({ ...input, taskId, workspaceId });
     if (!count) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.STALE_VERSION, "Task has changed since it was loaded.");
-    await this.workRepository.recordActivity({
+    await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: taskId,
       entityType: "task",
@@ -186,7 +188,7 @@ export class WorkService {
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
     await this.requireWorkspaceMembers(workspaceId, [userId]);
     const assignment = await this.workRepository.assignTask({ assignedById: ctx.userId, taskId, userId, workspaceId });
-    await this.workRepository.recordActivity({
+    await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: taskId,
       entityType: "task",
@@ -203,7 +205,7 @@ export class WorkService {
     const task = await this.getTask(ctx, workspaceId, taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
     await this.workRepository.unassignTask({ taskId, userId, workspaceId });
-    await this.workRepository.recordActivity({
+    await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: taskId,
       entityType: "task",
@@ -231,7 +233,7 @@ export class WorkService {
       taskId,
       workspaceId,
     });
-    await this.workRepository.recordActivity({
+    await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: subtask.id,
       entityType: "subtask",
@@ -274,7 +276,7 @@ export class WorkService {
     const task = await this.getTask(ctx, workspaceId, taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "COMMENTER");
     const comment = await this.workRepository.createComment({ authorId: ctx.userId, body: input.body, taskId, workspaceId });
-    await this.workRepository.recordActivity({
+    await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: comment.id,
       entityType: "comment",
@@ -319,7 +321,7 @@ export class WorkService {
       uploadedById: ctx.userId,
       workspaceId,
     });
-    await this.workRepository.recordActivity({
+    await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: attachment.id,
       entityType: "attachment",
