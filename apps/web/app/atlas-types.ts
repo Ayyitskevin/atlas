@@ -17,10 +17,14 @@ export type Workspace = {
 };
 
 export type Project = {
+  archivedAt?: string | null;
+  description?: string | null;
   id: string;
   name: string;
-  visibility: "PRIVATE" | "WORKSPACE";
+  visibility: ProjectVisibility;
 };
+
+export type ProjectVisibility = "PRIVATE" | "WORKSPACE";
 
 export type Section = {
   id: string;

@@ -7,6 +7,7 @@ import { BoardPanel } from "./board-panel";
 import { moveItemById, nextTaskPosition, sectionPositionPayload } from "./board-utils";
 import { formatEventType, slugify } from "./atlas-format";
 import { OutboxPanel } from "./outbox-panel";
+import { ProjectPanel } from "./project-panel";
 import { realtimeEventTouchesProject, realtimeEventTouchesTask, type RealtimeDomainEvent } from "./realtime-utils";
 import { TaskDetailPanel } from "./task-detail-panel";
 import { useActivity } from "./use-activity";
@@ -24,6 +25,7 @@ import type {
   CreateAttachmentResponse,
   Page,
   Project,
+  ProjectVisibility,
   Section,
   Subtask,
   Task,
@@ -297,6 +299,69 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
       await chooseWorkspace(auth.accessToken, selectedWorkspaceId);
       await chooseProject(auth.accessToken, selectedWorkspaceId, project.id);
       formElement.reset();
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
+  }
+
+  async function updateProject(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!auth || !selectedWorkspaceId) return;
+    const form = new FormData(event.currentTarget);
+    const projectId = String(form.get("projectId") ?? "");
+    if (!projectId) return;
+    const description = String(form.get("description") ?? "").trim();
+    try {
+      setMessage("");
+      const updated = await api<Project>(
+        "/workspaces/" + selectedWorkspaceId + "/projects/" + projectId,
+        {
+          body: JSON.stringify({
+            description,
+            name: String(form.get("name") ?? ""),
+            visibility: String(form.get("visibility")) as ProjectVisibility,
+          }),
+          method: "PATCH",
+        },
+        auth.accessToken,
+      );
+      setProjects((currentProjects) => currentProjects.map((project) => (project.id === updated.id ? updated : project)));
+      setMessage("");
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
+  }
+
+  async function archiveProject(projectId: string) {
+    if (!auth || !selectedWorkspaceId) return;
+    try {
+      setMessage("");
+      const archived = await api<Project>(
+        "/workspaces/" + selectedWorkspaceId + "/projects/" + projectId + "/archive",
+        { method: "POST" },
+        auth.accessToken,
+      );
+      setProjects((currentProjects) => currentProjects.map((project) => (project.id === archived.id ? archived : project)));
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
+  }
+
+  async function deleteProject(projectId: string) {
+    if (!auth || !selectedWorkspaceId) return;
+    try {
+      setMessage("");
+      await api<Project>("/workspaces/" + selectedWorkspaceId + "/projects/" + projectId, { method: "DELETE" }, auth.accessToken);
+      const remainingProjects = projects.filter((project) => project.id !== projectId);
+      setProjects(remainingProjects);
+      if (selectedProjectId === projectId) {
+        setSelectedProjectId("");
+        setSelectedTaskId("");
+        clearBoardState();
+        clearTaskDetailState();
+        clearActivity();
+        if (remainingProjects[0]) await chooseProject(auth.accessToken, selectedWorkspaceId, remainingProjects[0].id);
+      }
     } catch (error) {
       setMessage(errorMessage(error));
     }
@@ -1115,29 +1180,17 @@ export function AtlasClient({ initialMode = "login" }: { initialMode?: "login" |
             </div>
           </aside>
 
-          <aside className="grid content-start gap-4 rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold uppercase text-slate-500">{selectedWorkspace?.name ?? "Projects"}</h2>
-            <form className="grid gap-2" onSubmit={createProject}>
-              <input className="rounded-md border border-slate-300 px-3 py-2 text-sm" name="name" placeholder="Project name" required />
-              <button className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white" type="submit">
-                Create
-              </button>
-            </form>
-            <div className="grid gap-2">
-              {projects.map((project) => (
-                <button
-                  className={`rounded-md px-3 py-2 text-left text-sm ${
-                    project.id === selectedProjectId ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700"
-                  }`}
-                  key={project.id}
-                  onClick={() => auth && void chooseProject(auth.accessToken, selectedWorkspaceId, project.id)}
-                  type="button"
-                >
-                  {project.name}
-                </button>
-              ))}
-            </div>
-          </aside>
+          <ProjectPanel
+            onArchiveProject={archiveProject}
+            onChooseProject={(projectId) => (auth ? chooseProject(auth.accessToken, selectedWorkspaceId, projectId) : Promise.resolve())}
+            onCreateProject={createProject}
+            onDeleteProject={deleteProject}
+            onUpdateProject={updateProject}
+            projects={projects}
+            selectedProject={selectedProject}
+            selectedProjectId={selectedProjectId}
+            workspace={selectedWorkspace}
+          />
 
           <BoardPanel
             onChooseTask={chooseTask}
