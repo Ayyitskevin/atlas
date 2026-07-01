@@ -1,6 +1,6 @@
 "use client";
 
-import { formatEventType } from "./atlas-format";
+import { formatActivityDetail, formatActivityTitle } from "./atlas-format";
 import type { ActivityEvent, ActivityScope } from "./atlas-types";
 
 type ActivityPanelProps = {
@@ -55,11 +55,8 @@ export function ActivityPanel({ activities, onScopeChange, scope, selectedProjec
             <article className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm" key={activity.id}>
               <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
-                  <p className="font-medium text-slate-900">{formatEventType(activity.eventType)}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {activity.entityType}
-                    {activity.taskId ? " \u00b7 task" : activity.projectId ? " \u00b7 project" : ""}
-                  </p>
+                  <p className="font-medium text-slate-900">{formatActivityTitle(activity.eventType)}</p>
+                  <p className="mt-1 text-xs text-slate-500">{formatActivityDetail(activity)}</p>
                 </div>
                 <time className="shrink-0 text-xs text-slate-500">{new Date(activity.createdAt).toLocaleString()}</time>
               </div>

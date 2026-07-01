@@ -132,6 +132,7 @@ export type ActivityEvent = {
   entityType: string;
   eventType: string;
   id: string;
+  payload: Record<string, unknown>;
   projectId: string | null;
   taskId: string | null;
 };

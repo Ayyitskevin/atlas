@@ -26,6 +26,8 @@ export type RealtimeMessage =
 
 const projectRefreshEvents = new Set([
   "SectionCreated",
+  "SectionDeleted",
+  "SectionUpdated",
   "SectionsReordered",
   "TaskAssigned",
   "TaskCompleted",

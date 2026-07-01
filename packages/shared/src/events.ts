@@ -11,6 +11,8 @@ export const domainEventTypeSchema = z.enum([
   "ProjectMemberUpdated",
   "ProjectMemberRemoved",
   "SectionCreated",
+  "SectionUpdated",
+  "SectionDeleted",
   "SectionsReordered",
   "TaskCreated",
   "TaskUpdated",
@@ -19,8 +21,13 @@ export const domainEventTypeSchema = z.enum([
   "TaskUnassigned",
   "TaskCompleted",
   "SubtaskCreated",
+  "SubtaskUpdated",
+  "SubtaskDeleted",
   "CommentCreated",
+  "CommentUpdated",
+  "CommentDeleted",
   "AttachmentAdded",
+  "AttachmentDeleted",
 ]);
 
 export const domainEventSchema = z.object({

@@ -2,7 +2,7 @@
 
 import type { FormEvent } from "react";
 
-import { dateInputValue, formatEventType, taskStatusLabel } from "./atlas-format";
+import { dateInputValue, formatActivityDetail, formatActivityTitle, taskStatusLabel } from "./atlas-format";
 import type { ActivityEvent, MyWorkTask, Notification, Project, Section, Task, Workspace, WorkspaceMember } from "./atlas-types";
 import { recentActiveProjects, workspaceDashboardStats } from "./dashboard-utils";
 
@@ -197,11 +197,8 @@ function ActivityRow({ activity }: { activity: ActivityEvent }) {
     <article className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-medium text-slate-900">{formatEventType(activity.eventType)}</p>
-          <p className="mt-1 text-xs text-slate-500">
-            {activity.entityType}
-            {activity.taskId ? " - task" : activity.projectId ? " - project" : ""}
-          </p>
+          <p className="font-medium text-slate-900">{formatActivityTitle(activity.eventType)}</p>
+          <p className="mt-1 text-xs text-slate-500">{formatActivityDetail(activity)}</p>
         </div>
         <time className="shrink-0 text-xs text-slate-500">{new Date(activity.createdAt).toLocaleString()}</time>
       </div>

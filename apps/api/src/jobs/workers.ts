@@ -3,6 +3,7 @@ import { Worker } from "bullmq";
 import { prisma } from "@atlas/db";
 
 import { env } from "../config/env.js";
+import { taskNotificationCopy } from "./notification-copy.js";
 import { startOutboxDispatcher } from "./outbox.js";
 import { queueConnection, type MutationEventJob } from "./queues.js";
 
@@ -18,12 +19,13 @@ export function startWorkers() {
       });
       if (!task) return;
       const recipients = task.assignees.filter((assignee) => assignee.userId !== event.actorUserId);
+      const copy = taskNotificationCopy(event, task.title);
       await prisma.notification.createMany({
         data: recipients.map((recipient) => ({
-          body: `${event.eventType} on ${task.title}`,
+          body: copy.body,
           recipientId: recipient.userId,
           taskId: task.id,
-          title: "Atlas task update",
+          title: copy.title,
           type: `task.${event.eventType}`,
           workspaceId: event.workspaceId,
         })),

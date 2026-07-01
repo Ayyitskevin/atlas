@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 
-import { dateInputValue, formatBytes, formatEventType, invitationStatus, projectRoleLabel, taskStatusLabel, workspaceRoleLabel } from "./atlas-format";
+import {
+  dateInputValue,
+  formatActivityDetail,
+  formatActivityTitle,
+  formatBytes,
+  formatEventType,
+  invitationStatus,
+  projectRoleLabel,
+  taskStatusLabel,
+  workspaceRoleLabel,
+} from "./atlas-format";
 
 describe("atlas format helpers", () => {
   it("formats byte counts for attachment metadata", () => {
@@ -11,9 +21,28 @@ describe("atlas format helpers", () => {
 
   it("formats event and status labels", () => {
     expect(formatEventType("TaskCompleted")).toBe("Task Completed");
+    expect(formatActivityTitle("AttachmentDeleted")).toBe("Attachment removed");
+    expect(formatActivityTitle("CustomEvent")).toBe("Custom Event");
     expect(taskStatusLabel("IN_PROGRESS")).toBe("in progress");
     expect(workspaceRoleLabel("OWNER")).toBe("owner");
     expect(projectRoleLabel("PROJECT_ADMIN")).toBe("project admin");
+  });
+
+  it("formats activity details from payload context", () => {
+    expect(formatActivityDetail({ entityType: "subtask", eventType: "SubtaskUpdated", payload: { title: "Draft QA" }, taskId: "task-1" })).toBe(
+      "subtask: Draft QA",
+    );
+    expect(
+      formatActivityDetail({
+        entityType: "attachment",
+        eventType: "AttachmentDeleted",
+        payload: { fileName: "brief.pdf", sizeBytes: 2048 },
+        taskId: "task-1",
+      }),
+    ).toBe("File: brief.pdf · 2.0 KB");
+    expect(formatActivityDetail({ entityType: "project", eventType: "ProjectUpdated", payload: {}, projectId: "project-1" })).toBe(
+      "Project activity",
+    );
   });
 
   it("derives invitation status from lifecycle timestamps", () => {

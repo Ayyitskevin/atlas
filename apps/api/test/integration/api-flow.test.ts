@@ -89,6 +89,46 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     expect(section.statusCode).toBe(201);
     sectionId = section.json<{ id: string }>().id;
 
+    const scratchSection = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { name: "Scratch", position: 2000 },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/sections",
+    });
+    expect(scratchSection.statusCode).toBe(201);
+    const scratchSectionId = scratchSection.json<{ id: string }>().id;
+
+    const updateScratchSection = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: { name: "In Review" },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/sections/" + scratchSectionId,
+    });
+    expect(updateScratchSection.statusCode).toBe(200);
+    await expectActivityEvent({
+      entityId: scratchSectionId,
+      entityType: "section",
+      eventType: "SectionUpdated",
+      payload: { name: "In Review" },
+      projectId,
+      workspaceId,
+    });
+
+    const deleteScratchSection = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/sections/" + scratchSectionId,
+    });
+    expect(deleteScratchSection.statusCode).toBe(200);
+    await expectActivityEvent({
+      entityId: scratchSectionId,
+      entityType: "section",
+      eventType: "SectionDeleted",
+      payload: { name: "In Review" },
+      projectId,
+      workspaceId,
+    });
+
     const task = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
@@ -153,6 +193,15 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     expect(attachmentsAfterDelete.json<{ items: Array<{ id: string }> }>().items).not.toContainEqual(
       expect.objectContaining({ id: attachmentBody.attachment.id }),
     );
+    await expectActivityEvent({
+      entityId: attachmentBody.attachment.id,
+      entityType: "attachment",
+      eventType: "AttachmentDeleted",
+      payload: { fileName: "brief.pdf", sizeBytes: 2048 },
+      projectId,
+      taskId,
+      workspaceId,
+    });
 
     const outboxAfter = await prisma.domainEventOutbox.count();
     expect(outboxAfter).toBeGreaterThan(outboxBefore);
@@ -326,6 +375,15 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     });
     expect(updateSubtask.statusCode).toBe(200);
     expect(updateSubtask.json<{ status: string }>().status).toBe("DONE");
+    await expectActivityEvent({
+      entityId: subtaskBody.id,
+      entityType: "subtask",
+      eventType: "SubtaskUpdated",
+      payload: { status: "DONE", title: "Detail panel subtask" },
+      projectId,
+      taskId,
+      workspaceId,
+    });
 
     const deleteSubtask = await app!.inject({
       headers: authHeaders(accessToken),
@@ -333,6 +391,15 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/subtasks/" + subtaskBody.id,
     });
     expect(deleteSubtask.statusCode).toBe(200);
+    await expectActivityEvent({
+      entityId: subtaskBody.id,
+      entityType: "subtask",
+      eventType: "SubtaskDeleted",
+      payload: { status: "DONE", title: "Detail panel subtask" },
+      projectId,
+      taskId,
+      workspaceId,
+    });
 
     const subtasksAfterDelete = await app!.inject({
       headers: authHeaders(accessToken),
@@ -361,6 +428,14 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     });
     expect(updateComment.statusCode).toBe(200);
     expect(updateComment.json<{ body: string; editedAt: string | null }>()).toMatchObject({ body: "Edited detail comment" });
+    await expectActivityEvent({
+      entityId: detailCommentBody.id,
+      entityType: "comment",
+      eventType: "CommentUpdated",
+      projectId,
+      taskId,
+      workspaceId,
+    });
 
     const deleteComment = await app!.inject({
       headers: authHeaders(accessToken),
@@ -368,6 +443,14 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/comments/" + detailCommentBody.id,
     });
     expect(deleteComment.statusCode).toBe(200);
+    await expectActivityEvent({
+      entityId: detailCommentBody.id,
+      entityType: "comment",
+      eventType: "CommentDeleted",
+      projectId,
+      taskId,
+      workspaceId,
+    });
 
     const commentsAfterDelete = await app!.inject({
       headers: authHeaders(accessToken),
@@ -1208,6 +1291,51 @@ async function expectLatestTaskEvent(workspaceId: string, taskId: string, eventT
     taskId,
     workspaceId,
   });
+}
+
+async function expectActivityEvent(input: {
+  entityId: string;
+  entityType: string;
+  eventType: string;
+  payload?: Record<string, unknown>;
+  projectId?: string | null;
+  taskId?: string | null;
+  workspaceId: string;
+}) {
+  const activity = await prisma.activityEvent.findFirst({
+    orderBy: { createdAt: "desc" },
+    where: {
+      entityId: input.entityId,
+      entityType: input.entityType,
+      eventType: input.eventType,
+      workspaceId: input.workspaceId,
+    },
+  });
+  expect(activity).toMatchObject({
+    actorUserId: expect.any(String),
+    entityId: input.entityId,
+    entityType: input.entityType,
+    eventType: input.eventType,
+    projectId: input.projectId ?? null,
+    taskId: input.taskId ?? null,
+    workspaceId: input.workspaceId,
+  });
+
+  const outbox = await prisma.domainEventOutbox.findUnique({ where: { eventId: activity!.id } });
+  expect(outbox).toMatchObject({ eventType: input.eventType });
+  expect(outbox?.payload).toMatchObject({
+    entityId: input.entityId,
+    entityType: input.entityType,
+    eventId: activity!.id,
+    eventType: input.eventType,
+    occurredAt: expect.any(String),
+    projectId: input.projectId ?? null,
+    taskId: input.taskId ?? null,
+    workspaceId: input.workspaceId,
+  });
+  if (input.payload) {
+    expect(outbox?.payload).toMatchObject({ payload: expect.objectContaining(input.payload) });
+  }
 }
 
 async function expectProjectMemberLifecycleEvent(

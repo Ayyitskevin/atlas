@@ -86,6 +86,7 @@ describe("realtime utilities", () => {
 
     expect(realtimeEventTouchesProject(taskEvent, "project-1")).toBe(true);
     expect(realtimeEventTouchesProject(commentEvent, "project-1")).toBe(false);
+    expect(realtimeEventTouchesProject({ eventType: "SectionUpdated", projectId: "project-1", taskId: null } as RealtimeDomainEvent, "project-1")).toBe(true);
     expect(realtimeEventTouchesProjectList({ eventType: "ProjectUpdated", projectId: "project-1", taskId: null } as RealtimeDomainEvent)).toBe(true);
     expect(realtimeEventTouchesProjectList({ eventType: "ProjectMemberAdded", projectId: "project-1", taskId: null } as RealtimeDomainEvent)).toBe(true);
     expect(realtimeEventTouchesProjectList(taskEvent)).toBe(false);

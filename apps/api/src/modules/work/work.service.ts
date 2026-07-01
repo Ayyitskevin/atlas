@@ -62,13 +62,32 @@ export class WorkService {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
     const section = await this.workRepository.updateSection({ data: input, projectId, sectionId, workspaceId });
     if (!section) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Section not found in this Project.");
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: section.id,
+      entityType: "section",
+      eventType: "SectionUpdated",
+      payload: { name: section.name, position: String(section.position) },
+      projectId,
+      workspaceId,
+    });
     return section;
   }
 
   async deleteSection(ctx: AuthContext, workspaceId: string, projectId: string, sectionId: string) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
-    const count = await this.workRepository.softDeleteSection({ projectId, sectionId, workspaceId });
-    if (!count) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Section not found in this Project.");
+    const section = await this.workRepository.findSection({ projectId, sectionId, workspaceId });
+    if (!section) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Section not found in this Project.");
+    await this.workRepository.softDeleteSection({ projectId, sectionId, workspaceId });
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: section.id,
+      entityType: "section",
+      eventType: "SectionDeleted",
+      payload: { name: section.name },
+      projectId,
+      workspaceId,
+    });
     return { ok: true };
   }
 
@@ -226,7 +245,8 @@ export class WorkService {
   }
 
   async createSubtask(ctx: AuthContext, workspaceId: string, taskId: string, input: CreateSubtaskRequest) {
-    await this.permissions.requireTaskRole(ctx, workspaceId, taskId, "EDITOR");
+    const task = await this.getTask(ctx, workspaceId, taskId);
+    await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
     if (input.assigneeId) await this.requireWorkspaceMembers(workspaceId, [input.assigneeId]);
     const subtask = await this.workRepository.createSubtask({
       ...input,
@@ -239,6 +259,8 @@ export class WorkService {
       entityId: subtask.id,
       entityType: "subtask",
       eventType: "SubtaskCreated",
+      payload: { title: subtask.title },
+      projectId: task.projectId,
       taskId,
       workspaceId,
     });
@@ -253,7 +275,8 @@ export class WorkService {
   async updateSubtask(ctx: AuthContext, workspaceId: string, subtaskId: string, input: UpdateSubtaskRequest) {
     const subtask = await this.workRepository.findSubtask(workspaceId, subtaskId);
     if (!subtask) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Subtask not found.");
-    await this.permissions.requireTaskRole(ctx, workspaceId, subtask.taskId, "EDITOR");
+    const task = await this.getTask(ctx, workspaceId, subtask.taskId);
+    await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
     if (input.assigneeId) await this.requireWorkspaceMembers(workspaceId, [input.assigneeId]);
     const count = await this.workRepository.updateSubtask({
       data: { assigneeId: input.assigneeId, status: input.status, title: input.title },
@@ -262,14 +285,37 @@ export class WorkService {
       workspaceId,
     });
     if (!count) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.STALE_VERSION, "Subtask has changed since it was loaded.");
-    return this.workRepository.findSubtask(workspaceId, subtaskId);
+    const updated = await this.workRepository.findSubtask(workspaceId, subtaskId);
+    if (!updated) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Subtask not found.");
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: subtaskId,
+      entityType: "subtask",
+      eventType: "SubtaskUpdated",
+      payload: { status: updated.status, title: updated.title },
+      projectId: task.projectId,
+      taskId: subtask.taskId,
+      workspaceId,
+    });
+    return updated;
   }
 
   async deleteSubtask(ctx: AuthContext, workspaceId: string, subtaskId: string) {
     const subtask = await this.workRepository.findSubtask(workspaceId, subtaskId);
     if (!subtask) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Subtask not found.");
-    await this.permissions.requireTaskRole(ctx, workspaceId, subtask.taskId, "EDITOR");
+    const task = await this.getTask(ctx, workspaceId, subtask.taskId);
+    await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
     await this.workRepository.softDeleteSubtask(workspaceId, subtaskId);
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: subtaskId,
+      entityType: "subtask",
+      eventType: "SubtaskDeleted",
+      payload: { status: subtask.status, title: subtask.title },
+      projectId: task.projectId,
+      taskId: subtask.taskId,
+      workspaceId,
+    });
     return { ok: true };
   }
 
@@ -297,15 +343,36 @@ export class WorkService {
   async updateComment(ctx: AuthContext, workspaceId: string, commentId: string, input: UpdateCommentRequest) {
     const comment = await this.workRepository.findComment(workspaceId, commentId);
     if (!comment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Comment not found.");
+    const task = await this.getTask(ctx, workspaceId, comment.taskId);
     if (comment.authorId !== ctx.userId) await this.permissions.requireTaskRole(ctx, workspaceId, comment.taskId, "EDITOR");
-    return this.workRepository.updateComment(commentId, input.body);
+    const updated = await this.workRepository.updateComment(commentId, input.body);
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: commentId,
+      entityType: "comment",
+      eventType: "CommentUpdated",
+      projectId: task.projectId,
+      taskId: comment.taskId,
+      workspaceId,
+    });
+    return updated;
   }
 
   async deleteComment(ctx: AuthContext, workspaceId: string, commentId: string) {
     const comment = await this.workRepository.findComment(workspaceId, commentId);
     if (!comment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Comment not found.");
+    const task = await this.getTask(ctx, workspaceId, comment.taskId);
     if (comment.authorId !== ctx.userId) await this.permissions.requireTaskRole(ctx, workspaceId, comment.taskId, "EDITOR");
     await this.workRepository.softDeleteComment(commentId);
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: commentId,
+      entityType: "comment",
+      eventType: "CommentDeleted",
+      projectId: task.projectId,
+      taskId: comment.taskId,
+      workspaceId,
+    });
     return { ok: true };
   }
 
@@ -350,9 +417,20 @@ export class WorkService {
   async deleteAttachment(ctx: AuthContext, workspaceId: string, attachmentId: string) {
     const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
+    const task = await this.getTask(ctx, workspaceId, attachment.taskId);
     const requiredRole = attachment.uploadedById === ctx.userId ? "COMMENTER" : "EDITOR";
     await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, requiredRole);
     await this.workRepository.softDeleteAttachment({ attachmentId, workspaceId });
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: attachmentId,
+      entityType: "attachment",
+      eventType: "AttachmentDeleted",
+      payload: { attachmentId, fileName: attachment.fileName, sizeBytes: attachment.sizeBytes },
+      projectId: task.projectId,
+      taskId: attachment.taskId,
+      workspaceId,
+    });
     return { ok: true };
   }
 

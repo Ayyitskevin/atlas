@@ -342,6 +342,8 @@ Initial domain event types:
 - `ProjectMemberUpdated`
 - `ProjectMemberRemoved`
 - `SectionCreated`
+- `SectionUpdated`
+- `SectionDeleted`
 - `SectionsReordered`
 - `TaskCreated`
 - `TaskUpdated`
@@ -350,8 +352,13 @@ Initial domain event types:
 - `TaskUnassigned`
 - `TaskCompleted`
 - `SubtaskCreated`
+- `SubtaskUpdated`
+- `SubtaskDeleted`
 - `CommentCreated`
+- `CommentUpdated`
+- `CommentDeleted`
 - `AttachmentAdded`
+- `AttachmentDeleted`
 
 ## Data Consistency
 
