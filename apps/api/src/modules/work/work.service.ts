@@ -147,11 +147,12 @@ export class WorkService {
     });
     if (!count) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.STALE_VERSION, "Task has changed since it was loaded.");
     const updated = await this.workRepository.findTask(workspaceId, taskId);
+    const eventType = input.status === "DONE" && task.status !== "DONE" ? "TaskCompleted" : "TaskUpdated";
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: taskId,
       entityType: "task",
-      eventType: input.status === "DONE" ? "TaskCompleted" : "TaskUpdated",
+      eventType,
       projectId: task.projectId,
       taskId,
       workspaceId,

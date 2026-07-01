@@ -237,7 +237,27 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/complete",
     });
     expect(completeTask.statusCode).toBe(200);
-    expect(completeTask.json<{ status: string }>().status).toBe("DONE");
+    const completeTaskBody = completeTask.json<{ status: string; version: number }>();
+    expect(completeTaskBody.status).toBe("DONE");
+
+    const completedEventCount = await prisma.activityEvent.count({
+      where: { eventType: "TaskCompleted", taskId, workspaceId },
+    });
+    const editCompletedTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: {
+        description: "Edited after completion without re-completing.",
+        priority: "HIGH",
+        status: "DONE",
+        title: "Updated completed integration task",
+        version: completeTaskBody.version,
+      },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId,
+    });
+    expect(editCompletedTask.statusCode).toBe(200);
+    expect(await prisma.activityEvent.count({ where: { eventType: "TaskCompleted", taskId, workspaceId } })).toBe(completedEventCount);
+    await expectLatestTaskEvent(workspaceId, taskId, "TaskUpdated");
 
     const assignTask = await app!.inject({
       headers: authHeaders(accessToken),
@@ -1173,6 +1193,19 @@ async function expectProjectLifecycleEvent(workspaceId: string, eventType: strin
     projectId,
     taskId: null,
     version: 0,
+    workspaceId,
+  });
+}
+
+async function expectLatestTaskEvent(workspaceId: string, taskId: string, eventType: string) {
+  const activity = await prisma.activityEvent.findFirst({
+    orderBy: { createdAt: "desc" },
+    where: { taskId, workspaceId },
+  });
+  expect(activity).toMatchObject({
+    entityType: "task",
+    eventType,
+    taskId,
     workspaceId,
   });
 }
