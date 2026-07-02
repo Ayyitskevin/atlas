@@ -146,6 +146,22 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     });
     expect(comment.statusCode).toBe(201);
 
+    const unsupportedAttachmentType = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { fileName: "script.html", mimeType: "text/html", sizeBytes: 2048 },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/attachments",
+    });
+    expect(unsupportedAttachmentType.statusCode).toBe(400);
+
+    const unsupportedAttachmentExtension = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { fileName: "run.exe", mimeType: "application/pdf", sizeBytes: 2048 },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/attachments",
+    });
+    expect(unsupportedAttachmentExtension.statusCode).toBe(400);
+
     const attachment = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",

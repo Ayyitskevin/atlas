@@ -3,6 +3,7 @@
 import type { FormEvent } from "react";
 import { useMemo, useState } from "react";
 
+import { attachmentMimeTypeForUpload, attachmentUploadValidationMessage } from "./attachment-upload-utils";
 import { api, errorMessage } from "./atlas-api";
 import { moveItemById, nextTaskPosition, sectionPositionPayload } from "./board-utils";
 import type {
@@ -465,6 +466,12 @@ export function useProjectWork({
     const form = new FormData(event.currentTarget);
     const file = form.get("file");
     if (!(file instanceof File)) return;
+    const validationMessage = attachmentUploadValidationMessage(file);
+    if (validationMessage) {
+      setAttachmentStatus(validationMessage);
+      return;
+    }
+    const mimeType = attachmentMimeTypeForUpload(file);
 
     try {
       setAttachmentStatus("Uploading...");
@@ -473,7 +480,7 @@ export function useProjectWork({
         {
           body: JSON.stringify({
             fileName: file.name,
-            mimeType: file.type || "application/octet-stream",
+            mimeType,
             sizeBytes: file.size,
           }),
           method: "POST",

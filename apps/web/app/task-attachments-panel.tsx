@@ -2,6 +2,8 @@
 
 import type { FormEvent } from "react";
 
+import { ATTACHMENT_ACCEPT_ATTRIBUTE, ATTACHMENT_UPLOAD_HELP_TEXT } from "@atlas/shared";
+
 import { formatBytes } from "./atlas-format";
 import type { Attachment } from "./atlas-types";
 
@@ -21,7 +23,17 @@ export function TaskAttachmentsPanel({ attachmentStatus, attachments, onDeleteAt
         {attachmentStatus ? <p className="mt-1 text-xs text-slate-500">{attachmentStatus}</p> : null}
       </div>
       <form className="grid gap-2" onSubmit={(event) => void onUploadAttachment(event)}>
-        <input className="rounded-md border border-slate-300 px-3 py-2 text-sm" name="file" required type="file" />
+        <input
+          accept={ATTACHMENT_ACCEPT_ATTRIBUTE}
+          aria-describedby="attachment-upload-help"
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+          name="file"
+          required
+          type="file"
+        />
+        <p className="text-xs text-slate-500" id="attachment-upload-help">
+          {ATTACHMENT_UPLOAD_HELP_TEXT}
+        </p>
         <button className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white" type="submit">
           Upload
         </button>
