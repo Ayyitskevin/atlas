@@ -230,12 +230,20 @@ export class WorkRepository {
     return this.prisma.comment.findFirst({ where: { deletedAt: null, id: commentId, workspaceId } });
   }
 
-  updateComment(commentId: string, body: string) {
-    return this.prisma.comment.update({ data: { body, editedAt: new Date() }, where: { id: commentId } });
+  async updateComment(input: { body: string; commentId: string; workspaceId: string }) {
+    const result = await this.prisma.comment.updateMany({
+      data: { body: input.body, editedAt: new Date() },
+      where: { deletedAt: null, id: input.commentId, workspaceId: input.workspaceId },
+    });
+    if (!result.count) return null;
+    return this.findComment(input.workspaceId, input.commentId);
   }
 
-  softDeleteComment(commentId: string) {
-    return this.prisma.comment.update({ data: { deletedAt: new Date() }, where: { id: commentId } });
+  softDeleteComment(input: { commentId: string; workspaceId: string }) {
+    return this.prisma.comment.updateMany({
+      data: { deletedAt: new Date() },
+      where: { deletedAt: null, id: input.commentId, workspaceId: input.workspaceId },
+    });
   }
 
   createAttachment(input: {

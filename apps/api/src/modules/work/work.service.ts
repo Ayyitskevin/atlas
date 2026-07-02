@@ -345,7 +345,8 @@ export class WorkService {
     if (!comment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Comment not found.");
     const task = await this.getTask(ctx, workspaceId, comment.taskId);
     if (comment.authorId !== ctx.userId) await this.permissions.requireTaskRole(ctx, workspaceId, comment.taskId, "EDITOR");
-    const updated = await this.workRepository.updateComment(commentId, input.body);
+    const updated = await this.workRepository.updateComment({ body: input.body, commentId, workspaceId });
+    if (!updated) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Comment not found.");
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: commentId,
@@ -363,7 +364,7 @@ export class WorkService {
     if (!comment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Comment not found.");
     const task = await this.getTask(ctx, workspaceId, comment.taskId);
     if (comment.authorId !== ctx.userId) await this.permissions.requireTaskRole(ctx, workspaceId, comment.taskId, "EDITOR");
-    await this.workRepository.softDeleteComment(commentId);
+    await this.workRepository.softDeleteComment({ commentId, workspaceId });
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: commentId,
