@@ -244,6 +244,12 @@ export type ReplayOutboxEventResponse = {
 
 export type ActivityScope = "project" | "task" | "workspace";
 
+export type PageInfo = {
+  hasNextPage: boolean;
+  nextCursor: string | null;
+};
+
 export type Page<T> = {
   items: T[];
+  pageInfo?: PageInfo;
 };

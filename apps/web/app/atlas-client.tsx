@@ -184,7 +184,7 @@ export function AtlasClient({
     setMessage,
     setSelectedTaskId,
   });
-  const { clearSearch, openSearchResult, searchQuery, searchResults, searchStatus, searchWorkspace, setSearchQuery } =
+  const { clearSearch, hasMoreSearchResults, loadMoreSearchResults, openSearchResult, searchQuery, searchResults, searchStatus, searchWorkspace, setSearchQuery } =
     useWorkspaceSearch({ auth, chooseProject, chooseTask, selectedWorkspaceId, setMessage });
   const realtimeStatus = useRealtime({
     accessToken: auth?.accessToken,
@@ -647,6 +647,8 @@ export function AtlasClient({
         />
 
         <WorkspaceSearchPanel
+          hasMoreResults={hasMoreSearchResults}
+          onLoadMore={loadMoreSearchResults}
           onOpenResult={openSearchResult}
           onQueryChange={setSearchQuery}
           onSearch={searchWorkspace}

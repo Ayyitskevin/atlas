@@ -5,6 +5,8 @@ import type { FormEvent } from "react";
 import type { SearchResult, Workspace } from "./atlas-types";
 
 type WorkspaceSearchPanelProps = {
+  hasMoreResults: boolean;
+  onLoadMore: () => Promise<void>;
   onOpenResult: (result: SearchResult) => Promise<void>;
   onQueryChange: (query: string) => void;
   onSearch: (event: FormEvent<HTMLFormElement>) => Promise<void>;
@@ -16,6 +18,8 @@ type WorkspaceSearchPanelProps = {
 };
 
 export function WorkspaceSearchPanel({
+  hasMoreResults,
+  onLoadMore,
   onOpenResult,
   onQueryChange,
   onSearch,
@@ -78,6 +82,11 @@ export function WorkspaceSearchPanel({
             ),
           )}
         </div>
+      ) : null}
+      {hasMoreResults ? (
+        <button className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700" onClick={() => void onLoadMore()} type="button">
+          Load more
+        </button>
       ) : null}
     </section>
   );

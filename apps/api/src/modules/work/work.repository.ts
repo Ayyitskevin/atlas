@@ -1,5 +1,5 @@
 import type { Prisma, PrismaClient, TaskPriority, TaskStatus } from "@atlas/db";
-import type { MyWorkDueFilter, MyWorkStatusFilter } from "@atlas/shared";
+import type { MyWorkDueFilter, MyWorkStatusFilter, SearchResultType } from "@atlas/shared";
 
 import { paginationArgs } from "../../shared/pagination.js";
 import { myWorkDueDateWhere, myWorkStatusWhere } from "./my-work-filters.js";
@@ -315,24 +315,30 @@ export class WorkRepository {
     });
   }
 
-  searchWorkspace(input: { limit: number; q: string; type?: string; userId: string; workspaceId: string }) {
+  searchWorkspace(input: { after?: SearchWorkspaceCursor; limit: number; q: string; type?: SearchResultType; userId: string; workspaceId: string }) {
     const accessibleProject = this.accessibleProjectWhere(input.userId, input.workspaceId);
-    const tasks = input.type && !input.type.includes("task") ? [] : this.prisma.task.findMany({
-      orderBy: { updatedAt: "desc" },
-      take: input.limit,
+    const tasks = input.type && input.type !== "task" ? [] : this.prisma.task.findMany({
+      orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+      take: input.limit + 1,
       where: {
         deletedAt: null,
+        AND: compactWhere<Prisma.TaskWhereInput>([
+          searchAfterWhere<Prisma.TaskWhereInput>("task", input.after),
+          { OR: [{ title: { contains: input.q, mode: "insensitive" } }, { description: { contains: input.q, mode: "insensitive" } }] },
+        ]),
         project: accessibleProject,
         workspaceId: input.workspaceId,
-        OR: [{ title: { contains: input.q, mode: "insensitive" } }, { description: { contains: input.q, mode: "insensitive" } }],
       },
     });
-    const projects = input.type && !input.type.includes("project") ? [] : this.prisma.project.findMany({
-      orderBy: { updatedAt: "desc" },
-      take: input.limit,
+    const projects = input.type && input.type !== "project" ? [] : this.prisma.project.findMany({
+      orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+      take: input.limit + 1,
       where: {
         ...accessibleProject,
-        OR: [{ name: { contains: input.q, mode: "insensitive" } }, { description: { contains: input.q, mode: "insensitive" } }],
+        AND: compactWhere<Prisma.ProjectWhereInput>([
+          searchAfterWhere<Prisma.ProjectWhereInput>("project", input.after),
+          { OR: [{ name: { contains: input.q, mode: "insensitive" } }, { description: { contains: input.q, mode: "insensitive" } }] },
+        ]),
       },
     });
     return Promise.all([tasks, projects]);
@@ -362,4 +368,35 @@ export class WorkRepository {
       ],
     };
   }
+}
+
+export type SearchWorkspaceCursor = {
+  id: string;
+  type: SearchResultType;
+  updatedAt: Date;
+};
+
+const searchResultTypeRank: Record<SearchResultType, number> = {
+  project: 0,
+  task: 1,
+};
+
+function compactWhere<TWhere>(items: Array<TWhere | undefined>) {
+  return items.filter((item): item is TWhere => Boolean(item));
+}
+
+function searchAfterWhere<TWhere>(resultType: SearchResultType, after?: SearchWorkspaceCursor): TWhere | undefined {
+  if (!after) return undefined;
+  const resultRank = searchResultRank(resultType);
+  const afterRank = searchResultRank(after.type);
+  const sameTimestampFilters: Prisma.ProjectWhereInput[] = [];
+  if (resultRank > afterRank) sameTimestampFilters.push({ updatedAt: after.updatedAt });
+  if (resultRank === afterRank) sameTimestampFilters.push({ id: { gt: after.id }, updatedAt: after.updatedAt });
+  return {
+    OR: [{ updatedAt: { lt: after.updatedAt } }, ...sameTimestampFilters],
+  } as TWhere;
+}
+
+function searchResultRank(type: SearchResultType) {
+  return searchResultTypeRank[type] ?? 0;
 }

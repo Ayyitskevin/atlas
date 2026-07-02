@@ -15,6 +15,7 @@ import {
   myWorkQuerySchema,
   notificationQuerySchema,
   reorderSectionsRequestSchema,
+  searchResponseSchema,
   searchQuerySchema,
   updateCommentRequestSchema,
   updateSectionRequestSchema,
@@ -85,5 +86,16 @@ export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
   app.post("/workspaces/:workspaceId/notifications/:notificationId/read", { schema: openApiSchema({ params: notificationParamsSchema, tags: ["Notifications"] }) }, controller.markNotificationRead);
   app.post("/workspaces/:workspaceId/notifications/read-all", { schema: openApiSchema({ params: workspaceParamsSchema, tags: ["Notifications"] }) }, controller.markAllNotificationsRead);
 
-  app.get("/workspaces/:workspaceId/search", { schema: openApiSchema({ params: workspaceParamsSchema, querystring: searchQuerySchema, tags: ["Search"] }) }, controller.search);
+  app.get(
+    "/workspaces/:workspaceId/search",
+    {
+      schema: openApiSchema({
+        params: workspaceParamsSchema,
+        querystring: searchQuerySchema,
+        response: { 200: searchResponseSchema },
+        tags: ["Search"],
+      }),
+    },
+    controller.search,
+  );
 }

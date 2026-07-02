@@ -918,6 +918,22 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     expect(privateTask.statusCode).toBe(201);
     const privateTaskId = privateTask.json<{ id: string }>().id;
 
+    const secondPrivateTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { sectionId: privateSection.json<{ id: string }>().id, title: secretTitle + " follow-up" },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + privateProjectId + "/tasks",
+    });
+    expect(secondPrivateTask.statusCode).toBe(201);
+    const secondPrivateTaskId = secondPrivateTask.json<{ id: string }>().id;
+
+    const invalidSearchType = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/search?q=" + encodeURIComponent(secretTitle) + "&type=comment",
+    });
+    expect(invalidSearchType.statusCode).toBe(400);
+
     const ownerTaskSearch = await app!.inject({
       headers: authHeaders(accessToken),
       method: "GET",
@@ -930,6 +946,47 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
         type: "task",
       }),
     );
+    expect(ownerTaskSearch.json<{ pageInfo: { hasNextPage: boolean; nextCursor: string | null } }>().pageInfo).toEqual({
+      hasNextPage: false,
+      nextCursor: null,
+    });
+
+    const firstTaskSearchPage = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/search?q=" + encodeURIComponent(secretTitle) + "&type=task&limit=1",
+    });
+    expect(firstTaskSearchPage.statusCode).toBe(200);
+    const firstTaskSearchPageBody = firstTaskSearchPage.json<{
+      items: Array<{ task: { id: string }; type: "task" }>;
+      pageInfo: { hasNextPage: boolean; nextCursor: string | null };
+    }>();
+    expect(firstTaskSearchPageBody.items).toHaveLength(1);
+    expect(firstTaskSearchPageBody.pageInfo.hasNextPage).toBe(true);
+    expect(typeof firstTaskSearchPageBody.pageInfo.nextCursor).toBe("string");
+
+    const secondTaskSearchPage = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url:
+        "/api/v1/workspaces/" +
+        workspaceId +
+        "/search?q=" +
+        encodeURIComponent(secretTitle) +
+        "&type=task&limit=1&cursor=" +
+        encodeURIComponent(firstTaskSearchPageBody.pageInfo.nextCursor ?? ""),
+    });
+    expect(secondTaskSearchPage.statusCode).toBe(200);
+    const secondTaskSearchPageBody = secondTaskSearchPage.json<{
+      items: Array<{ task: { id: string }; type: "task" }>;
+      pageInfo: { hasNextPage: boolean; nextCursor: string | null };
+    }>();
+    expect(secondTaskSearchPageBody.items).toHaveLength(1);
+    expect(secondTaskSearchPageBody.items[0]?.task.id).not.toBe(firstTaskSearchPageBody.items[0]?.task.id);
+    expect([firstTaskSearchPageBody.items[0]?.task.id, secondTaskSearchPageBody.items[0]?.task.id].sort()).toEqual(
+      [privateTaskId, secondPrivateTaskId].sort(),
+    );
+    expect(secondTaskSearchPageBody.pageInfo).toEqual({ hasNextPage: false, nextCursor: null });
 
     const ownerProjectSearch = await app!.inject({
       headers: authHeaders(accessToken),

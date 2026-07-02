@@ -11,7 +11,9 @@ import {
   type MyWorkQuery,
   type NotificationQuery,
   type ReorderSectionsRequest,
+  searchCursorSchema,
   type SearchQuery,
+  type SearchResultType,
   type UpdateCommentRequest,
   type UpdateSectionRequest,
   type UpdateSubtaskRequest,
@@ -468,8 +470,22 @@ export class WorkService {
 
   async search(ctx: AuthContext, workspaceId: string, query: SearchQuery) {
     await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
-    const [tasks, projects] = await this.workRepository.searchWorkspace({ ...query, userId: ctx.userId, workspaceId });
-    return { items: [...projects.map((project) => ({ type: "project", project })), ...tasks.map((task) => ({ type: "task", task }))] };
+    const after = decodeSearchCursor(query.cursor, query.type);
+    const [tasks, projects] = await this.workRepository.searchWorkspace({ ...query, after, userId: ctx.userId, workspaceId });
+    const items: SearchResultItem[] = [
+      ...projects.map((project) => ({ type: "project" as const, project })),
+      ...tasks.map((task) => ({ type: "task" as const, task })),
+    ].sort(compareSearchResults);
+    const pageItems = items.slice(0, query.limit);
+    const hasNextPage = items.length > query.limit;
+    const lastPageItem = pageItems.at(-1);
+    return {
+      items: pageItems,
+      pageInfo: {
+        hasNextPage,
+        nextCursor: hasNextPage && lastPageItem ? encodeSearchCursor(lastPageItem) : null,
+      },
+    };
   }
 
   private async requireSectionInProject(workspaceId: string, projectId: string, sectionId: string) {
@@ -491,4 +507,68 @@ export class WorkService {
       throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "One or more assignees are not active members of this Workspace.");
     }
   }
+}
+
+type SearchCursor = {
+  id: string;
+  type: SearchResultType;
+  updatedAt: Date;
+};
+
+type SearchResultItem =
+  | { project: { id: string; updatedAt: Date }; type: "project" }
+  | { task: { id: string; updatedAt: Date }; type: "task" };
+
+const searchResultTypeRank: Record<SearchResultType, number> = {
+  project: 0,
+  task: 1,
+};
+
+function compareSearchResults(left: SearchResultItem, right: SearchResultItem) {
+  const updatedAtDelta = searchResultUpdatedAt(right).getTime() - searchResultUpdatedAt(left).getTime();
+  if (updatedAtDelta) return updatedAtDelta;
+  const typeDelta = searchResultRank(left.type) - searchResultRank(right.type);
+  if (typeDelta) return typeDelta;
+  return searchResultId(left).localeCompare(searchResultId(right));
+}
+
+function decodeSearchCursor(cursor?: string, requestedType?: SearchResultType): SearchCursor | undefined {
+  if (!cursor) return undefined;
+  try {
+    const parsed = searchCursorSchema.safeParse(JSON.parse(Buffer.from(cursor, "base64url").toString("utf8")));
+    if (!parsed.success) throw new Error("Invalid cursor payload.");
+    if (requestedType && parsed.data.type !== requestedType) {
+      throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "Search cursor does not match the requested result type.");
+    }
+    return {
+      id: parsed.data.id,
+      type: parsed.data.type,
+      updatedAt: new Date(parsed.data.updatedAt),
+    };
+  } catch (error) {
+    if (error instanceof AtlasHttpError) throw error;
+    throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "Invalid search cursor.");
+  }
+}
+
+function encodeSearchCursor(item: SearchResultItem) {
+  return Buffer.from(
+    JSON.stringify({
+      id: searchResultId(item),
+      type: item.type,
+      updatedAt: searchResultUpdatedAt(item).toISOString(),
+    }),
+  ).toString("base64url");
+}
+
+function searchResultId(item: SearchResultItem) {
+  return item.type === "project" ? item.project.id : item.task.id;
+}
+
+function searchResultUpdatedAt(item: SearchResultItem) {
+  return item.type === "project" ? item.project.updatedAt : item.task.updatedAt;
+}
+
+function searchResultRank(type: SearchResultType) {
+  return searchResultTypeRank[type] ?? 0;
 }

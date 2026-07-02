@@ -5,6 +5,7 @@ import { useState } from "react";
 
 import { api, errorMessage } from "./atlas-api";
 import type { AuthPair, Page, SearchResult } from "./atlas-types";
+import { searchStatusMessage } from "./workspace-search-utils";
 
 type UseWorkspaceSearchInput = {
   auth: AuthPair | null;
@@ -16,11 +17,13 @@ type UseWorkspaceSearchInput = {
 
 export function useWorkspaceSearch({ auth, chooseProject, chooseTask, selectedWorkspaceId, setMessage }: UseWorkspaceSearchInput) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchNextCursor, setSearchNextCursor] = useState("");
   const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
   const [searchStatus, setSearchStatus] = useState("");
 
   function clearSearch() {
     setSearchQuery("");
+    setSearchNextCursor("");
     setSearchResults([]);
     setSearchStatus("");
   }
@@ -30,6 +33,7 @@ export function useWorkspaceSearch({ auth, chooseProject, chooseTask, selectedWo
     if (!auth || !selectedWorkspaceId) return;
     const queryText = searchQuery.trim();
     if (!queryText) {
+      setSearchNextCursor("");
       setSearchResults([]);
       setSearchStatus("");
       return;
@@ -37,14 +41,29 @@ export function useWorkspaceSearch({ auth, chooseProject, chooseTask, selectedWo
 
     try {
       setSearchStatus("Searching...");
-      const query = new URLSearchParams({ limit: "8", q: queryText });
-      const resultPage = await api<Page<SearchResult>>(
-        "/workspaces/" + selectedWorkspaceId + "/search?" + query.toString(),
-        {},
-        auth.accessToken,
-      );
+      const resultPage = await fetchSearchPage(auth.accessToken, queryText);
       setSearchResults(resultPage.items);
-      setSearchStatus(resultPage.items.length + " " + (resultPage.items.length === 1 ? "result" : "results"));
+      setSearchNextCursor(resultPage.pageInfo?.nextCursor ?? "");
+      setSearchStatus(searchStatusMessage(resultPage.items.length, Boolean(resultPage.pageInfo?.hasNextPage)));
+      setMessage("");
+    } catch (error) {
+      setSearchStatus("");
+      setMessage(errorMessage(error));
+    }
+  }
+
+  async function loadMoreSearchResults() {
+    if (!auth || !selectedWorkspaceId || !searchNextCursor) return;
+    const queryText = searchQuery.trim();
+    if (!queryText) return;
+
+    try {
+      setSearchStatus("Loading more results...");
+      const resultPage = await fetchSearchPage(auth.accessToken, queryText, searchNextCursor);
+      const nextResults = [...searchResults, ...resultPage.items];
+      setSearchResults(nextResults);
+      setSearchNextCursor(resultPage.pageInfo?.nextCursor ?? "");
+      setSearchStatus(searchStatusMessage(nextResults.length, Boolean(resultPage.pageInfo?.hasNextPage)));
       setMessage("");
     } catch (error) {
       setSearchStatus("");
@@ -71,8 +90,20 @@ export function useWorkspaceSearch({ auth, chooseProject, chooseTask, selectedWo
     }
   }
 
+  async function fetchSearchPage(accessToken: string, queryText: string, cursor?: string) {
+    const query = new URLSearchParams({ limit: "8", q: queryText });
+    if (cursor) query.set("cursor", cursor);
+    return api<Page<SearchResult>>(
+      "/workspaces/" + selectedWorkspaceId + "/search?" + query.toString(),
+      {},
+      accessToken,
+    );
+  }
+
   return {
     clearSearch,
+    hasMoreSearchResults: Boolean(searchNextCursor),
+    loadMoreSearchResults,
     openSearchResult,
     searchQuery,
     searchResults,
