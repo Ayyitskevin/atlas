@@ -173,8 +173,17 @@ export type WorkspaceInvitation = {
   workspaceId: string;
 };
 
+export type EmailDeliveryOutcome = {
+  provider: string;
+  providerMessageId?: string;
+  reason?: string;
+  recipientCount: number;
+  status: "delivered" | "failed" | "stubbed";
+};
+
 export type WorkspaceInvitationWithToken = WorkspaceInvitation & {
   acceptToken: string;
+  emailDelivery: EmailDeliveryOutcome;
   status: "PENDING";
 };
 
@@ -184,6 +193,7 @@ export type AcceptWorkspaceInvitationResponse = {
 
 export type ResendWorkspaceInvitationResponse = {
   acceptToken: string;
+  emailDelivery: EmailDeliveryOutcome;
   ok: boolean;
 };
 

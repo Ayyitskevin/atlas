@@ -747,7 +747,12 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + lifecycleWorkspaceId + "/invitations",
     });
     expect(firstInvite.statusCode).toBe(201);
-    const firstInviteBody = firstInvite.json<{ acceptToken: string; id: string }>();
+    const firstInviteBody = firstInvite.json<{
+      acceptToken: string;
+      emailDelivery: { provider: string; recipientCount: number; status: string };
+      id: string;
+    }>();
+    expect(firstInviteBody.emailDelivery).toEqual({ provider: "noop", recipientCount: 1, status: "stubbed" });
 
     const listInvitations = await app!.inject({
       headers: authHeaders(accessToken),
@@ -792,7 +797,9 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + lifecycleWorkspaceId + "/invitations/" + firstInviteBody.id + "/resend",
     });
     expect(resend.statusCode).toBe(200);
-    const resentToken = resend.json<{ acceptToken: string }>().acceptToken;
+    const resendBody = resend.json<{ acceptToken: string; emailDelivery: { provider: string; recipientCount: number; status: string } }>();
+    const resentToken = resendBody.acceptToken;
+    expect(resendBody.emailDelivery).toEqual({ provider: "noop", recipientCount: 1, status: "stubbed" });
 
     const oldTokenAccept = await app!.inject({
       headers: authHeaders(firstAccessToken),

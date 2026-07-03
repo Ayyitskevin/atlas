@@ -17,6 +17,14 @@ export type EmailSendResult = {
   stubbed: boolean;
 };
 
+export type EmailDeliveryOutcome = {
+  provider: string;
+  providerMessageId?: string;
+  reason?: string;
+  recipientCount: number;
+  status: "delivered" | "failed" | "stubbed";
+};
+
 export type EmailProvider = {
   readonly from: string;
   readonly name: string;

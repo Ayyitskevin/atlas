@@ -10,6 +10,8 @@ import {
   type UpdateWorkspaceRequest,
 } from "@atlas/shared";
 
+import type { EmailDeliveryOutcome, EmailProvider } from "../../email/email-provider.js";
+import { sendWorkspaceInvitationEmail } from "../../email/workspace-invitation-email.js";
 import type { AuthContext } from "../../shared/auth-context.js";
 import { createOpaqueToken, hashToken } from "../../shared/crypto.js";
 import { AtlasHttpError } from "../../shared/errors.js";
@@ -23,6 +25,8 @@ export class WorkspacesService {
   constructor(
     private readonly workspacesRepository: WorkspacesRepository,
     private readonly permissions: PermissionsService,
+    private readonly emailProvider: EmailProvider,
+    private readonly webOrigin: string,
   ) {}
 
   async create(ctx: AuthContext, input: CreateWorkspaceRequest) {
@@ -74,8 +78,17 @@ export class WorkspacesService {
       tokenHash: hashToken(acceptToken),
       workspaceId,
     });
+    const emailDelivery = await this.deliverInvitationEmail({
+      acceptToken,
+      email,
+      expiresAt: invitation.expiresAt,
+      invitationId: invitation.id,
+      invitedById: ctx.userId,
+      role: invitation.role as Exclude<WorkspaceRole, "OWNER">,
+      workspaceId,
+    });
 
-    return { ...invitation, acceptToken, status: "PENDING" };
+    return { ...invitation, acceptToken, emailDelivery, status: "PENDING" };
   }
 
   async acceptInvitation(ctx: AuthContext, input: AcceptWorkspaceInvitationRequest) {
@@ -116,14 +129,23 @@ export class WorkspacesService {
   async resendInvitation(ctx: AuthContext, workspaceId: string, invitationId: string) {
     await this.permissions.requireWorkspaceRole(ctx, workspaceId, "ADMIN");
     const acceptToken = createOpaqueToken();
-    const result = await this.workspacesRepository.resendInvitation({
+    const invitation = await this.workspacesRepository.resendInvitation({
       expiresAt: new Date(Date.now() + invitationTtlMs),
       invitationId,
       tokenHash: hashToken(acceptToken),
       workspaceId,
     });
-    if (result.count === 0) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Invitation not found.");
-    return { acceptToken, ok: true };
+    if (!invitation) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Invitation not found.");
+    const emailDelivery = await this.deliverInvitationEmail({
+      acceptToken,
+      email: invitation.email,
+      expiresAt: invitation.expiresAt,
+      invitationId: invitation.id,
+      invitedById: invitation.invitedById,
+      role: invitation.role as Exclude<WorkspaceRole, "OWNER">,
+      workspaceId,
+    });
+    return { acceptToken, emailDelivery, ok: true };
   }
 
   async listMembers(ctx: AuthContext, workspaceId: string) {
@@ -164,5 +186,41 @@ export class WorkspacesService {
     });
     if (!member) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Target Workspace member not found.");
     return { ok: true };
+  }
+
+  private async deliverInvitationEmail(input: {
+    acceptToken: string;
+    email: string;
+    expiresAt: Date;
+    invitationId: string;
+    invitedById: string;
+    role: Exclude<WorkspaceRole, "OWNER">;
+    workspaceId: string;
+  }): Promise<EmailDeliveryOutcome> {
+    const context = await this.workspacesRepository.findInvitationEmailContext({
+      invitedById: input.invitedById,
+      workspaceId: input.workspaceId,
+    });
+    if (!context) {
+      return {
+        provider: this.emailProvider.name,
+        reason: "Workspace no longer exists.",
+        recipientCount: 0,
+        status: "failed",
+      };
+    }
+
+    const invitedByName = context.members[0]?.user.name ?? context.owner.name;
+    return sendWorkspaceInvitationEmail(this.emailProvider, {
+      acceptToken: input.acceptToken,
+      email: input.email,
+      expiresAt: input.expiresAt,
+      invitationId: input.invitationId,
+      invitedByName,
+      role: input.role,
+      webOrigin: this.webOrigin,
+      workspaceId: input.workspaceId,
+      workspaceName: context.name,
+    });
   }
 }

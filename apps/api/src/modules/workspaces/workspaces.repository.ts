@@ -33,6 +33,22 @@ export class WorkspacesRepository {
     return this.prisma.workspace.findFirst({ where: { deletedAt: null, id: workspaceId } });
   }
 
+  findInvitationEmailContext(input: { invitedById: string; workspaceId: string }) {
+    return this.prisma.workspace.findFirst({
+      select: {
+        id: true,
+        name: true,
+        ownerId: true,
+        owner: { select: { name: true } },
+        members: {
+          select: { user: { select: { name: true } }, userId: true },
+          where: { deletedAt: null, userId: input.invitedById },
+        },
+      },
+      where: { deletedAt: null, id: input.workspaceId },
+    });
+  }
+
   update(workspaceId: string, input: { name?: string; slug?: string }) {
     return this.prisma.workspace.update({ data: input, where: { id: workspaceId } });
   }
@@ -156,15 +172,22 @@ export class WorkspacesRepository {
   }
 
   resendInvitation(input: { expiresAt: Date; invitationId: string; tokenHash: string; workspaceId: string }) {
-    return this.prisma.workspaceInvitation.updateMany({
-      data: { expiresAt: input.expiresAt, tokenHash: input.tokenHash },
-      where: {
-        acceptedAt: null,
-        canceledAt: null,
-        declinedAt: null,
-        id: input.invitationId,
-        workspaceId: input.workspaceId,
-      },
+    return this.prisma.$transaction(async (tx) => {
+      const updated = await tx.workspaceInvitation.updateMany({
+        data: { expiresAt: input.expiresAt, tokenHash: input.tokenHash },
+        where: {
+          acceptedAt: null,
+          canceledAt: null,
+          declinedAt: null,
+          id: input.invitationId,
+          workspaceId: input.workspaceId,
+        },
+      });
+      if (updated.count === 0) return null;
+      return tx.workspaceInvitation.findFirst({
+        select: invitationSelect,
+        where: { id: input.invitationId, workspaceId: input.workspaceId },
+      });
     });
   }
 

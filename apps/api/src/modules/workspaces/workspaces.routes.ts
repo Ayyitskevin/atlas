@@ -12,6 +12,8 @@ import {
 } from "@atlas/shared";
 import { prisma } from "@atlas/db";
 
+import { env } from "../../config/env.js";
+import { createEmailProvider } from "../../email/email-provider.js";
 import { openApiSchema } from "../../shared/zod-openapi.js";
 import { PermissionsService } from "../permissions/permissions.service.js";
 import { WorkspacesController } from "./workspaces.controller.js";
@@ -24,7 +26,12 @@ const memberParamsSchema = workspaceParamsSchema.extend({ userId: z.string().uui
 
 export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<void> {
   const controller = new WorkspacesController(
-    new WorkspacesService(new WorkspacesRepository(prisma), new PermissionsService(prisma)),
+    new WorkspacesService(
+      new WorkspacesRepository(prisma),
+      new PermissionsService(prisma),
+      createEmailProvider({ from: env.EMAIL_FROM, provider: env.EMAIL_PROVIDER }),
+      env.WEB_ORIGIN,
+    ),
   );
 
   app.post("/workspaces", { schema: openApiSchema({ body: createWorkspaceRequestSchema, tags: ["Workspaces"] }) }, controller.create);

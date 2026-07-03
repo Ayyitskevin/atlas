@@ -4,7 +4,16 @@ import type { FormEvent } from "react";
 import { useState } from "react";
 
 import { api, errorMessage } from "./atlas-api";
-import type { AuthPair, Page, ResendWorkspaceInvitationResponse, WorkspaceInvitation, WorkspaceInvitationWithToken, WorkspaceMember, WorkspaceRole } from "./atlas-types";
+import type {
+  AuthPair,
+  EmailDeliveryOutcome,
+  Page,
+  ResendWorkspaceInvitationResponse,
+  WorkspaceInvitation,
+  WorkspaceInvitationWithToken,
+  WorkspaceMember,
+  WorkspaceRole,
+} from "./atlas-types";
 
 export function useWorkspaceAdmin(auth: AuthPair | null, selectedWorkspaceId: string, currentUserId?: string) {
   const [workspaceMembers, setWorkspaceMembers] = useState<WorkspaceMember[]>([]);
@@ -75,7 +84,7 @@ export function useWorkspaceAdmin(auth: AuthPair | null, selectedWorkspaceId: st
       );
       setWorkspaceAdminToken(invitation.acceptToken);
       await refreshWorkspaceAdmin();
-      setWorkspaceAdminMessage("Invitation created.");
+      setWorkspaceAdminMessage(invitationDeliveryMessage("Invitation created.", invitation.emailDelivery));
       event.currentTarget.reset();
     } catch (error) {
       setWorkspaceAdminMessage(errorMessage(error));
@@ -110,7 +119,7 @@ export function useWorkspaceAdmin(auth: AuthPair | null, selectedWorkspaceId: st
       );
       setWorkspaceAdminToken(result.acceptToken);
       await refreshWorkspaceAdmin();
-      setWorkspaceAdminMessage("Invitation resent.");
+      setWorkspaceAdminMessage(invitationDeliveryMessage("Invitation resent.", result.emailDelivery));
     } catch (error) {
       setWorkspaceAdminMessage(errorMessage(error));
     }
@@ -180,4 +189,15 @@ export function useWorkspaceAdmin(auth: AuthPair | null, selectedWorkspaceId: st
     workspaceInvitations,
     workspaceMembers,
   };
+}
+
+function invitationDeliveryMessage(prefix: string, delivery: EmailDeliveryOutcome) {
+  switch (delivery.status) {
+    case "delivered":
+      return prefix + " Email sent to " + delivery.recipientCount + " recipient.";
+    case "failed":
+      return prefix + " Email delivery failed: " + (delivery.reason ?? "Unknown provider error.");
+    case "stubbed":
+      return prefix + " Email delivery is in no-op mode.";
+  }
 }
