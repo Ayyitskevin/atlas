@@ -89,6 +89,8 @@ corepack pnpm dev
 
 Worker note: search indexing is intentionally served by direct database queries until an external provider is chosen. Email delivery uses `EMAIL_PROVIDER=noop` by default, returning structured no-op outcomes and writing BullMQ job logs plus durable `worker_job_outcomes` rows so local operators can distinguish delivered, skipped, failed, and stubbed side effects from outbox detail. Set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, and a verified-domain `EMAIL_FROM` value to send through Resend.
 
+Production note: when `NODE_ENV=production`, Atlas refuses to start with local JWT placeholders, secrets shorter than 32 characters, or matching access/refresh secrets. Generate unique values for `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` before deploying.
+
 Run the dockerized E2E smoke test against a running API container:
 
 ```bash

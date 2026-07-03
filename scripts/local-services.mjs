@@ -1,4 +1,7 @@
 import { spawnSync } from "node:child_process";
+import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 export const repoRoot = fileURLToPath(new URL("..", import.meta.url));
@@ -53,6 +56,7 @@ export async function withLocalIntegrationServices(task, options = {}) {
   };
 
   let cleaningUp = false;
+  let releaseLock = () => {};
   let serviceDriver;
 
   const cleanup = () => {
@@ -73,6 +77,7 @@ export async function withLocalIntegrationServices(task, options = {}) {
   process.once("SIGTERM", handleSigterm);
 
   try {
+    releaseLock = acquireProjectLock(config.projectName);
     serviceDriver = selectServiceDriver(config, composeEnv);
     console.info("Starting integration services with " + serviceDriver.name + ".");
     serviceDriver.cleanup();
@@ -84,6 +89,7 @@ export async function withLocalIntegrationServices(task, options = {}) {
     process.off("SIGINT", handleSigint);
     process.off("SIGTERM", handleSigterm);
     cleanup();
+    releaseLock();
   }
 }
 
@@ -107,6 +113,63 @@ export function run(command, args, options = {}) {
 function validateDriver(requestedDriver) {
   if (!["auto", "compose", "podman"].includes(requestedDriver)) {
     throw new Error("ATLAS_INTEGRATION_DRIVER must be auto, compose, or podman.");
+  }
+}
+
+function acquireProjectLock(projectName) {
+  const lockDir = join(tmpdir(), sanitizeResourceName(projectName) + ".lock");
+  createLockDir(lockDir, projectName);
+  writeFileSync(
+    join(lockDir, "owner.json"),
+    JSON.stringify({
+      pid: process.pid,
+      projectName,
+      startedAt: new Date().toISOString(),
+    }) + "\n",
+  );
+  return () => rmSync(lockDir, { force: true, recursive: true });
+}
+
+function createLockDir(lockDir, projectName) {
+  try {
+    mkdirSync(lockDir);
+    return;
+  } catch (error) {
+    if (!isNodeError(error) || error.code !== "EEXIST") throw error;
+  }
+
+  if (hasStaleLock(lockDir)) {
+    rmSync(lockDir, { force: true, recursive: true });
+    mkdirSync(lockDir);
+    return;
+  }
+
+  throw new Error(
+    "Local integration services are already running for project " +
+      projectName +
+      ". Wait for the current command to finish, or set ATLAS_INTEGRATION_PROJECT and alternate ports for a parallel run.",
+  );
+}
+
+function hasStaleLock(lockDir) {
+  const ownerPath = join(lockDir, "owner.json");
+  if (!existsSync(ownerPath)) return true;
+
+  try {
+    const owner = JSON.parse(readFileSync(ownerPath, "utf8"));
+    return typeof owner.pid !== "number" || !isProcessRunning(owner.pid);
+  } catch {
+    return true;
+  }
+}
+
+function isProcessRunning(pid) {
+  try {
+    process.kill(pid, 0);
+    return true;
+  } catch (error) {
+    if (isNodeError(error) && error.code === "ESRCH") return false;
+    return true;
   }
 }
 
@@ -143,7 +206,7 @@ function dockerComposeDriver(config, composeEnv) {
 }
 
 function podmanDriver(config) {
-  const resourcePrefix = config.projectName.replace(/[^a-zA-Z0-9_.-]/g, "-") || "atlas-integration";
+  const resourcePrefix = sanitizeResourceName(config.projectName) || "atlas-integration";
   const postgresContainer = resourcePrefix + "-postgres";
   const redisContainer = resourcePrefix + "-redis";
   const postgresVolume = resourcePrefix + "-postgres-data";
@@ -209,4 +272,12 @@ function waitForService(name, checkService) {
 function driverError(name, result) {
   const detail = result.error ? result.error.message : "exit code " + result.status;
   return new Error(name + " is not usable by this session: " + detail);
+}
+
+function sanitizeResourceName(name) {
+  return name.replace(/[^a-zA-Z0-9_.-]/g, "-");
+}
+
+function isNodeError(error) {
+  return error instanceof Error && "code" in error;
 }

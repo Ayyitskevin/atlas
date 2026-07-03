@@ -1,14 +1,19 @@
 import { z } from "zod";
 
+const localDevAccessSecret = "local-dev-access-secret-change-me";
+const localDevRefreshSecret = "local-dev-refresh-secret-change-me";
+const minimumProductionSecretLength = 32;
+
 const envSchema = z.object({
   API_HOST: z.string().default("0.0.0.0"),
   API_PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().default("postgresql://atlas:atlas@localhost:5432/atlas"),
   EMAIL_FROM: z.string().default("no-reply@atlas.local"),
   EMAIL_PROVIDER: z.enum(["noop", "resend"]).default("noop"),
-  JWT_ACCESS_SECRET: z.string().default("local-dev-access-secret-change-me"),
-  JWT_REFRESH_SECRET: z.string().default("local-dev-refresh-secret-change-me"),
+  JWT_ACCESS_SECRET: z.string().default(localDevAccessSecret),
+  JWT_REFRESH_SECRET: z.string().default(localDevRefreshSecret),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
+  NODE_ENV: z.string().default("development"),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
   RATE_LIMIT_WINDOW: z.string().default("1 minute"),
   REDIS_URL: z.string().default("redis://localhost:6379"),
@@ -29,6 +34,40 @@ const envSchema = z.object({
       path: ["RESEND_API_KEY"],
     });
   }
+  if (value.NODE_ENV === "production") {
+    requireProductionJwtSecret(ctx, "JWT_ACCESS_SECRET", value.JWT_ACCESS_SECRET, localDevAccessSecret);
+    requireProductionJwtSecret(ctx, "JWT_REFRESH_SECRET", value.JWT_REFRESH_SECRET, localDevRefreshSecret);
+    if (value.JWT_ACCESS_SECRET === value.JWT_REFRESH_SECRET) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be different in production.",
+        path: ["JWT_REFRESH_SECRET"],
+      });
+    }
+  }
 });
 
-export const env = envSchema.parse(process.env);
+export function parseEnv(input: NodeJS.ProcessEnv) {
+  return envSchema.parse(input);
+}
+
+export const env = parseEnv(process.env);
+
+function requireProductionJwtSecret(ctx: z.RefinementCtx, name: "JWT_ACCESS_SECRET" | "JWT_REFRESH_SECRET", value: string, localDefault: string) {
+  if (value === localDefault || value.startsWith("replace-with-")) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: name + " must be changed from the local development placeholder in production.",
+      path: [name],
+    });
+    return;
+  }
+
+  if (value.length < minimumProductionSecretLength) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: name + " must be at least " + minimumProductionSecretLength + " characters in production.",
+      path: [name],
+    });
+  }
+}
