@@ -288,6 +288,38 @@ describe("worker handlers", () => {
     });
   });
 
+  it("creates specific notifications when dependency events unblock tasks", async () => {
+    const actorUserId = randomUUID();
+    const recipientId = randomUUID();
+    const taskId = randomUUID();
+    const store = notificationStore({
+      task: {
+        assignees: [{ userId: recipientId }],
+        id: taskId,
+        title: "Client review",
+        watchers: [],
+      },
+    });
+    const job = jobFor(eventJob({ actorUserId, eventType: "TaskDependencyUnblocked", payload: { blockingTaskTitle: "Design draft" }, taskId }));
+
+    await expect(handleNotificationFanoutJob(job, store)).resolves.toMatchObject({
+      recipientCount: 1,
+      status: "delivered",
+    });
+    expect(store.notification.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          body: "\"Client review\" is unblocked because \"Design draft\" was completed.",
+          recipientId,
+          taskId,
+          title: "Task unblocked",
+          type: "task.TaskDependencyUnblocked",
+        }),
+      ],
+      skipDuplicates: true,
+    });
+  });
+
   it("skips notification fanout when no eligible assignees remain", async () => {
     const actorUserId = randomUUID();
     const store = notificationStore({
@@ -317,6 +349,7 @@ function eventJob(input: Partial<MutationEventJob> = {}): MutationEventJob {
     entityType: "task",
     eventId: randomUUID(),
     eventType: "TaskUpdated",
+    payload: {},
     projectId: randomUUID(),
     taskId: randomUUID(),
     workspaceId: randomUUID(),

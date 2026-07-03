@@ -358,6 +358,36 @@ export class WorkRepository {
     });
   }
 
+  listTasksUnblockedByCompletion(input: { blockingTaskId: string; workspaceId: string }) {
+    return this.prisma.taskDependency.findMany({
+      select: {
+        blockedTask: {
+          select: {
+            dependenciesAsBlocked: {
+              select: { id: true },
+              take: 1,
+              where: {
+                blockingTask: { deletedAt: null, status: { not: "DONE" } },
+                blockingTaskId: { not: input.blockingTaskId },
+                workspaceId: input.workspaceId,
+              },
+            },
+            id: true,
+            projectId: true,
+            title: true,
+          },
+        },
+        blockedTaskId: true,
+        id: true,
+      },
+      where: {
+        blockedTask: { deletedAt: null, status: { not: "DONE" } },
+        blockingTaskId: input.blockingTaskId,
+        workspaceId: input.workspaceId,
+      },
+    });
+  }
+
   findTaskDependencyByPair(input: { blockedTaskId: string; blockingTaskId: string; workspaceId: string }) {
     return this.prisma.taskDependency.findFirst({
       include: {

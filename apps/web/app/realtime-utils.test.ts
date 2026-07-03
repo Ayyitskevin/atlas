@@ -107,6 +107,15 @@ describe("realtime utilities", () => {
       taskId: "task-1",
       type: "TaskDependencyAdded",
     };
+    const unblockedDependencyEvent = {
+      ...dependencyEvent,
+      event: {
+        ...dependencyEvent.event,
+        eventType: "TaskDependencyUnblocked",
+      },
+      eventType: "TaskDependencyUnblocked",
+      type: "TaskDependencyUnblocked",
+    };
     const messageEvent = { eventType: "ProjectMessageCreated", projectId: "project-1", taskId: null } as RealtimeDomainEvent;
     const pinnedMessageEvent = { eventType: "ProjectMessagePinned", projectId: "project-1", taskId: null } as RealtimeDomainEvent;
     const templateEvent = { eventType: "ProjectTemplateCreated", projectId: "project-1", taskId: null } as RealtimeDomainEvent;
@@ -137,5 +146,7 @@ describe("realtime utilities", () => {
     expect(realtimeEventTouchesTask(dependencyEvent, "task-2")).toBe(true);
     expect(realtimeEventTouchesTask(dependencyEvent, "task-3")).toBe(false);
     expect(realtimeEventTouchesProject(dependencyEvent, "project-1")).toBe(true);
+    expect(realtimeEventTouchesTask(unblockedDependencyEvent, "task-2")).toBe(true);
+    expect(realtimeEventTouchesProject(unblockedDependencyEvent, "project-1")).toBe(true);
   });
 });

@@ -101,6 +101,17 @@ describe("atlas format helpers", () => {
       { label: "Blocked by", value: "Design draft" },
     ]);
     expect(
+      formatActivityTitle("TaskDependencyUnblocked"),
+    ).toBe("Task unblocked");
+    expect(
+      formatActivityDetail({
+        entityType: "task_dependency",
+        eventType: "TaskDependencyUnblocked",
+        payload: { blockedTaskTitle: "Client review", blockingTaskTitle: "Design draft" },
+        taskId: "task-1",
+      }),
+    ).toBe("Task: Client review · unblocked after Design draft completed");
+    expect(
       formatActivityDetail({
         entityType: "task",
         eventType: "TaskWatched",

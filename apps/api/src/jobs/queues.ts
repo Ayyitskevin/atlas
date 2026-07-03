@@ -9,6 +9,7 @@ export type MutationEventJob = {
   entityType: string;
   eventId: string;
   eventType: string;
+  payload: Record<string, unknown>;
   projectId?: string | null;
   taskId?: string | null;
   workspaceId: string;

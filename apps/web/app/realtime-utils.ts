@@ -34,6 +34,7 @@ const projectRefreshEvents = new Set([
   "TaskCreated",
   "TaskDependencyAdded",
   "TaskDependencyRemoved",
+  "TaskDependencyUnblocked",
   "TaskLabelAdded",
   "TaskLabelRemoved",
   "TaskMoved",
@@ -152,7 +153,7 @@ export function realtimeEventTouchesProjectMessages(event: RealtimeDomainEvent, 
 export function realtimeEventTouchesTask(event: RealtimeDomainEvent, selectedTaskId: string) {
   if (!selectedTaskId) return false;
   if (event.taskId === selectedTaskId) return true;
-  if (event.eventType === "TaskDependencyAdded" || event.eventType === "TaskDependencyRemoved") {
+  if (event.eventType === "TaskDependencyAdded" || event.eventType === "TaskDependencyRemoved" || event.eventType === "TaskDependencyUnblocked") {
     return dependencyPayloadTouchesTask(event.event.payload, selectedTaskId);
   }
   return false;

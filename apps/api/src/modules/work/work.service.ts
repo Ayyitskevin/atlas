@@ -206,7 +206,10 @@ export class WorkService {
       taskId,
       workspaceId,
     });
-    if (eventType === "TaskCompleted") await this.createNextRecurringTask(ctx, workspaceId, updated);
+    if (eventType === "TaskCompleted") {
+      await this.createNextRecurringTask(ctx, workspaceId, updated);
+      await this.recordTasksUnblockedByCompletion(ctx, workspaceId, updated);
+    }
     return updated;
   }
 
@@ -859,6 +862,38 @@ export class WorkService {
         { openBlockerCount },
       );
     }
+  }
+
+  private async recordTasksUnblockedByCompletion(
+    ctx: AuthContext,
+    workspaceId: string,
+    blockingTask: { id: string; title: string },
+  ) {
+    const rows = await this.workRepository.listTasksUnblockedByCompletion({
+      blockingTaskId: blockingTask.id,
+      workspaceId,
+    });
+    const unblockedRows = rows.filter((row) => row.blockedTask.dependenciesAsBlocked.length === 0);
+
+    await Promise.all(
+      unblockedRows.map((row) =>
+        this.events.recordActivity({
+          actorUserId: ctx.userId,
+          entityId: row.id,
+          entityType: "task_dependency",
+          eventType: "TaskDependencyUnblocked",
+          payload: {
+            blockedTaskId: row.blockedTaskId,
+            blockedTaskTitle: row.blockedTask.title,
+            blockingTaskId: blockingTask.id,
+            blockingTaskTitle: blockingTask.title,
+          },
+          projectId: row.blockedTask.projectId,
+          taskId: row.blockedTaskId,
+          workspaceId,
+        }),
+      ),
+    );
   }
 
   private createRecurrence(input: CreateTaskRequest) {

@@ -30,6 +30,18 @@ describe("taskNotificationCopy", () => {
       body: "\"Launch checklist\" was skipped and advanced to the next occurrence.",
       title: "Recurring task skipped",
     });
+    expect(taskNotificationCopy(event("TaskDependencyAdded", { blockingTaskTitle: "Design draft" }), "Client review")).toEqual({
+      body: "\"Client review\" is now blocked by \"Design draft\".",
+      title: "Dependency added",
+    });
+    expect(taskNotificationCopy(event("TaskDependencyRemoved", { blockingTaskTitle: "Design draft" }), "Client review")).toEqual({
+      body: "\"Client review\" is no longer blocked by \"Design draft\".",
+      title: "Dependency removed",
+    });
+    expect(taskNotificationCopy(event("TaskDependencyUnblocked", { blockingTaskTitle: "Design draft" }), "Client review")).toEqual({
+      body: "\"Client review\" is unblocked because \"Design draft\" was completed.",
+      title: "Task unblocked",
+    });
   });
 
   it("falls back to generic task activity copy for unknown event types", () => {
@@ -40,13 +52,14 @@ describe("taskNotificationCopy", () => {
   });
 });
 
-function event(eventType: string) {
+function event(eventType: string, payload: Record<string, unknown> = {}) {
   return {
     actorUserId: randomUUID(),
     entityId: randomUUID(),
     entityType: "task",
     eventId: randomUUID(),
     eventType,
+    payload,
     taskId: randomUUID(),
     workspaceId: randomUUID(),
   };

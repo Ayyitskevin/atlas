@@ -32,6 +32,27 @@ export function taskNotificationCopy(event: MutationEventJob, taskTitle: string)
       return { body: "A follower was added to " + quote(title) + ".", title: "Follower added" };
     case "TaskUnwatched":
       return { body: "A follower was removed from " + quote(title) + ".", title: "Follower removed" };
+    case "TaskDependencyAdded": {
+      const blockingTaskTitle = stringPayload(event.payload, "blockingTaskTitle");
+      return {
+        body: quote(title) + " is now blocked" + (blockingTaskTitle ? " by " + quote(blockingTaskTitle) : "") + ".",
+        title: "Dependency added",
+      };
+    }
+    case "TaskDependencyRemoved": {
+      const blockingTaskTitle = stringPayload(event.payload, "blockingTaskTitle");
+      return {
+        body: quote(title) + " is no longer blocked" + (blockingTaskTitle ? " by " + quote(blockingTaskTitle) : "") + ".",
+        title: "Dependency removed",
+      };
+    }
+    case "TaskDependencyUnblocked": {
+      const blockingTaskTitle = stringPayload(event.payload, "blockingTaskTitle");
+      return {
+        body: quote(title) + " is unblocked" + (blockingTaskTitle ? " because " + quote(blockingTaskTitle) + " was completed" : "") + ".",
+        title: "Task unblocked",
+      };
+    }
     case "SubtaskCreated":
       return { body: "A subtask was added to " + quote(title) + ".", title: "Subtask added" };
     case "SubtaskUpdated":
@@ -57,4 +78,9 @@ export function taskNotificationCopy(event: MutationEventJob, taskTitle: string)
 
 function quote(value: string): string {
   return '"' + value + '"';
+}
+
+function stringPayload(payload: Record<string, unknown>, key: string): string | null {
+  const value = payload[key];
+  return typeof value === "string" && value.trim() ? value : null;
 }

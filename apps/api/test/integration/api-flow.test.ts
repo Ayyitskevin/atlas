@@ -1456,6 +1456,15 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockingTaskId + "/complete",
     });
     expect(completeBlockingTask.statusCode).toBe(200);
+    await expectActivityEvent({
+      entityId: dependencyId,
+      entityType: "task_dependency",
+      eventType: "TaskDependencyUnblocked",
+      payload: { blockedTaskId, blockingTaskId },
+      projectId,
+      taskId: blockedTaskId,
+      workspaceId,
+    });
 
     const dependenciesAfterBlockerDone = await app!.inject({
       headers: authHeaders(accessToken),

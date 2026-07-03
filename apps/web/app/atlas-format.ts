@@ -37,6 +37,7 @@ const activityTitles: Record<string, string> = {
   TaskCreated: "Task created",
   TaskDependencyAdded: "Dependency added",
   TaskDependencyRemoved: "Dependency removed",
+  TaskDependencyUnblocked: "Task unblocked",
   TaskLabelAdded: "Label added",
   TaskLabelRemoved: "Label removed",
   TaskMoved: "Task moved",
@@ -209,6 +210,8 @@ function taskActivityMetadata(payload: Record<string, unknown>) {
 function taskDependencyActivityDetail(activity: ActivitySummaryInput, payload: Record<string, unknown>) {
   const blocked = stringPayload(payload, "blockedTaskTitle");
   const blocking = stringPayload(payload, "blockingTaskTitle");
+  if (activity.eventType === "TaskDependencyRemoved" && blocked && blocking) return "Task: " + blocked + " · no longer blocked by " + blocking;
+  if (activity.eventType === "TaskDependencyUnblocked" && blocked && blocking) return "Task: " + blocked + " · unblocked after " + blocking + " completed";
   if (blocked && blocking) return "Task: " + blocked + " · blocked by " + blocking;
   return scopeLabel(activity);
 }
