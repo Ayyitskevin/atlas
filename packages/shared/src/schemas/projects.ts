@@ -22,6 +22,7 @@ export const updateProjectTemplateRequestSchema = z.object({
 
 export const createProjectFromTemplateRequestSchema = z.object({
   description: z.string().trim().max(4000).optional(),
+  dueDateAnchor: z.string().date().optional(),
   name: z.string().trim().min(1).max(160),
   visibility: projectVisibilitySchema.default("WORKSPACE"),
 });

@@ -12,6 +12,8 @@ import type {
 
 import { paginationArgs } from "../../shared/pagination.js";
 
+const dayInMs = 24 * 60 * 60 * 1000;
+
 const projectTemplateInclude = {
   _count: { select: { sections: true, tasks: true } },
   createdBy: { select: { email: true, id: true, name: true } },
@@ -38,6 +40,33 @@ const projectTemplateDetailInclude = {
     orderBy: { position: "asc" },
   },
 } satisfies Prisma.ProjectTemplateInclude;
+
+function utcDay(date: Date) {
+  return Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate());
+}
+
+function daysBetweenDates(from: Date, to: Date) {
+  return Math.round((utcDay(to) - utcDay(from)) / dayInMs);
+}
+
+function earliestDueDate(
+  sections: Array<{
+    tasks: Array<{
+      dueDate: Date | null;
+    }>;
+  }>,
+) {
+  const dueDates = sections.flatMap((section) => section.tasks.flatMap((task) => (task.dueDate ? [task.dueDate] : [])));
+  if (!dueDates.length) return null;
+  return dueDates.reduce((earliest, dueDate) => (utcDay(dueDate) < utcDay(earliest) ? dueDate : earliest));
+}
+
+function dueDateFromAnchor(anchor: string | undefined, offsetDays: number | null) {
+  if (!anchor || offsetDays === null) return null;
+  const date = new Date(anchor + "T00:00:00.000Z");
+  date.setUTCDate(date.getUTCDate() + offsetDays);
+  return date;
+}
 
 export class ProjectsRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -143,6 +172,7 @@ export class ProjectsRepository {
                     },
                   },
                   description: true,
+                  dueDate: true,
                   labelAssignments: {
                     select: { labelId: true },
                     where: { label: { deletedAt: null, workspaceId: input.workspaceId } },
@@ -161,6 +191,7 @@ export class ProjectsRepository {
         where: { deletedAt: null, id: input.projectId, workspaceId: input.workspaceId },
       });
       if (!project) return null;
+      const dueDateAnchor = earliestDueDate(project.sections);
 
       const template = await tx.projectTemplate.create({
         data: {
@@ -185,6 +216,7 @@ export class ProjectsRepository {
         await tx.projectTemplateTask.createMany({
           data: templateTasks.map(({ id, task }) => ({
             description: task.description,
+            dueDateOffsetDays: dueDateAnchor && task.dueDate ? daysBetweenDates(dueDateAnchor, task.dueDate) : null,
             id,
             position: task.position,
             priority: task.priority,
@@ -289,6 +321,7 @@ export class ProjectsRepository {
         await tx.task.createMany({
           data: tasks.map(({ id, task }) => ({
             description: task.description,
+            dueDate: dueDateFromAnchor(input.dueDateAnchor, task.dueDateOffsetDays),
             id,
             position: task.position,
             priority: task.priority,

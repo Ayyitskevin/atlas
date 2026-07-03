@@ -110,8 +110,12 @@ export function ProjectTemplatesPanel({
                     </div>
                   </div>
                   {template.description ? <p className="whitespace-pre-wrap break-words text-sm leading-6 text-slate-700">{template.description}</p> : null}
-                  <form className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_150px_auto]" onSubmit={(event) => void onCreateProjectFromTemplate(template.id, event)}>
+                  <form
+                    className="grid gap-2 sm:grid-cols-[minmax(0,1fr)_140px_150px_auto]"
+                    onSubmit={(event) => void onCreateProjectFromTemplate(template.id, event)}
+                  >
                     <input className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm" defaultValue={template.name} maxLength={160} name="name" required />
+                    <input aria-label="Template start date" className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm" name="dueDateAnchor" type="date" />
                     <select className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm" defaultValue="WORKSPACE" name="visibility">
                       <option value="WORKSPACE">Workspace</option>
                       <option value="PRIVATE">Private</option>
@@ -179,7 +183,14 @@ function TemplateDetail({
                     <li className="grid gap-1 rounded-md border border-slate-100 bg-slate-50 px-3 py-2" key={task.id}>
                       <div className="flex flex-wrap items-start justify-between gap-2">
                         <p className="break-words text-sm font-medium text-slate-900">{task.title}</p>
-                        <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">{task.priority.toLowerCase()}</span>
+                        <div className="flex flex-wrap justify-end gap-2">
+                          {task.dueDateOffsetDays !== null && task.dueDateOffsetDays !== undefined ? (
+                            <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">
+                              {dueOffsetLabel(task.dueDateOffsetDays)}
+                            </span>
+                          ) : null}
+                          <span className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs text-slate-600">{task.priority.toLowerCase()}</span>
+                        </div>
                       </div>
                       {task.description ? <p className="whitespace-pre-wrap break-words text-xs leading-5 text-slate-600">{task.description}</p> : null}
                       <TemplateTaskMeta task={task} />
@@ -222,4 +233,9 @@ function TemplateTaskMeta({ task }: { task: ProjectTemplateTask }) {
       ) : null}
     </div>
   );
+}
+
+function dueOffsetLabel(offsetDays: number) {
+  if (offsetDays === 0) return "start day";
+  return "+" + offsetDays + " days";
 }

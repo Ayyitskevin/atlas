@@ -12,11 +12,13 @@ describe("project schemas", () => {
   });
 
   it("validates creating projects from templates", () => {
-    expect(createProjectFromTemplateRequestSchema.parse({ name: " Client launch " })).toEqual({
+    expect(createProjectFromTemplateRequestSchema.parse({ dueDateAnchor: "2026-08-01", name: " Client launch " })).toEqual({
+      dueDateAnchor: "2026-08-01",
       name: "Client launch",
       visibility: "WORKSPACE",
     });
     expect(createProjectFromTemplateRequestSchema.safeParse({ name: "" }).success).toBe(false);
+    expect(createProjectFromTemplateRequestSchema.safeParse({ dueDateAnchor: "2026-8-1", name: "Client launch" }).success).toBe(false);
   });
 
   it("validates project template updates", () => {

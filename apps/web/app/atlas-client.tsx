@@ -604,6 +604,7 @@ export function AtlasClient({
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
     const name = String(form.get("name") ?? "").trim();
+    const dueDateAnchor = String(form.get("dueDateAnchor") ?? "");
     if (!name) return;
     try {
       setProjectTemplatesStatus("Creating project...");
@@ -611,6 +612,7 @@ export function AtlasClient({
         "/workspaces/" + selectedWorkspaceId + "/project-templates/" + templateId + "/projects",
         {
           body: JSON.stringify({
+            ...(dueDateAnchor ? { dueDateAnchor } : {}),
             name,
             visibility: String(form.get("visibility")) as ProjectVisibility,
           }),

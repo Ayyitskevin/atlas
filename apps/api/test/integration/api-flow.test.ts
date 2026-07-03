@@ -417,18 +417,53 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     expect(createTemplateLabel.statusCode).toBe(201);
     const templateLabel = createTemplateLabel.json<{ id: string; name: string }>();
 
+    const templateProject = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { name: "Template source project", visibility: "WORKSPACE" },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects",
+    });
+    expect(templateProject.statusCode).toBe(201);
+    const templateProjectId = templateProject.json<{ id: string }>().id;
+
+    const templateSection = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { name: "Template To Do", position: 1000 },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + templateProjectId + "/sections",
+    });
+    expect(templateSection.statusCode).toBe(201);
+    const templateSectionId = templateSection.json<{ id: string }>().id;
+
+    const templateTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { dueDate: "2026-07-10", sectionId: templateSectionId, title: "Integration task" },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + templateProjectId + "/tasks",
+    });
+    expect(templateTask.statusCode).toBe(201);
+    const templateTaskId = templateTask.json<{ id: string }>().id;
+
+    const templateFollowUpTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { dueDate: "2026-07-12", priority: "HIGH", sectionId: templateSectionId, title: "Follow-up task" },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + templateProjectId + "/tasks",
+    });
+    expect(templateFollowUpTask.statusCode).toBe(201);
+
     const assignTemplateTask = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
       payload: { userId: currentUser.id },
-      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/assign",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + templateTaskId + "/assign",
     });
     expect(assignTemplateTask.statusCode).toBe(200);
 
     const assignTemplateLabel = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
-      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/labels/" + templateLabel.id,
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + templateTaskId + "/labels/" + templateLabel.id,
     });
     expect(assignTemplateLabel.statusCode).toBe(200);
 
@@ -436,7 +471,7 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       headers: authHeaders(accessToken),
       method: "POST",
       payload: { description: "Reusable launch checklist", name: "Launch template" },
-      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/template",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + templateProjectId + "/template",
     });
     expect(createTemplate.statusCode).toBe(201);
     const templateBody = createTemplate.json<{
@@ -446,7 +481,7 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       name: string;
     }>();
     expect(templateBody).toMatchObject({
-      _count: { sections: 1, tasks: 1 },
+      _count: { sections: 1, tasks: 2 },
       createdBy: { email, name: "Integration User" },
       name: "Launch template",
     });
@@ -454,8 +489,8 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       entityId: templateBody.id,
       entityType: "project_template",
       eventType: "ProjectTemplateCreated",
-      payload: { name: "Launch template", sectionCount: 1, sourceProjectId: projectId, taskCount: 1 },
-      projectId,
+      payload: { name: "Launch template", sectionCount: 1, sourceProjectId: templateProjectId, taskCount: 2 },
+      projectId: templateProjectId,
       workspaceId,
     });
 
@@ -475,21 +510,25 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/project-templates/" + templateBody.id,
     });
     expect(templateDetail.statusCode).toBe(200);
-    const detailTask = templateDetail
+    const detailTasks = templateDetail
       .json<{
         sections: Array<{
           name: string;
           tasks: Array<{
             assignees: Array<{ userId: string }>;
+            dueDateOffsetDays: number | null;
             labelAssignments: Array<{ label: { name: string }; labelId: string }>;
             title: string;
           }>;
         }>;
       }>()
-      .sections[0].tasks[0];
-    expect(detailTask).toMatchObject({ title: "Integration task" });
-    expect(detailTask.assignees).toContainEqual(expect.objectContaining({ userId: currentUser.id }));
-    expect(detailTask.labelAssignments).toContainEqual(
+      .sections[0].tasks;
+    const detailTask = detailTasks.find((task) => task.title === "Integration task");
+    const detailFollowUpTask = detailTasks.find((task) => task.title === "Follow-up task");
+    expect(detailTask).toMatchObject({ dueDateOffsetDays: 0, title: "Integration task" });
+    expect(detailFollowUpTask).toMatchObject({ dueDateOffsetDays: 2, title: "Follow-up task" });
+    expect(detailTask!.assignees).toContainEqual(expect.objectContaining({ userId: currentUser.id }));
+    expect(detailTask!.labelAssignments).toContainEqual(
       expect.objectContaining({ label: expect.objectContaining({ name: templateLabel.name }), labelId: templateLabel.id }),
     );
 
@@ -514,7 +553,7 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
         previousDescription: "Reusable launch checklist",
         previousName: "Launch template",
         sectionCount: 1,
-        taskCount: 1,
+        taskCount: 2,
       },
       workspaceId,
     });
@@ -522,7 +561,7 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     const createProjectFromTemplate = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
-      payload: { name: "Launch from template", visibility: "PRIVATE" },
+      payload: { dueDateAnchor: "2026-08-01", name: "Launch from template", visibility: "PRIVATE" },
       url: "/api/v1/workspaces/" + workspaceId + "/project-templates/" + templateBody.id + "/projects",
     });
     expect(createProjectFromTemplate.statusCode).toBe(201);
@@ -536,7 +575,7 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       entityId: templatedProject.id,
       entityType: "project",
       eventType: "ProjectCreatedFromTemplate",
-      payload: { name: "Launch from template", templateId: templateBody.id, visibility: "PRIVATE" },
+      payload: { dueDateAnchor: "2026-08-01", name: "Launch from template", templateId: templateBody.id, visibility: "PRIVATE" },
       projectId: templatedProject.id,
       workspaceId,
     });
@@ -548,7 +587,7 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     });
     expect(templatedSections.statusCode).toBe(200);
     const copiedSection = templatedSections.json<{ items: Array<{ id: string; name: string }> }>().items[0];
-    expect(copiedSection).toMatchObject({ name: "To Do" });
+    expect(copiedSection).toMatchObject({ name: "Template To Do" });
 
     const templatedTasks = await app!.inject({
       headers: authHeaders(accessToken),
@@ -556,11 +595,23 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/projects/" + templatedProject.id + "/tasks",
     });
     expect(templatedTasks.statusCode).toBe(200);
-    const copiedTask = templatedTasks
-      .json<{ items: Array<{ assignees: Array<{ userId: string }>; id: string; priority: string; sectionId: string; title: string }> }>()
-      .items.find((item) => item.title === "Integration task");
+    const copiedTasks = templatedTasks.json<{
+      items: Array<{
+        assignees: Array<{ userId: string }>;
+        dueDate: string | null;
+        id: string;
+        priority: string;
+        sectionId: string;
+        title: string;
+      }>;
+    }>().items;
+    const copiedTask = copiedTasks.find((item) => item.title === "Integration task");
     expect(copiedTask).toEqual(expect.objectContaining({ priority: "MEDIUM", sectionId: copiedSection.id, title: "Integration task" }));
-    expect(copiedTask?.assignees).toContainEqual(expect.objectContaining({ userId: currentUser.id }));
+    expect(copiedTask?.dueDate?.startsWith("2026-08-01")).toBe(true);
+    expect(copiedTask!.assignees).toContainEqual(expect.objectContaining({ userId: currentUser.id }));
+    const copiedFollowUpTask = copiedTasks.find((item) => item.title === "Follow-up task");
+    expect(copiedFollowUpTask).toMatchObject({ priority: "HIGH", title: "Follow-up task" });
+    expect(copiedFollowUpTask?.dueDate?.startsWith("2026-08-03")).toBe(true);
 
     const copiedTaskLabels = await app!.inject({
       headers: authHeaders(accessToken),
@@ -582,7 +633,7 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       entityId: templateBody.id,
       entityType: "project_template",
       eventType: "ProjectTemplateDeleted",
-      payload: { name: "Launch template edited", sectionCount: 1, taskCount: 1 },
+      payload: { name: "Launch template edited", sectionCount: 1, taskCount: 2 },
       workspaceId,
     });
 

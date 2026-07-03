@@ -152,7 +152,7 @@ export class ProjectsService {
       entityId: project.id,
       entityType: "project",
       eventType: "ProjectCreatedFromTemplate",
-      payload: { ...projectPayload(project), templateId },
+      payload: { ...projectPayload(project), ...(input.dueDateAnchor ? { dueDateAnchor: input.dueDateAnchor } : {}), templateId },
       projectId: project.id,
       workspaceId,
     });

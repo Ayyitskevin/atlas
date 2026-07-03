@@ -297,6 +297,7 @@ model ProjectTemplateTask {
   title       String
   description String?
   priority    TaskPriority           @default(MEDIUM)
+  dueDateOffsetDays Int?             @map("due_date_offset_days")
   position    Decimal                @db.Decimal(20, 10)
   createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   template    ProjectTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)

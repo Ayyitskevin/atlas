@@ -81,6 +81,7 @@ export type ProjectTemplateTaskLabelAssignment = {
 export type ProjectTemplateTask = {
   assignees?: ProjectTemplateTaskAssignee[];
   description?: string | null;
+  dueDateOffsetDays?: number | null;
   id: string;
   labelAssignments?: ProjectTemplateTaskLabelAssignment[];
   position?: number | string;
