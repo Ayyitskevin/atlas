@@ -1279,6 +1279,21 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
         status: "failed",
       },
     });
+    await prisma.workerJobOutcome.create({
+      data: {
+        entityId: taskId,
+        entityType: "task",
+        eventId,
+        eventType: "TaskUpdated",
+        jobId: "email-job-1",
+        provider: "noop",
+        queue: "atlas-email-stub",
+        reason: "Email provider is configured for no-op delivery.",
+        recipientCount: 1,
+        status: "stubbed",
+        workspaceId,
+      },
+    });
 
     const memberList = await app!.inject({
       headers: authHeaders(memberAccessToken),
@@ -1325,6 +1340,7 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
         deadLettered: boolean;
         id: string;
         payload: { payload?: { source?: string }; taskId?: string; workspaceId?: string };
+        workerOutcomes: Array<{ jobId: string | null; provider: string | null; queue: string; recipientCount: number | null; status: string }>;
       }>(),
     ).toMatchObject({
       attemptHistory: [expect.objectContaining({ attemptNumber: 10, error: "Queue unavailable", status: "failed" })],
@@ -1344,6 +1360,15 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
         taskId,
         workspaceId,
       },
+      workerOutcomes: [
+        expect.objectContaining({
+          jobId: "email-job-1",
+          provider: "noop",
+          queue: "atlas-email-stub",
+          recipientCount: 1,
+          status: "stubbed",
+        }),
+      ],
     });
 
     const replay = await app!.inject({

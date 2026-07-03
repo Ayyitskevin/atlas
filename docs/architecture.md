@@ -259,7 +259,7 @@ Base path: `/api/v1`.
 ### Outbox Admin
 
 - `GET /workspaces/:workspaceId/outbox?status=failed|pending|processed|locked|all`
-- `GET /workspaces/:workspaceId/outbox/:outboxEventId` returns raw payload, operator context, replay state, and recent dispatch attempt history
+- `GET /workspaces/:workspaceId/outbox/:outboxEventId` returns raw payload, operator context, replay state, recent dispatch attempt history, and recent worker outcomes
 - `POST /workspaces/:workspaceId/outbox/:outboxEventId/replay`
 
 All list endpoints use cursor pagination:
@@ -386,6 +386,7 @@ The initial implementation can store generated `tsvector` columns or a separate 
 
 - Structured logs with pino in API and worker processes.
 - Request ids on every HTTP request and WebSocket connection.
+- Worker side effects persist delivered/skipped/failed/stubbed outcomes to `worker_job_outcomes` and expose recent rows from outbox detail.
 - OpenTelemetry hooks for HTTP, Prisma, Redis/BullMQ, and custom domain-event spans.
 - Health endpoints:
   - `GET /healthz`: process liveness.

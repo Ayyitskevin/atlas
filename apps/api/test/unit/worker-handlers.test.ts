@@ -10,6 +10,7 @@ import {
   type EmailDeliveryStore,
   type NotificationFanoutStore,
   type WorkerJobLike,
+  type WorkerOutcomePersistenceStore,
 } from "../../src/jobs/worker-handlers.js";
 import type { MutationEventJob } from "../../src/jobs/queues.js";
 
@@ -23,6 +24,28 @@ describe("worker handlers", () => {
       status: "stubbed",
     });
     expectLoggedOutcome(job, { provider: "database-search", status: "stubbed" });
+  });
+
+  it("persists worker outcomes when an outcome store is provided", async () => {
+    const job = jobFor(eventJob({ eventType: "TaskUpdated" }), "bull-job-1");
+    const store = outcomeStore();
+
+    await expect(handleSearchIndexJob(job, store)).resolves.toMatchObject({
+      provider: "database-search",
+      status: "stubbed",
+    });
+
+    expect(store.workerJobOutcome.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({
+        eventId: job.data.eventId,
+        eventType: "TaskUpdated",
+        jobId: "bull-job-1",
+        provider: "database-search",
+        queue: "atlas-search-index",
+        status: "stubbed",
+        workspaceId: job.data.workspaceId,
+      }),
+    });
   });
 
   it("records email delivery as an explicit no-op provider outcome", async () => {
@@ -238,9 +261,10 @@ function expectLoggedOutcome(job: WorkerJobLike, expected: Record<string, unknow
   expect(JSON.parse(String(log.mock.calls[0]?.[0]))).toMatchObject(expected);
 }
 
-function jobFor(data: MutationEventJob): WorkerJobLike {
+function jobFor(data: MutationEventJob, id?: string): WorkerJobLike {
   return {
     data,
+    id,
     log: vi.fn(),
   };
 }
@@ -270,6 +294,14 @@ function emailStore(
       findMany: vi.fn().mockResolvedValue((input.emailEnabledUserIds ?? []).map((userId) => ({ userId }))),
     },
   } satisfies EmailDeliveryStore;
+}
+
+function outcomeStore() {
+  return {
+    workerJobOutcome: {
+      create: vi.fn().mockResolvedValue({}),
+    },
+  } satisfies WorkerOutcomePersistenceStore;
 }
 
 function testEmailProvider(send: EmailProvider["send"]): EmailProvider {

@@ -72,6 +72,7 @@ function toOutboxEventDetailResponse(event: OutboxEventDetail) {
     attemptHistory: event.attemptsLog.map(toOutboxAttemptResponse),
     context: outboxEventContext(event.payload),
     payload: event.payload,
+    workerOutcomes: event.workerOutcomes.map(toWorkerOutcomeResponse),
   };
 }
 
@@ -84,6 +85,21 @@ function toOutboxAttemptResponse(attempt: DomainEventOutboxAttempt) {
     id: attempt.id,
     startedAt: attempt.startedAt.toISOString(),
     status: attempt.status,
+  };
+}
+
+function toWorkerOutcomeResponse(outcome: OutboxEventDetail["workerOutcomes"][number]) {
+  return {
+    createdAt: outcome.createdAt.toISOString(),
+    eventId: outcome.eventId,
+    id: outcome.id,
+    jobId: outcome.jobId,
+    provider: outcome.provider,
+    providerMessageId: outcome.providerMessageId,
+    queue: outcome.queue,
+    reason: outcome.reason,
+    recipientCount: outcome.recipientCount,
+    status: outcome.status,
   };
 }
 

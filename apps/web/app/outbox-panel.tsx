@@ -173,6 +173,25 @@ export function OutboxPanel({
                 )}
               </section>
               <section className="grid gap-2">
+                <h4 className="text-xs font-semibold uppercase text-slate-500">Worker outcomes</h4>
+                {detail.workerOutcomes.length ? (
+                  detail.workerOutcomes.map((outcome) => (
+                    <article className="rounded-md border border-slate-200 bg-white p-2 text-xs" key={outcome.id}>
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <p className="font-medium text-slate-700">{outcome.queue}</p>
+                        <span className={outcome.status === "failed" ? "text-red-700" : "text-slate-600"}>{outcome.status}</span>
+                      </div>
+                      <p className="mt-1 text-slate-500">{formatDateTime(outcome.createdAt)}</p>
+                      {outcome.provider ? <p className="mt-1 text-slate-600">Provider: {outcome.provider}</p> : null}
+                      {outcome.recipientCount !== null ? <p className="mt-1 text-slate-600">Recipients: {outcome.recipientCount}</p> : null}
+                      {outcome.reason ? <p className="mt-2 break-words text-slate-600">{outcome.reason}</p> : null}
+                    </article>
+                  ))
+                ) : (
+                  <p className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-600">No worker outcomes recorded.</p>
+                )}
+              </section>
+              <section className="grid gap-2">
                 <h4 className="text-xs font-semibold uppercase text-slate-500">Payload</h4>
                 <pre className="max-h-80 overflow-auto rounded-md border border-slate-200 bg-white p-3 text-xs text-slate-700">
                   {JSON.stringify(detail.payload, null, 2)}

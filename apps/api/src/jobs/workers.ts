@@ -18,19 +18,19 @@ export function startWorkers() {
   const emailProvider = createEmailProvider({ from: env.EMAIL_FROM, provider: env.EMAIL_PROVIDER });
   const notificationWorker = new Worker<MutationEventJob, WorkerOutcome, string>(
     WORKER_QUEUE_NAMES.notificationFanout,
-    async (job) => handleNotificationFanoutJob(job, prisma),
+    async (job) => handleNotificationFanoutJob(job, prisma, prisma),
     { connection: queueConnection },
   );
 
   const searchWorker = new Worker<MutationEventJob, WorkerOutcome, string>(
     WORKER_QUEUE_NAMES.searchIndex,
-    handleSearchIndexJob,
+    async (job) => handleSearchIndexJob(job, prisma),
     { connection: queueConnection },
   );
 
   const emailWorker = new Worker<MutationEventJob, WorkerOutcome, string>(
     WORKER_QUEUE_NAMES.emailDelivery,
-    async (job) => handleEmailDeliveryJob(job, prisma, emailProvider),
+    async (job) => handleEmailDeliveryJob(job, prisma, emailProvider, prisma),
     { connection: queueConnection },
   );
 

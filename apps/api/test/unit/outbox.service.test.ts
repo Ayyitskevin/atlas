@@ -54,6 +54,7 @@ describe("OutboxService", () => {
         workspaceId,
       },
       attemptHistory: [],
+      workerOutcomes: [],
       status: "failed",
       workspaceId,
     });
@@ -89,6 +90,51 @@ describe("OutboxService", () => {
         workspaceId,
       },
       attemptHistory: [],
+      workerOutcomes: [],
+    });
+  });
+
+  it("returns recent worker outcomes with event detail", async () => {
+    const event = outboxEvent({
+      payload: {
+        actorUserId: ctx.userId,
+        entityId: randomUUID(),
+        entityType: "task",
+        eventId: randomUUID(),
+        eventType: "TaskUpdated",
+        workspaceId,
+      },
+    });
+    event.workerOutcomes = [
+      {
+        createdAt: new Date(),
+        entityId: randomUUID(),
+        entityType: "task",
+        eventId: event.eventId,
+        eventType: "TaskUpdated",
+        id: randomUUID(),
+        jobId: "job-1",
+        provider: "noop",
+        providerMessageId: null,
+        queue: "atlas-email-stub",
+        reason: "Email provider is configured for no-op delivery.",
+        recipientCount: 1,
+        status: "stubbed",
+        workspaceId,
+      },
+    ];
+    const service = serviceFor(event);
+
+    await expect(service.get(ctx, workspaceId, event.id)).resolves.toMatchObject({
+      workerOutcomes: [
+        expect.objectContaining({
+          jobId: "job-1",
+          provider: "noop",
+          queue: "atlas-email-stub",
+          recipientCount: 1,
+          status: "stubbed",
+        }),
+      ],
     });
   });
 });
@@ -123,5 +169,6 @@ function outboxEvent(input: { payload: DomainEventOutbox["payload"] }): OutboxEv
     payload: input.payload,
     processedAt: null,
     updatedAt: now,
+    workerOutcomes: [],
   };
 }

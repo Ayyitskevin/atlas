@@ -239,6 +239,19 @@ export type OutboxAttempt = {
   status: "failed" | "succeeded";
 };
 
+export type WorkerOutcome = {
+  createdAt: string;
+  eventId: string;
+  id: string;
+  jobId: string | null;
+  provider: string | null;
+  providerMessageId: string | null;
+  queue: string;
+  reason: string | null;
+  recipientCount: number | null;
+  status: "delivered" | "failed" | "skipped" | "stubbed";
+};
+
 export type OutboxEventContext = {
   actorUserId: string | null;
   entityId: string | null;
@@ -253,6 +266,7 @@ export type OutboxEventDetail = OutboxEvent & {
   attemptHistory: OutboxAttempt[];
   context: OutboxEventContext;
   payload: Record<string, unknown>;
+  workerOutcomes: WorkerOutcome[];
 };
 
 export type ReplayOutboxEventResponse = {

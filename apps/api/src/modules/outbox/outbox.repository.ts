@@ -1,4 +1,4 @@
-import type { DomainEventOutbox, DomainEventOutboxAttempt, Prisma, PrismaClient } from "@atlas/db";
+import type { DomainEventOutbox, DomainEventOutboxAttempt, Prisma, PrismaClient, WorkerJobOutcome } from "@atlas/db";
 
 import { paginationArgs } from "../../shared/pagination.js";
 
@@ -28,8 +28,8 @@ export class OutboxRepository {
     });
   }
 
-  findDetailById(workspaceId: string, outboxEventId: string) {
-    return this.prisma.domainEventOutbox.findFirst({
+  async findDetailById(workspaceId: string, outboxEventId: string) {
+    const event = await this.prisma.domainEventOutbox.findFirst({
       include: {
         attemptsLog: {
           orderBy: { attemptNumber: "desc" },
@@ -41,6 +41,13 @@ export class OutboxRepository {
         ...this.workspaceWhere(workspaceId),
       },
     });
+    if (!event) return null;
+    const workerOutcomes = await this.prisma.workerJobOutcome.findMany({
+      orderBy: { createdAt: "desc" },
+      take: 20,
+      where: { eventId: event.eventId, workspaceId },
+    });
+    return { ...event, workerOutcomes };
   }
 
   async replayFailed(workspaceId: string, outboxEventId: string) {
@@ -90,7 +97,10 @@ export class OutboxRepository {
   }
 }
 
-export type OutboxEventDetail = DomainEventOutbox & { attemptsLog: DomainEventOutboxAttempt[] };
+export type OutboxEventDetail = DomainEventOutbox & {
+  attemptsLog: DomainEventOutboxAttempt[];
+  workerOutcomes: WorkerJobOutcome[];
+};
 
 export function outboxStatus(event: DomainEventOutbox): Exclude<OutboxEventStatus, "all"> {
   if (event.processedAt) return "processed";

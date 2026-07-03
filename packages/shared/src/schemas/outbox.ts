@@ -49,10 +49,26 @@ export const outboxEventContextSchema = z.object({
   version: z.number().int().nonnegative().nullable(),
 });
 
+export const workerOutcomeStatusSchema = z.enum(["delivered", "failed", "skipped", "stubbed"]);
+
+export const workerOutcomeResponseSchema = z.object({
+  createdAt: z.string().datetime(),
+  eventId: z.string().uuid(),
+  id: z.string().uuid(),
+  jobId: z.string().nullable(),
+  provider: z.string().nullable(),
+  providerMessageId: z.string().nullable(),
+  queue: z.string(),
+  reason: z.string().nullable(),
+  recipientCount: z.number().int().nonnegative().nullable(),
+  status: workerOutcomeStatusSchema,
+});
+
 export const outboxEventDetailResponseSchema = outboxEventResponseSchema.extend({
   attemptHistory: outboxAttemptResponseSchema.array(),
   context: outboxEventContextSchema,
   payload: z.record(z.unknown()),
+  workerOutcomes: workerOutcomeResponseSchema.array(),
 });
 
 export const replayOutboxEventResponseSchema = z.object({
