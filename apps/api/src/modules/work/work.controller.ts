@@ -188,6 +188,11 @@ export class WorkController {
     return this.workService.listTaskDependencies(await requireAuth(request), workspaceId, taskId);
   };
 
+  listProjectDependencyMap = async (request: FastifyRequest) => {
+    const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
+    return this.workService.listProjectDependencyMap(await requireAuth(request), workspaceId, projectId);
+  };
+
   addTaskDependency = async (request: FastifyRequest, reply: FastifyReply) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
     const result = await this.workService.addTaskDependency(await requireAuth(request), workspaceId, taskId, parseBody(request, addTaskDependencyRequestSchema));

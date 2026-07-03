@@ -10,6 +10,7 @@ import { InviteAcceptancePanel } from "./invite-acceptance-panel";
 import { MyWorkPanel } from "./my-work-panel";
 import { NotificationsPanel } from "./notifications-panel";
 import { OutboxPanel } from "./outbox-panel";
+import { ProjectDependencyMapPanel } from "./project-dependency-map-panel";
 import { ProjectMembersPanel } from "./project-members-panel";
 import { ProjectPanel } from "./project-panel";
 import { ProjectTemplatesPanel } from "./project-templates-panel";
@@ -221,6 +222,7 @@ export function AtlasClient({
     labelStatus,
     moveSection,
     moveTaskToSection,
+    projectDependencyMap,
     renameSection,
     sections,
     selectedTask,
@@ -1050,21 +1052,25 @@ export function AtlasClient({
             workspace={selectedWorkspace}
           />
 
-          <BoardPanel
-            onChooseTask={chooseTask}
-            onCreateSection={createSection}
-            onCreateTask={createTask}
-            onDeleteSection={deleteSection}
-            onDependencyFilterChange={changeTaskDependencyFilter}
-            onMoveSection={moveSection}
-            onMoveTask={moveTaskToSection}
-            onRenameSection={renameSection}
-            projectName={selectedProject?.name}
-            sections={sections}
-            selectedTaskId={selectedTaskId}
-            taskDependencyFilter={taskDependencyFilter}
-            tasks={tasks}
-          />
+          <div className="grid gap-4">
+            <BoardPanel
+              onChooseTask={chooseTask}
+              onCreateSection={createSection}
+              onCreateTask={createTask}
+              onDeleteSection={deleteSection}
+              onDependencyFilterChange={changeTaskDependencyFilter}
+              onMoveSection={moveSection}
+              onMoveTask={moveTaskToSection}
+              onRenameSection={renameSection}
+              projectName={selectedProject?.name}
+              sections={sections}
+              selectedTaskId={selectedTaskId}
+              taskDependencyFilter={taskDependencyFilter}
+              tasks={tasks}
+            />
+
+            <ProjectDependencyMapPanel dependencyMap={projectDependencyMap} onOpenTask={chooseTask} />
+          </div>
 
           <TaskDetailPanel
             attachmentStatus={attachmentStatus}

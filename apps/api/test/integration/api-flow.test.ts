@@ -1419,6 +1419,40 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       isBlocked: false,
     });
 
+    const projectDependencyMap = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/dependencies",
+    });
+    expect(projectDependencyMap.statusCode).toBe(200);
+    const projectDependencyMapBody = projectDependencyMap.json<{
+      criticalPathTaskIds: string[];
+      edges: Array<{ blockedTaskId: string; blockingTaskId: string; id: string }>;
+      nodes: Array<{
+        dependencySummary: { blockedByOpenCount: number; blocksCount: number; isBlocked: boolean };
+        id: string;
+        title: string;
+      }>;
+      stats: { blockedTaskCount: number; blockingTaskCount: number; edgeCount: number; openEdgeCount: number; readyBlockerCount: number };
+    }>();
+    expect(projectDependencyMapBody.edges).toContainEqual(expect.objectContaining({ blockedTaskId, blockingTaskId, id: dependencyId }));
+    expect(projectDependencyMapBody.nodes.find((node) => node.id === blockedTaskId)?.dependencySummary).toMatchObject({
+      blockedByOpenCount: 1,
+      isBlocked: true,
+    });
+    expect(projectDependencyMapBody.nodes.find((node) => node.id === blockingTaskId)?.dependencySummary).toMatchObject({
+      blocksCount: 1,
+      isBlocked: false,
+    });
+    expect(projectDependencyMapBody.stats).toMatchObject({
+      blockedTaskCount: 1,
+      blockingTaskCount: 1,
+      edgeCount: 1,
+      openEdgeCount: 1,
+      readyBlockerCount: 1,
+    });
+    expect(projectDependencyMapBody.criticalPathTaskIds).toEqual([blockingTaskId, blockedTaskId]);
+
     const blockedProjectTasks = await app!.inject({
       headers: authHeaders(accessToken),
       method: "GET",

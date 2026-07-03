@@ -15,6 +15,7 @@ import type {
   Comment,
   CreateAttachmentResponse,
   Page,
+  ProjectDependencyMap,
   ProjectMember,
   Section,
   Subtask,
@@ -29,6 +30,12 @@ import type {
 } from "./atlas-types";
 
 const emptyTaskDependencies: TaskDependencies = { blockedBy: [], blocks: [], isBlocked: false };
+const emptyProjectDependencyMap: ProjectDependencyMap = {
+  criticalPathTaskIds: [],
+  edges: [],
+  nodes: [],
+  stats: { blockedTaskCount: 0, blockingTaskCount: 0, edgeCount: 0, openEdgeCount: 0, readyBlockerCount: 0 },
+};
 
 type UseProjectWorkInput = {
   activityScope: ActivityScope;
@@ -57,6 +64,7 @@ export function useProjectWork({
 }: UseProjectWorkInput) {
   const [sections, setSections] = useState<Section[]>([]);
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [projectDependencyMap, setProjectDependencyMap] = useState<ProjectDependencyMap>(emptyProjectDependencyMap);
   const [comments, setComments] = useState<Comment[]>([]);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -74,6 +82,7 @@ export function useProjectWork({
   function clearBoardState() {
     setSections([]);
     setTasks([]);
+    setProjectDependencyMap(emptyProjectDependencyMap);
     setWorkspaceLabels([]);
   }
 
@@ -92,14 +101,16 @@ export function useProjectWork({
 
   async function loadProjectData(accessToken: string, workspaceId: string, projectId: string, dependency: TaskDependencyFilter = taskDependencyFilter) {
     const taskQuery = new URLSearchParams({ dependency, limit: "100" });
-    const [sectionPage, taskPage, labelPage] = await Promise.all([
+    const [sectionPage, taskPage, dependencyMap, labelPage] = await Promise.all([
       api<Page<Section>>(`/workspaces/${workspaceId}/projects/${projectId}/sections`, {}, accessToken),
       api<Page<Task>>(`/workspaces/${workspaceId}/projects/${projectId}/tasks?${taskQuery.toString()}`, {}, accessToken),
+      api<ProjectDependencyMap>(`/workspaces/${workspaceId}/projects/${projectId}/dependencies`, {}, accessToken),
       api<Page<TaskLabel>>(`/workspaces/${workspaceId}/labels`, {}, accessToken),
       loadProjectMembers(accessToken, workspaceId, projectId),
     ]);
     setSections(sectionPage.items);
     setTasks(taskPage.items);
+    setProjectDependencyMap(dependencyMap);
     setWorkspaceLabels(labelPage.items);
   }
 
@@ -856,6 +867,7 @@ export function useProjectWork({
     loadTaskWatchers,
     moveSection,
     moveTaskToSection,
+    projectDependencyMap,
     renameSection,
     sections,
     selectedTask,

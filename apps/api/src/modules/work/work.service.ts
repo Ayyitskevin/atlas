@@ -24,7 +24,7 @@ import {
   type UpdateSubtaskRequest,
   type UpdateTaskRequest,
 } from "@atlas/shared";
-import { Prisma, type TaskPriority, type TaskRecurrenceFrequency } from "@atlas/db";
+import { Prisma, type TaskPriority, type TaskRecurrenceFrequency, type TaskStatus } from "@atlas/db";
 
 import type { AuthContext } from "../../shared/auth-context.js";
 import { AtlasHttpError } from "../../shared/errors.js";
@@ -419,6 +419,26 @@ export class WorkService {
       .map((row) => dependencyEdgeView(row, row.blockedTask, summaries.get(row.blockedTaskId)));
     const isBlocked = blockedBy.some((edge) => edge.task.status !== "DONE");
     return { blockedBy, blocks, isBlocked };
+  }
+
+  async listProjectDependencyMap(ctx: AuthContext, workspaceId: string, projectId: string) {
+    await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "VIEWER");
+    const rows = await this.workRepository.listProjectDependencyMapRows({ projectId, workspaceId });
+    const nodeIds = rows.flatMap((row) => [row.blockedTaskId, row.blockingTaskId]);
+    const summaries = await this.dependencySummaryMap(workspaceId, nodeIds);
+    const nodes = uniqueDependencyMapNodes(rows, summaries);
+    const edges = rows.map((row) => ({
+      blockedTaskId: row.blockedTaskId,
+      blockingTaskId: row.blockingTaskId,
+      createdAt: dateTimePayloadValue(row.createdAt),
+      id: row.id,
+    }));
+    return {
+      criticalPathTaskIds: longestOpenDependencyChain(nodes, edges),
+      edges,
+      nodes,
+      stats: dependencyMapStats(nodes, edges),
+    };
   }
 
   async addTaskDependency(ctx: AuthContext, workspaceId: string, taskId: string, input: AddTaskDependencyRequest) {
@@ -1143,6 +1163,106 @@ function dependencyEdgeView(
       title: task.title,
     },
   };
+}
+
+type ProjectDependencyMapTask = {
+  dueDate?: Date | string | null;
+  id: string;
+  priority: TaskPriority;
+  sectionId: string;
+  status: TaskStatus;
+  title: string;
+};
+
+type ProjectDependencyMapNode = ReturnType<typeof projectDependencyMapNodeView>;
+
+type ProjectDependencyMapEdge = {
+  blockedTaskId: string;
+  blockingTaskId: string;
+};
+
+function uniqueDependencyMapNodes(
+  rows: Array<{ blockedTask: ProjectDependencyMapTask; blockedTaskId: string; blockingTask: ProjectDependencyMapTask; blockingTaskId: string }>,
+  summaries: Map<string, TaskDependencySummary>,
+) {
+  const nodes = new Map<string, ProjectDependencyMapNode>();
+  for (const row of rows) {
+    nodes.set(row.blockingTaskId, projectDependencyMapNodeView(row.blockingTask, summaries.get(row.blockingTaskId)));
+    nodes.set(row.blockedTaskId, projectDependencyMapNodeView(row.blockedTask, summaries.get(row.blockedTaskId)));
+  }
+  return [...nodes.values()].sort(compareDependencyMapNodes);
+}
+
+function projectDependencyMapNodeView(task: ProjectDependencyMapTask, dependencySummary?: TaskDependencySummary) {
+  return {
+    dependencySummary: dependencySummary ?? emptyDependencySummary(),
+    dueDate: datePayloadValue(task.dueDate),
+    id: task.id,
+    priority: task.priority,
+    sectionId: task.sectionId,
+    status: task.status,
+    title: task.title,
+  };
+}
+
+function dependencyMapStats(nodes: ProjectDependencyMapNode[], edges: ProjectDependencyMapEdge[]) {
+  return {
+    blockedTaskCount: nodes.filter((node) => node.dependencySummary.isBlocked).length,
+    blockingTaskCount: nodes.filter((node) => node.dependencySummary.blocksCount > 0).length,
+    edgeCount: edges.length,
+    openEdgeCount: openDependencyEdges(nodes, edges).length,
+    readyBlockerCount: nodes.filter((node) => node.status !== "DONE" && node.dependencySummary.blocksCount > 0 && node.dependencySummary.blockedByOpenCount === 0).length,
+  };
+}
+
+function longestOpenDependencyChain(nodes: ProjectDependencyMapNode[], edges: ProjectDependencyMapEdge[]) {
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  const outgoing = new Map<string, string[]>();
+  for (const edge of openDependencyEdges(nodes, edges)) {
+    const blocked = outgoing.get(edge.blockingTaskId) ?? [];
+    blocked.push(edge.blockedTaskId);
+    outgoing.set(edge.blockingTaskId, blocked);
+  }
+  for (const blocked of outgoing.values()) blocked.sort((left, right) => compareDependencyMapNodes(nodesById.get(left), nodesById.get(right)));
+
+  const memo = new Map<string, string[]>();
+  const visiting = new Set<string>();
+  const bestFrom = (taskId: string): string[] => {
+    if (memo.has(taskId)) return memo.get(taskId) ?? [taskId];
+    if (visiting.has(taskId)) return [taskId];
+    visiting.add(taskId);
+    let best = [taskId];
+    for (const blockedTaskId of outgoing.get(taskId) ?? []) {
+      const candidate = [taskId, ...bestFrom(blockedTaskId)];
+      if (candidate.length > best.length) best = candidate;
+    }
+    visiting.delete(taskId);
+    memo.set(taskId, best);
+    return best;
+  };
+
+  let best: string[] = [];
+  for (const node of nodes.filter((candidate) => candidate.status !== "DONE")) {
+    const candidate = bestFrom(node.id);
+    if (candidate.length > best.length) best = candidate;
+  }
+  return best.length > 1 ? best : [];
+}
+
+function openDependencyEdges(nodes: ProjectDependencyMapNode[], edges: ProjectDependencyMapEdge[]) {
+  const nodesById = new Map(nodes.map((node) => [node.id, node]));
+  return edges.filter((edge) => nodesById.get(edge.blockingTaskId)?.status !== "DONE" && nodesById.get(edge.blockedTaskId)?.status !== "DONE");
+}
+
+function compareDependencyMapNodes(left?: ProjectDependencyMapNode, right?: ProjectDependencyMapNode) {
+  if (!left && !right) return 0;
+  if (!left) return 1;
+  if (!right) return -1;
+  const due = (left.dueDate ?? "9999-12-31").localeCompare(right.dueDate ?? "9999-12-31");
+  if (due !== 0) return due;
+  const title = left.title.localeCompare(right.title);
+  if (title !== 0) return title;
+  return left.id.localeCompare(right.id);
 }
 
 function emptyDependencySummary(): TaskDependencySummary {

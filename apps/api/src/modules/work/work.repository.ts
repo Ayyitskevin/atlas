@@ -363,6 +363,39 @@ export class WorkRepository {
     });
   }
 
+  listProjectDependencyMapRows(input: { projectId: string; workspaceId: string }) {
+    return this.prisma.taskDependency.findMany({
+      include: {
+        blockedTask: {
+          select: {
+            dueDate: true,
+            id: true,
+            priority: true,
+            sectionId: true,
+            status: true,
+            title: true,
+          },
+        },
+        blockingTask: {
+          select: {
+            dueDate: true,
+            id: true,
+            priority: true,
+            sectionId: true,
+            status: true,
+            title: true,
+          },
+        },
+      },
+      orderBy: { createdAt: "asc" },
+      where: {
+        blockedTask: { deletedAt: null, projectId: input.projectId },
+        blockingTask: { deletedAt: null, projectId: input.projectId },
+        workspaceId: input.workspaceId,
+      },
+    });
+  }
+
   listTaskDependencySummaryRows(input: { taskIds: string[]; workspaceId: string }) {
     const taskIds = [...new Set(input.taskIds)];
     if (!taskIds.length) return Promise.resolve([]);

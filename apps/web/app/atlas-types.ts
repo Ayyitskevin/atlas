@@ -177,6 +177,36 @@ export type TaskDependencySummary = {
   isBlocked: boolean;
 };
 
+export type ProjectDependencyMapNode = {
+  dependencySummary: TaskDependencySummary;
+  dueDate: string | null;
+  id: string;
+  priority: TaskPriority;
+  sectionId: string;
+  status: TaskStatus;
+  title: string;
+};
+
+export type ProjectDependencyMapEdge = {
+  blockedTaskId: string;
+  blockingTaskId: string;
+  createdAt: string;
+  id: string;
+};
+
+export type ProjectDependencyMap = {
+  criticalPathTaskIds: string[];
+  edges: ProjectDependencyMapEdge[];
+  nodes: ProjectDependencyMapNode[];
+  stats: {
+    blockedTaskCount: number;
+    blockingTaskCount: number;
+    edgeCount: number;
+    openEdgeCount: number;
+    readyBlockerCount: number;
+  };
+};
+
 export type Task = {
   assignees?: TaskAssignee[];
   completedAt?: string | null;

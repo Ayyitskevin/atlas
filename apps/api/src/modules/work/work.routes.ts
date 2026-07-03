@@ -17,6 +17,7 @@ import {
   myWorkQuerySchema,
   notificationQuerySchema,
   notificationPreferenceResponseSchema,
+  projectDependencyMapResponseSchema,
   projectTaskQuerySchema,
   reorderSectionsRequestSchema,
   searchResponseSchema,
@@ -86,6 +87,11 @@ export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
   app.post("/workspaces/:workspaceId/tasks/:taskId/labels/:labelId", { schema: openApiSchema({ params: taskLabelParamsSchema, tags: ["Labels"] }) }, controller.assignTaskLabel);
   app.delete("/workspaces/:workspaceId/tasks/:taskId/labels/:labelId", { schema: openApiSchema({ params: taskLabelParamsSchema, tags: ["Labels"] }) }, controller.unassignTaskLabel);
 
+  app.get(
+    "/workspaces/:workspaceId/projects/:projectId/dependencies",
+    { schema: openApiSchema({ params: projectParamsSchema, response: { 200: projectDependencyMapResponseSchema }, tags: ["Dependencies"] }) },
+    controller.listProjectDependencyMap,
+  );
   app.get("/workspaces/:workspaceId/tasks/:taskId/dependencies", { schema: openApiSchema({ params: taskParamsSchema, tags: ["Dependencies"] }) }, controller.listTaskDependencies);
   app.post("/workspaces/:workspaceId/tasks/:taskId/dependencies", { schema: openApiSchema({ body: addTaskDependencyRequestSchema, params: taskParamsSchema, tags: ["Dependencies"] }) }, controller.addTaskDependency);
   app.delete("/workspaces/:workspaceId/task-dependencies/:dependencyId", { schema: openApiSchema({ params: taskDependencyParamsSchema, tags: ["Dependencies"] }) }, controller.removeTaskDependency);
