@@ -8,6 +8,7 @@ import { recentActiveProjects, workspaceDashboardStats } from "./dashboard-utils
 
 type WorkspaceDashboardPanelProps = {
   activities: ActivityEvent[];
+  dashboardWorkStatus: string;
   myWorkTasks: MyWorkTask[];
   notifications: Notification[];
   onChooseProject: (projectId: string) => Promise<void>;
@@ -24,6 +25,7 @@ type WorkspaceDashboardPanelProps = {
 
 export function WorkspaceDashboardPanel({
   activities,
+  dashboardWorkStatus,
   myWorkTasks,
   notifications,
   onChooseProject,
@@ -61,9 +63,9 @@ export function WorkspaceDashboardPanel({
       <div className="grid gap-4 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
         <section className="grid gap-3 rounded-lg border border-slate-200 bg-white p-4">
           <div className="grid gap-3 md:grid-cols-3">
-            <Metric label="Selected tasks" value={stats.selectedProjectTasks} />
-            <Metric label="Done" value={stats.doneTasks} />
-            <Metric label="Private" value={stats.privateProjects} />
+            <Metric label="Overdue" value={stats.overdueMyWork} />
+            <Metric label="Due today" value={stats.todayMyWork} />
+            <Metric label="Next 7" value={stats.upcomingMyWork} />
           </div>
 
           <div className="grid gap-3 md:grid-cols-2">
@@ -118,8 +120,14 @@ export function WorkspaceDashboardPanel({
         <aside className="grid content-start gap-3 rounded-lg border border-slate-200 bg-white p-4">
           <div>
             <h3 className="text-sm font-semibold uppercase text-slate-500">Next up</h3>
-            <p className="text-sm text-slate-600">{stats.archivedProjects} archived projects</p>
+            <p className="text-sm text-slate-600">
+              {stats.unscheduledMyWork} unscheduled - {stats.archivedProjects} archived projects
+            </p>
           </div>
+
+          {dashboardWorkStatus ? (
+            <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-600">{dashboardWorkStatus}</p>
+          ) : null}
 
           <div className="grid gap-2">
             {quickTasks.length ? (
@@ -138,7 +146,9 @@ export function WorkspaceDashboardPanel({
                 </button>
               ))
             ) : (
-              <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">No assigned tasks.</p>
+              <p className="rounded-md border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-600">
+                No assigned or watched tasks.
+              </p>
             )}
           </div>
         </aside>

@@ -32,6 +32,7 @@ import { useProjectMembers } from "./use-project-members";
 import { useProjectWork } from "./use-project-work";
 import { useRealtime } from "./use-realtime";
 import { useWorkspaceAdmin } from "./use-workspace-admin";
+import { useWorkspaceDashboardWork } from "./use-workspace-dashboard-work";
 import { useWorkspaceSearch } from "./use-workspace-search";
 import { WorkspaceDashboardPanel } from "./workspace-dashboard-panel";
 import { WorkspaceSearchPanel } from "./workspace-search-panel";
@@ -92,6 +93,12 @@ export function AtlasClient({
     myWorkTasks,
     refreshMyWork,
   } = useMyWork(auth, selectedWorkspaceId);
+  const {
+    clearDashboardWork,
+    dashboardTasks,
+    dashboardWorkStatus,
+    loadDashboardWork,
+  } = useWorkspaceDashboardWork(auth, selectedWorkspaceId);
   const {
     clearNotifications,
     loadNotifications,
@@ -273,6 +280,7 @@ export function AtlasClient({
     const selectedProjectMembershipChanged = realtimeEventTouchesProjectMembers(event, selectedProjectId);
     const refreshes: Promise<void>[] = [
       loadNotifications(auth.accessToken, selectedWorkspaceId, notificationFilter),
+      loadDashboardWork(auth.accessToken, selectedWorkspaceId),
       loadMyWork(auth.accessToken, selectedWorkspaceId, myWorkStatusFilter, myWorkDueFilter, myWorkScopeFilter),
     ];
     if (!selectedProjectWasDeleted && !selectedProjectMembershipChanged) {
@@ -359,6 +367,7 @@ export function AtlasClient({
         clearProjectMemberState();
         clearProjectMessages();
         clearOutboxState();
+        clearDashboardWork();
       }
     } catch (error) {
       clearSession();
@@ -450,6 +459,7 @@ export function AtlasClient({
     clearProjectMemberState();
     clearProjectMessages();
     clearOutboxState();
+    clearDashboardWork();
     clearMyWork();
     clearNotificationPreferences();
     clearSearch();
@@ -457,8 +467,9 @@ export function AtlasClient({
     setActivityScope("project");
     try {
       await loadNotifications(accessToken, workspaceId, notificationFilter);
-      const [projectPage, , , members] = await Promise.all([
+      const [projectPage, , , , members] = await Promise.all([
         api<Page<Project>>(`/workspaces/${workspaceId}/projects`, {}, accessToken),
+        loadDashboardWork(accessToken, workspaceId),
         loadMyWork(accessToken, workspaceId, myWorkStatusFilter, myWorkDueFilter, myWorkScopeFilter),
         loadNotificationPreferences(accessToken, workspaceId),
         loadWorkspaceMembers(accessToken, workspaceId),
@@ -608,6 +619,7 @@ export function AtlasClient({
     clearMyWork();
     clearWorkspaceAdminState();
     clearOutboxState();
+    clearDashboardWork();
     clearProjectMessages();
     clearSearch();
     clearActivity();
@@ -688,7 +700,8 @@ export function AtlasClient({
 
         <WorkspaceDashboardPanel
           activities={activities}
-          myWorkTasks={myWorkTasks}
+          dashboardWorkStatus={dashboardWorkStatus}
+          myWorkTasks={dashboardTasks}
           notifications={notifications}
           onChooseProject={(projectId) => (auth ? chooseProject(auth.accessToken, selectedWorkspaceId, projectId) : Promise.resolve())}
           onCreateProject={createProject}
