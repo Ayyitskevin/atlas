@@ -16,15 +16,18 @@ import {
   realtimeEventTouchesProject,
   realtimeEventTouchesProjectList,
   realtimeEventTouchesProjectMembers,
+  realtimeEventTouchesProjectMessages,
   realtimeEventTouchesTask,
   type RealtimeDomainEvent,
 } from "./realtime-utils";
+import { ProjectMessagesPanel } from "./project-messages-panel";
 import { TaskDetailPanel } from "./task-detail-panel";
 import { useActivity } from "./use-activity";
 import { useMyWork } from "./use-my-work";
 import { useNotificationPreferences } from "./use-notification-preferences";
 import { useNotifications } from "./use-notifications";
 import { useOutbox } from "./use-outbox";
+import { useProjectMessages } from "./use-project-messages";
 import { useProjectMembers } from "./use-project-members";
 import { useProjectWork } from "./use-project-work";
 import { useRealtime } from "./use-realtime";
@@ -146,6 +149,23 @@ export function AtlasClient({
     updateProjectMemberRole,
   } = useProjectMembers(auth, selectedWorkspaceId, selectedProjectId);
   const {
+    clearProjectMessages,
+    createProjectMessage,
+    deleteProjectMessage,
+    loadProjectMessages,
+    projectMessages,
+    projectMessagesStatus,
+    refreshProjectMessages,
+    updateProjectMessage,
+  } = useProjectMessages({
+    activityScope,
+    auth,
+    loadActivity,
+    selectedProjectId,
+    selectedTaskId,
+    selectedWorkspaceId,
+  });
+  const {
     assignTask,
     attachmentStatus,
     attachments,
@@ -264,6 +284,10 @@ export function AtlasClient({
       refreshes.push(refreshProjectMembers());
     }
 
+    if (realtimeEventTouchesProjectMessages(event, selectedProjectId)) {
+      refreshes.push(loadProjectMessages(auth.accessToken, selectedWorkspaceId, selectedProjectId));
+    }
+
     if (realtimeEventTouchesTask(event, selectedTaskId)) {
       refreshes.push(
         Promise.all([
@@ -287,6 +311,7 @@ export function AtlasClient({
       setSelectedTaskId("");
       clearBoardState();
       clearProjectMemberState();
+      clearProjectMessages();
       clearTaskDetailState();
       clearActivity();
       if (projectPage.items[0]) await chooseProject(accessToken, workspaceId, projectPage.items[0].id);
@@ -300,6 +325,7 @@ export function AtlasClient({
     setProjects([]);
     clearBoardState();
     clearProjectMemberState();
+    clearProjectMessages();
   }
 
   async function hydrate(currentAuth: AuthPair) {
@@ -323,6 +349,7 @@ export function AtlasClient({
         clearActivity();
         clearWorkspaceAdminState();
         clearProjectMemberState();
+        clearProjectMessages();
         clearOutboxState();
       }
     } catch (error) {
@@ -413,6 +440,7 @@ export function AtlasClient({
     clearTaskDetailState();
     clearWorkspaceAdminState();
     clearProjectMemberState();
+    clearProjectMessages();
     clearOutboxState();
     clearMyWork();
     clearNotificationPreferences();
@@ -520,6 +548,7 @@ export function AtlasClient({
         setSelectedTaskId("");
         clearBoardState();
         clearProjectMemberState();
+        clearProjectMessages();
         clearTaskDetailState();
         clearActivity();
         if (remainingProjects[0]) await chooseProject(auth.accessToken, selectedWorkspaceId, remainingProjects[0].id);
@@ -534,13 +563,18 @@ export function AtlasClient({
     setSelectedTaskId("");
     clearBoardState();
     clearProjectMemberState();
+    clearProjectMessages();
     clearTaskDetailState();
     clearActivity();
     if (activityScope === "task") setActivityScope("project");
     try {
-      await loadProjectData(accessToken, workspaceId, projectId);
+      await Promise.all([
+        loadProjectData(accessToken, workspaceId, projectId),
+        loadProjectMessages(accessToken, workspaceId, projectId),
+      ]);
     } catch (error) {
       clearBoardState();
+      clearProjectMessages();
       clearTaskDetailState();
       setSelectedTaskId("");
       setMessage(errorMessage(error));
@@ -566,6 +600,7 @@ export function AtlasClient({
     clearMyWork();
     clearWorkspaceAdminState();
     clearOutboxState();
+    clearProjectMessages();
     clearSearch();
     clearActivity();
     setActivityScope("project");
@@ -706,6 +741,16 @@ export function AtlasClient({
           selectedProjectId={selectedProjectId}
           selectedTaskId={selectedTaskId}
           statusMessage={activityStatus}
+        />
+
+        <ProjectMessagesPanel
+          messages={projectMessages}
+          onCreateMessage={createProjectMessage}
+          onDeleteMessage={deleteProjectMessage}
+          onRefresh={refreshProjectMessages}
+          onUpdateMessage={updateProjectMessage}
+          project={selectedProject}
+          statusMessage={projectMessagesStatus}
         />
 
         <WorkspaceAdminPanel

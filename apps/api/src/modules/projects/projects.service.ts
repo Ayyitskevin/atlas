@@ -1,8 +1,10 @@
 import {
   ATLAS_ERROR_CODES,
   type AddProjectMemberRequest,
+  type CreateProjectMessageRequest,
   type CreateProjectRequest,
   type CursorPaginationQuery,
+  type UpdateProjectMessageRequest,
   type UpdateProjectMemberRequest,
   type UpdateProjectRequest,
 } from "@atlas/shared";
@@ -161,6 +163,78 @@ export class ProjectsService {
     return { ok: true };
   }
 
+  async listMessages(ctx: AuthContext, workspaceId: string, projectId: string, query: CursorPaginationQuery) {
+    await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "VIEWER");
+    const items = await this.projectsRepository.listMessages({ ...query, projectId, workspaceId });
+    return pageFromLimit(items, query.limit);
+  }
+
+  async createMessage(ctx: AuthContext, workspaceId: string, projectId: string, input: CreateProjectMessageRequest) {
+    await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "COMMENTER");
+    const message = await this.projectsRepository.createMessage({
+      authorId: ctx.userId,
+      body: input.body,
+      projectId,
+      title: input.title,
+      workspaceId,
+    });
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: message.id,
+      entityType: "project_message",
+      eventType: "ProjectMessageCreated",
+      payload: projectMessagePayload(message),
+      projectId,
+      workspaceId,
+    });
+    return message;
+  }
+
+  async updateMessage(ctx: AuthContext, workspaceId: string, projectId: string, messageId: string, input: UpdateProjectMessageRequest) {
+    const message = await this.projectsRepository.findMessage({ messageId, projectId, workspaceId });
+    if (!message) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project message not found.");
+    await this.requireMessageMutationRole(ctx, workspaceId, projectId, message.authorId);
+    const updated = await this.projectsRepository.updateMessage({
+      body: input.body,
+      messageId,
+      projectId,
+      title: input.title,
+      workspaceId,
+    });
+    if (!updated) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project message not found.");
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: updated.id,
+      entityType: "project_message",
+      eventType: "ProjectMessageUpdated",
+      payload: projectMessagePayload(updated, message),
+      projectId,
+      workspaceId,
+    });
+    return updated;
+  }
+
+  async deleteMessage(ctx: AuthContext, workspaceId: string, projectId: string, messageId: string) {
+    const message = await this.projectsRepository.findMessage({ messageId, projectId, workspaceId });
+    if (!message) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project message not found.");
+    await this.requireMessageMutationRole(ctx, workspaceId, projectId, message.authorId);
+    await this.projectsRepository.softDeleteMessage({ messageId, projectId, workspaceId });
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: message.id,
+      entityType: "project_message",
+      eventType: "ProjectMessageDeleted",
+      payload: projectMessagePayload(message),
+      projectId,
+      workspaceId,
+    });
+    return { ok: true };
+  }
+
+  private async requireMessageMutationRole(ctx: AuthContext, workspaceId: string, projectId: string, authorId: string) {
+    await this.permissions.requireProjectRole(ctx, workspaceId, projectId, authorId === ctx.userId ? "COMMENTER" : "EDITOR");
+  }
+
   private async ensureProjectAdminCanChange(projectId: string, currentRole: ProjectRole, nextRole: ProjectRole | null) {
     if (currentRole !== "PROJECT_ADMIN" || nextRole === "PROJECT_ADMIN") return;
     const projectAdminCount = await this.projectsRepository.countProjectAdmins(projectId);
@@ -193,4 +267,18 @@ function projectMemberPayload(
     user: member.user,
     userId: member.userId,
   };
+}
+
+function projectMessagePayload(
+  message: { body: string; title: string },
+  previous?: { body: string; title: string },
+) {
+  const payload: Record<string, string | null> = {
+    bodyPreview: message.body.slice(0, 160),
+    title: message.title,
+  };
+  if (!previous) return payload;
+  if (previous.title !== message.title) payload.previousTitle = previous.title;
+  if (previous.body !== message.body) payload.previousBodyPreview = previous.body.slice(0, 160);
+  return payload;
 }

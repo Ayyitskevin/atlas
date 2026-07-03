@@ -3,8 +3,10 @@ import { z } from "zod";
 
 import {
   addProjectMemberRequestSchema,
+  createProjectMessageRequestSchema,
   createProjectRequestSchema,
   cursorPaginationQuerySchema,
+  updateProjectMessageRequestSchema,
   updateProjectMemberRequestSchema,
   updateProjectRequestSchema,
 } from "@atlas/shared";
@@ -20,6 +22,7 @@ import { ProjectsService } from "./projects.service.js";
 const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
 const projectParamsSchema = workspaceParamsSchema.extend({ projectId: z.string().uuid() });
 const projectMemberParamsSchema = projectParamsSchema.extend({ userId: z.string().uuid() });
+const projectMessageParamsSchema = projectParamsSchema.extend({ messageId: z.string().uuid() });
 
 export async function registerProjectRoutes(app: FastifyInstance): Promise<void> {
   const controller = new ProjectsController(
@@ -75,5 +78,25 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     "/workspaces/:workspaceId/projects/:projectId/members/:userId",
     { schema: openApiSchema({ params: projectMemberParamsSchema, tags: ["Projects"] }) },
     controller.removeMember,
+  );
+  app.get(
+    "/workspaces/:workspaceId/projects/:projectId/messages",
+    { schema: openApiSchema({ params: projectParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Project Messages"] }) },
+    controller.listMessages,
+  );
+  app.post(
+    "/workspaces/:workspaceId/projects/:projectId/messages",
+    { schema: openApiSchema({ body: createProjectMessageRequestSchema, params: projectParamsSchema, tags: ["Project Messages"] }) },
+    controller.createMessage,
+  );
+  app.patch(
+    "/workspaces/:workspaceId/projects/:projectId/messages/:messageId",
+    { schema: openApiSchema({ body: updateProjectMessageRequestSchema, params: projectMessageParamsSchema, tags: ["Project Messages"] }) },
+    controller.updateMessage,
+  );
+  app.delete(
+    "/workspaces/:workspaceId/projects/:projectId/messages/:messageId",
+    { schema: openApiSchema({ params: projectMessageParamsSchema, tags: ["Project Messages"] }) },
+    controller.deleteMessage,
   );
 }

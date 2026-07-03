@@ -270,6 +270,90 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     await expectProjectLifecycleEvent(workspaceId, "ProjectDeleted", lifecycleProjectId, { name: name + " Updated", visibility: "PRIVATE" });
   }, 60_000);
 
+  it("manages project message board posts", async () => {
+    const createMessage = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { body: "Here is the weekly project update.", title: "Weekly update" },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/messages",
+    });
+    expect(createMessage.statusCode).toBe(201);
+    const messageBody = createMessage.json<{ author: { email: string; name: string }; body: string; id: string; title: string }>();
+    expect(messageBody).toMatchObject({
+      author: { email, name: "Integration User" },
+      body: "Here is the weekly project update.",
+      title: "Weekly update",
+    });
+    await expectActivityEvent({
+      entityId: messageBody.id,
+      entityType: "project_message",
+      eventType: "ProjectMessageCreated",
+      payload: { bodyPreview: "Here is the weekly project update.", title: "Weekly update" },
+      projectId,
+      workspaceId,
+    });
+
+    const messages = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/messages",
+    });
+    expect(messages.statusCode).toBe(200);
+    expect(messages.json<{ items: Array<{ id: string; title: string }> }>().items).toContainEqual(
+      expect.objectContaining({ id: messageBody.id, title: "Weekly update" }),
+    );
+
+    const updateMessage = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: { body: "Updated weekly project notes.", title: "Weekly update edited" },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/messages/" + messageBody.id,
+    });
+    expect(updateMessage.statusCode).toBe(200);
+    expect(updateMessage.json<{ body: string; title: string }>()).toMatchObject({
+      body: "Updated weekly project notes.",
+      title: "Weekly update edited",
+    });
+    await expectActivityEvent({
+      entityId: messageBody.id,
+      entityType: "project_message",
+      eventType: "ProjectMessageUpdated",
+      payload: {
+        bodyPreview: "Updated weekly project notes.",
+        previousBodyPreview: "Here is the weekly project update.",
+        previousTitle: "Weekly update",
+        title: "Weekly update edited",
+      },
+      projectId,
+      workspaceId,
+    });
+
+    const deleteMessage = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/messages/" + messageBody.id,
+    });
+    expect(deleteMessage.statusCode).toBe(200);
+    await expectActivityEvent({
+      entityId: messageBody.id,
+      entityType: "project_message",
+      eventType: "ProjectMessageDeleted",
+      payload: { bodyPreview: "Updated weekly project notes.", title: "Weekly update edited" },
+      projectId,
+      workspaceId,
+    });
+
+    const messagesAfterDelete = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/messages",
+    });
+    expect(messagesAfterDelete.statusCode).toBe(200);
+    expect(messagesAfterDelete.json<{ items: Array<{ id: string }> }>().items).not.toContainEqual(
+      expect.objectContaining({ id: messageBody.id }),
+    );
+  }, 60_000);
+
   it("updates task details, assignments, subtasks, and comments", async () => {
     const currentUser = await prisma.user.findUniqueOrThrow({ where: { email } });
 

@@ -62,6 +62,7 @@ model User {
   sentWorkspaceInvitations WorkspaceInvitation[] @relation("WorkspaceInvitationInviter")
   ownedWorkspaces          Workspace[]           @relation("WorkspaceOwner")
   createdProjects          Project[]             @relation("ProjectCreator")
+  projectMessages          ProjectMessage[]      @relation("ProjectMessageAuthor")
   projectLinks             ProjectMember[]
   assignedTasks            TaskAssignee[]
   subtasks                 Subtask[]             @relation("SubtaskAssignee")
@@ -123,6 +124,7 @@ model Workspace {
   members       WorkspaceMember[]
   invitations   WorkspaceInvitation[]
   projects      Project[]
+  projectMessages ProjectMessage[]
   activity      ActivityEvent[]
   notifications Notification[]
   notificationPreferences WorkspaceNotificationPreference[]
@@ -193,6 +195,7 @@ model Project {
   members     ProjectMember[]
   sections    Section[]
   tasks       Task[]
+  messages    ProjectMessage[]
   activity    ActivityEvent[]
 
   @@index([workspaceId, deletedAt])
@@ -214,6 +217,25 @@ model ProjectMember {
   @@unique([projectId, userId])
   @@index([userId])
   @@map("project_members")
+}
+
+model ProjectMessage {
+  id          String    @id @default(uuid()) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  projectId   String    @map("project_id") @db.Uuid
+  authorId    String    @map("author_id") @db.Uuid
+  title       String
+  body        String
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  author      User      @relation("ProjectMessageAuthor", fields: [authorId], references: [id])
+
+  @@index([workspaceId, projectId, createdAt])
+  @@index([workspaceId, authorId])
+  @@map("project_messages")
 }
 
 model Section {

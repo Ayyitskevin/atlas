@@ -115,4 +115,43 @@ export class ProjectsRepository {
       where: { projectId_userId: { projectId: input.projectId, userId: input.userId } },
     });
   }
+
+  createMessage(input: { authorId: string; body: string; projectId: string; title: string; workspaceId: string }) {
+    return this.prisma.projectMessage.create({
+      data: input,
+      include: { author: { select: { email: true, id: true, name: true } } },
+    });
+  }
+
+  listMessages(input: { cursor?: string; limit: number; projectId: string; workspaceId: string }) {
+    return this.prisma.projectMessage.findMany({
+      ...paginationArgs(input),
+      include: { author: { select: { email: true, id: true, name: true } } },
+      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      where: { deletedAt: null, projectId: input.projectId, workspaceId: input.workspaceId },
+    });
+  }
+
+  findMessage(input: { messageId: string; projectId: string; workspaceId: string }) {
+    return this.prisma.projectMessage.findFirst({
+      include: { author: { select: { email: true, id: true, name: true } } },
+      where: { deletedAt: null, id: input.messageId, projectId: input.projectId, workspaceId: input.workspaceId },
+    });
+  }
+
+  async updateMessage(input: { body?: string; messageId: string; projectId: string; title?: string; workspaceId: string }) {
+    const result = await this.prisma.projectMessage.updateMany({
+      data: { body: input.body, title: input.title },
+      where: { deletedAt: null, id: input.messageId, projectId: input.projectId, workspaceId: input.workspaceId },
+    });
+    if (!result.count) return null;
+    return this.findMessage(input);
+  }
+
+  softDeleteMessage(input: { messageId: string; projectId: string; workspaceId: string }) {
+    return this.prisma.projectMessage.updateMany({
+      data: { deletedAt: new Date() },
+      where: { deletedAt: null, id: input.messageId, projectId: input.projectId, workspaceId: input.workspaceId },
+    });
+  }
 }

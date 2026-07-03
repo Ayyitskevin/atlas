@@ -41,6 +41,8 @@ const projectRefreshEvents = new Set([
 
 const projectMemberRefreshEvents = new Set(["ProjectMemberAdded", "ProjectMemberRemoved", "ProjectMemberUpdated"]);
 
+const projectMessageRefreshEvents = new Set(["ProjectMessageCreated", "ProjectMessageDeleted", "ProjectMessageUpdated"]);
+
 const projectListRefreshEvents = new Set([
   "ProjectArchived",
   "ProjectCreated",
@@ -122,6 +124,10 @@ export function realtimeEventTouchesProjectList(event: RealtimeDomainEvent) {
 
 export function realtimeEventTouchesProjectMembers(event: RealtimeDomainEvent, selectedProjectId: string) {
   return Boolean(selectedProjectId && event.projectId === selectedProjectId && projectMemberRefreshEvents.has(event.eventType));
+}
+
+export function realtimeEventTouchesProjectMessages(event: RealtimeDomainEvent, selectedProjectId: string) {
+  return Boolean(selectedProjectId && event.projectId === selectedProjectId && projectMessageRefreshEvents.has(event.eventType));
 }
 
 export function realtimeEventTouchesTask(event: RealtimeDomainEvent, selectedTaskId: string) {

@@ -36,6 +36,18 @@ export type ProjectMember = {
   userId: string;
 };
 
+export type ProjectMessage = {
+  author: User;
+  authorId: string;
+  body: string;
+  createdAt: string;
+  id: string;
+  projectId: string;
+  title: string;
+  updatedAt: string;
+  workspaceId: string;
+};
+
 export type Section = {
   id: string;
   name: string;

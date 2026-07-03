@@ -24,6 +24,7 @@ describe("atlas format helpers", () => {
     expect(formatEventType("TaskCompleted")).toBe("Task Completed");
     expect(formatActivityTitle("AttachmentDeleted")).toBe("Attachment removed");
     expect(formatActivityTitle("TaskLabelAdded")).toBe("Label added");
+    expect(formatActivityTitle("ProjectMessageCreated")).toBe("Message posted");
     expect(formatActivityTitle("CustomEvent")).toBe("Custom Event");
     expect(taskStatusLabel("IN_PROGRESS")).toBe("in progress");
     expect(workspaceRoleLabel("OWNER")).toBe("owner");
@@ -53,6 +54,14 @@ describe("atlas format helpers", () => {
         taskId: "task-1",
       }),
     ).toBe("Task: Prep launch QA · label Client Review");
+    expect(
+      formatActivityDetail({
+        entityType: "project_message",
+        eventType: "ProjectMessageCreated",
+        payload: { title: "Weekly update" },
+        projectId: "project-1",
+      }),
+    ).toBe("project message: Weekly update");
   });
 
   it("formats task audit transitions from activity payloads", () => {

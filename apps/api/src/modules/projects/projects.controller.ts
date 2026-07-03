@@ -3,8 +3,10 @@ import { z } from "zod";
 
 import {
   addProjectMemberRequestSchema,
+  createProjectMessageRequestSchema,
   createProjectRequestSchema,
   cursorPaginationQuerySchema,
+  updateProjectMessageRequestSchema,
   updateProjectMemberRequestSchema,
   updateProjectRequestSchema,
 } from "@atlas/shared";
@@ -16,6 +18,7 @@ import { ProjectsService } from "./projects.service.js";
 const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
 const projectParamsSchema = workspaceParamsSchema.extend({ projectId: z.string().uuid() });
 const projectMemberParamsSchema = projectParamsSchema.extend({ userId: z.string().uuid() });
+const projectMessageParamsSchema = projectParamsSchema.extend({ messageId: z.string().uuid() });
 
 export class ProjectsController {
   constructor(private readonly projectsService: ProjectsService) {}
@@ -81,5 +84,42 @@ export class ProjectsController {
   removeMember = async (request: FastifyRequest) => {
     const { projectId, userId, workspaceId } = parseParams(request, projectMemberParamsSchema);
     return this.projectsService.removeMember(await requireAuth(request), workspaceId, projectId, userId);
+  };
+
+  listMessages = async (request: FastifyRequest) => {
+    const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
+    return this.projectsService.listMessages(
+      await requireAuth(request),
+      workspaceId,
+      projectId,
+      parseQuery(request, cursorPaginationQuerySchema),
+    );
+  };
+
+  createMessage = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
+    const result = await this.projectsService.createMessage(
+      await requireAuth(request),
+      workspaceId,
+      projectId,
+      parseBody(request, createProjectMessageRequestSchema),
+    );
+    return reply.status(201).send(result);
+  };
+
+  updateMessage = async (request: FastifyRequest) => {
+    const { messageId, projectId, workspaceId } = parseParams(request, projectMessageParamsSchema);
+    return this.projectsService.updateMessage(
+      await requireAuth(request),
+      workspaceId,
+      projectId,
+      messageId,
+      parseBody(request, updateProjectMessageRequestSchema),
+    );
+  };
+
+  deleteMessage = async (request: FastifyRequest) => {
+    const { messageId, projectId, workspaceId } = parseParams(request, projectMessageParamsSchema);
+    return this.projectsService.deleteMessage(await requireAuth(request), workspaceId, projectId, messageId);
   };
 }

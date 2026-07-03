@@ -5,6 +5,7 @@ import {
   realtimeEventTouchesProject,
   realtimeEventTouchesProjectList,
   realtimeEventTouchesProjectMembers,
+  realtimeEventTouchesProjectMessages,
   realtimeEventTouchesTask,
   realtimeReconnectDelay,
   realtimeSubscriptions,
@@ -84,6 +85,7 @@ describe("realtime utilities", () => {
     const taskEvent = { eventType: "TaskMoved", projectId: "project-1", taskId: "task-1" } as RealtimeDomainEvent;
     const labelEvent = { eventType: "TaskLabelAdded", projectId: "project-1", taskId: "task-1" } as RealtimeDomainEvent;
     const commentEvent = { eventType: "CommentCreated", projectId: "project-1", taskId: "task-1" } as RealtimeDomainEvent;
+    const messageEvent = { eventType: "ProjectMessageCreated", projectId: "project-1", taskId: null } as RealtimeDomainEvent;
 
     expect(realtimeEventTouchesProject(taskEvent, "project-1")).toBe(true);
     expect(realtimeEventTouchesProject(labelEvent, "project-1")).toBe(true);
@@ -94,6 +96,8 @@ describe("realtime utilities", () => {
     expect(realtimeEventTouchesProjectList(taskEvent)).toBe(false);
     expect(realtimeEventTouchesProjectMembers({ eventType: "ProjectMemberUpdated", projectId: "project-1", taskId: null } as RealtimeDomainEvent, "project-1")).toBe(true);
     expect(realtimeEventTouchesProjectMembers({ eventType: "ProjectMemberUpdated", projectId: "project-2", taskId: null } as RealtimeDomainEvent, "project-1")).toBe(false);
+    expect(realtimeEventTouchesProjectMessages(messageEvent, "project-1")).toBe(true);
+    expect(realtimeEventTouchesProjectMessages(messageEvent, "project-2")).toBe(false);
     expect(realtimeEventTouchesTask(commentEvent, "task-1")).toBe(true);
     expect(realtimeEventTouchesTask(commentEvent, "task-2")).toBe(false);
   });
