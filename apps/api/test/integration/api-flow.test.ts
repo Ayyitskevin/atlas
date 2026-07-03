@@ -1403,6 +1403,14 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     });
     expect(assignBlockedTask.statusCode).toBe(200);
 
+    const assignBlockingTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { userId: currentUser.id },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockingTaskId + "/assign",
+    });
+    expect(assignBlockingTask.statusCode).toBe(200);
+
     const myBlockedWork = await app!.inject({
       headers: authHeaders(accessToken),
       method: "GET",
@@ -1414,6 +1422,22 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
         .json<{ items: Array<{ dependencySummary: { blockedByOpenCount: number; isBlocked: boolean }; id: string }> }>()
         .items.find((item) => item.id === blockedTaskId)?.dependencySummary,
     ).toMatchObject({ blockedByOpenCount: 1, isBlocked: true });
+
+    const myBlockedOnlyWork = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/my-work?dependency=blocked&due=any&limit=20&status=open",
+    });
+    expect(myBlockedOnlyWork.statusCode).toBe(200);
+    expect(myBlockedOnlyWork.json<{ items: Array<{ id: string }> }>().items.map((item) => item.id)).toEqual([blockedTaskId]);
+
+    const myBlockingOnlyWork = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/my-work?dependency=blocking&due=any&limit=20&status=open",
+    });
+    expect(myBlockingOnlyWork.statusCode).toBe(200);
+    expect(myBlockingOnlyWork.json<{ items: Array<{ id: string }> }>().items.map((item) => item.id)).toEqual([blockingTaskId]);
 
     const completeBlockedTask = await app!.inject({
       headers: authHeaders(accessToken),
@@ -1440,6 +1464,14 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     });
     expect(dependenciesAfterBlockerDone.statusCode).toBe(200);
     expect(dependenciesAfterBlockerDone.json<{ isBlocked: boolean }>().isBlocked).toBe(false);
+
+    const myBlockedOnlyWorkAfterUnblock = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/my-work?dependency=blocked&due=any&limit=20&status=open",
+    });
+    expect(myBlockedOnlyWorkAfterUnblock.statusCode).toBe(200);
+    expect(myBlockedOnlyWorkAfterUnblock.json<{ items: Array<{ id: string }> }>().items.map((item) => item.id)).not.toContain(blockedTaskId);
 
     const completeUnblockedTask = await app!.inject({
       headers: authHeaders(accessToken),

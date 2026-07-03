@@ -88,11 +88,13 @@ export function AtlasClient({
     selectedTaskId,
   );
   const {
+    changeMyWorkDependencyFilter,
     changeMyWorkDueFilter,
     changeMyWorkScopeFilter,
     changeMyWorkStatusFilter,
     clearMyWork,
     loadMyWork,
+    myWorkDependencyFilter,
     myWorkDueFilter,
     myWorkScopeFilter,
     myWorkStatus,
@@ -296,7 +298,7 @@ export function AtlasClient({
     const refreshes: Promise<void>[] = [
       loadNotifications(auth.accessToken, selectedWorkspaceId, notificationFilter),
       loadDashboardWork(auth.accessToken, selectedWorkspaceId),
-      loadMyWork(auth.accessToken, selectedWorkspaceId, myWorkStatusFilter, myWorkDueFilter, myWorkScopeFilter),
+      loadMyWork(auth.accessToken, selectedWorkspaceId, myWorkStatusFilter, myWorkDueFilter, myWorkScopeFilter, myWorkDependencyFilter),
     ];
     if (!selectedProjectWasDeleted && !selectedProjectMembershipChanged) {
       refreshes.push(loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId));
@@ -502,7 +504,7 @@ export function AtlasClient({
         api<Page<Project>>(`/workspaces/${workspaceId}/projects`, {}, accessToken),
         loadProjectTemplates(accessToken, workspaceId),
         loadDashboardWork(accessToken, workspaceId),
-        loadMyWork(accessToken, workspaceId, myWorkStatusFilter, myWorkDueFilter, myWorkScopeFilter),
+        loadMyWork(accessToken, workspaceId, myWorkStatusFilter, myWorkDueFilter, myWorkScopeFilter, myWorkDependencyFilter),
         loadNotificationPreferences(accessToken, workspaceId),
         loadWorkspaceMembers(accessToken, workspaceId),
       ]);
@@ -888,7 +890,9 @@ export function AtlasClient({
         />
 
         <MyWorkPanel
+          dependencyFilter={myWorkDependencyFilter}
           dueFilter={myWorkDueFilter}
+          onDependencyFilterChange={changeMyWorkDependencyFilter}
           onDueFilterChange={changeMyWorkDueFilter}
           onOpenTask={openMyWorkTask}
           onRefresh={refreshMyWork}

@@ -1,7 +1,7 @@
 "use client";
 
 import { dateInputValue, taskStatusLabel } from "./atlas-format";
-import type { MyWorkDueFilter, MyWorkScopeFilter, MyWorkStatusFilter, MyWorkTask } from "./atlas-types";
+import type { MyWorkDependencyFilter, MyWorkDueFilter, MyWorkScopeFilter, MyWorkStatusFilter, MyWorkTask } from "./atlas-types";
 import { TaskDependencyBadges } from "./task-dependency-badges";
 
 const dueFilters: Array<{ label: string; value: MyWorkDueFilter }> = [
@@ -24,8 +24,16 @@ const scopeFilters: Array<{ label: string; value: MyWorkScopeFilter }> = [
   { label: "Assigned or watching", value: "all" },
 ];
 
+const dependencyFilters: Array<{ label: string; value: MyWorkDependencyFilter }> = [
+  { label: "Any dependency", value: "any" },
+  { label: "Blocked", value: "blocked" },
+  { label: "Blocking open tasks", value: "blocking" },
+];
+
 type MyWorkPanelProps = {
+  dependencyFilter: MyWorkDependencyFilter;
   dueFilter: MyWorkDueFilter;
+  onDependencyFilterChange: (value: MyWorkDependencyFilter) => void;
   onDueFilterChange: (value: MyWorkDueFilter) => void;
   onOpenTask: (task: MyWorkTask) => Promise<void>;
   onRefresh: () => Promise<void>;
@@ -39,7 +47,9 @@ type MyWorkPanelProps = {
 };
 
 export function MyWorkPanel({
+  dependencyFilter,
   dueFilter,
+  onDependencyFilterChange,
   onDueFilterChange,
   onOpenTask,
   onRefresh,
@@ -68,7 +78,7 @@ export function MyWorkPanel({
         </button>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-3">
+      <div className="grid gap-2 md:grid-cols-4">
         <label className="grid gap-1 text-xs font-medium uppercase text-slate-500">
           Scope
           <select
@@ -108,6 +118,21 @@ export function MyWorkPanel({
             value={dueFilter}
           >
             {dueFilters.map((filter) => (
+              <option key={filter.value} value={filter.value}>
+                {filter.label}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-xs font-medium uppercase text-slate-500">
+          Dependency
+          <select
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm normal-case text-slate-700"
+            disabled={!workspaceSelected}
+            onChange={(event) => onDependencyFilterChange(event.target.value as MyWorkDependencyFilter)}
+            value={dependencyFilter}
+          >
+            {dependencyFilters.map((filter) => (
               <option key={filter.value} value={filter.value}>
                 {filter.label}
               </option>

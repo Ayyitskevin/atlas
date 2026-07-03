@@ -1,5 +1,5 @@
 import type { Prisma } from "@atlas/db";
-import type { MyWorkDueFilter, MyWorkScopeFilter, MyWorkStatusFilter } from "@atlas/shared";
+import type { MyWorkDependencyFilter, MyWorkDueFilter, MyWorkScopeFilter, MyWorkStatusFilter } from "@atlas/shared";
 
 export function myWorkStatusWhere(status: MyWorkStatusFilter): Prisma.TaskWhereInput {
   if (status === "done") return { status: "DONE" };
@@ -15,6 +15,34 @@ export function myWorkDueDateWhere(due: MyWorkDueFilter, now = new Date()): Pris
   if (due === "today") return { dueDate: { gte: today, lt: tomorrow } };
   if (due === "next7") return { dueDate: { gte: today, lt: addUtcDays(today, 8) } };
   if (due === "unscheduled") return { dueDate: null };
+  return {};
+}
+
+export function myWorkDependencyWhere(dependency: MyWorkDependencyFilter, workspaceId: string): Prisma.TaskWhereInput {
+  if (dependency === "blocked") {
+    return {
+      dependenciesAsBlocked: {
+        some: {
+          blockingTask: { deletedAt: null, status: { not: "DONE" }, workspaceId },
+          workspaceId,
+        },
+      },
+      status: { not: "DONE" },
+    };
+  }
+
+  if (dependency === "blocking") {
+    return {
+      dependenciesAsBlocker: {
+        some: {
+          blockedTask: { deletedAt: null, status: { not: "DONE" }, workspaceId },
+          workspaceId,
+        },
+      },
+      status: { not: "DONE" },
+    };
+  }
+
   return {};
 }
 
