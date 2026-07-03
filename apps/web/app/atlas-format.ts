@@ -35,6 +35,8 @@ const activityTitles: Record<string, string> = {
   TaskAssigned: "Task assigned",
   TaskCompleted: "Task completed",
   TaskCreated: "Task created",
+  TaskDependencyAdded: "Dependency added",
+  TaskDependencyRemoved: "Dependency removed",
   TaskLabelAdded: "Label added",
   TaskLabelRemoved: "Label removed",
   TaskMoved: "Task moved",
@@ -69,6 +71,7 @@ export function formatActivityTitle(eventType: string) {
 export function formatActivityDetail(activity: ActivitySummaryInput) {
   const payload = activity.payload ?? {};
   if (activity.entityType === "task") return taskActivityDetail(activity, payload);
+  if (activity.entityType === "task_dependency") return taskDependencyActivityDetail(activity, payload);
   if (activity.entityType === "project") return projectActivityDetail(activity, payload);
   if (activity.entityType === "project_member") return projectMemberActivityDetail(activity, payload);
 
@@ -84,6 +87,7 @@ export function formatActivityDetail(activity: ActivitySummaryInput) {
 export function formatActivityMetadata(activity: ActivitySummaryInput): ActivityMetadataItem[] {
   const payload = activity.payload ?? {};
   if (activity.entityType === "task") return taskActivityMetadata(payload);
+  if (activity.entityType === "task_dependency") return taskDependencyActivityMetadata(payload);
   if (activity.entityType === "project") return projectActivityMetadata(payload);
   if (activity.entityType === "project_member") return projectMemberActivityMetadata(payload);
   if (activity.eventType === "AttachmentAdded" || activity.eventType === "AttachmentDeleted") {
@@ -199,6 +203,22 @@ function taskActivityMetadata(payload: Record<string, unknown>) {
   if (recurrence) items.push({ label: "Repeat", value: taskRecurrenceLabel(recurrence, numberPayload(payload, "recurrenceInterval")) });
   if (recurrenceState) items.push({ label: "Repeat state", value: recurrenceState });
   if (label) items.push({ label: "Label", value: label });
+  return items;
+}
+
+function taskDependencyActivityDetail(activity: ActivitySummaryInput, payload: Record<string, unknown>) {
+  const blocked = stringPayload(payload, "blockedTaskTitle");
+  const blocking = stringPayload(payload, "blockingTaskTitle");
+  if (blocked && blocking) return "Task: " + blocked + " · blocked by " + blocking;
+  return scopeLabel(activity);
+}
+
+function taskDependencyActivityMetadata(payload: Record<string, unknown>) {
+  const items: ActivityMetadataItem[] = [];
+  const blocked = stringPayload(payload, "blockedTaskTitle");
+  const blocking = stringPayload(payload, "blockingTaskTitle");
+  if (blocked) items.push({ label: "Blocked", value: blocked });
+  if (blocking) items.push({ label: "Blocked by", value: blocking });
   return items;
 }
 

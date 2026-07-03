@@ -89,6 +89,24 @@ describe("realtime utilities", () => {
     const recurringSkipEvent = { eventType: "TaskRecurrenceSkipped", projectId: "project-1", taskId: "task-1" } as RealtimeDomainEvent;
     const labelEvent = { eventType: "TaskLabelAdded", projectId: "project-1", taskId: "task-1" } as RealtimeDomainEvent;
     const commentEvent = { eventType: "CommentCreated", projectId: "project-1", taskId: "task-1" } as RealtimeDomainEvent;
+    const dependencyEvent = {
+      event: {
+        actorUserId: "user-1",
+        createdAt: "2026-07-03T00:00:00.000Z",
+        entityId: "dependency-1",
+        entityType: "task_dependency",
+        eventType: "TaskDependencyAdded",
+        id: "event-2",
+        payload: { blockedTaskId: "task-1", blockingTaskId: "task-2" },
+        projectId: "project-1",
+        taskId: "task-1",
+      },
+      eventId: "event-2",
+      eventType: "TaskDependencyAdded",
+      projectId: "project-1",
+      taskId: "task-1",
+      type: "TaskDependencyAdded",
+    };
     const messageEvent = { eventType: "ProjectMessageCreated", projectId: "project-1", taskId: null } as RealtimeDomainEvent;
     const pinnedMessageEvent = { eventType: "ProjectMessagePinned", projectId: "project-1", taskId: null } as RealtimeDomainEvent;
     const templateEvent = { eventType: "ProjectTemplateCreated", projectId: "project-1", taskId: null } as RealtimeDomainEvent;
@@ -115,5 +133,8 @@ describe("realtime utilities", () => {
     expect(realtimeEventTouchesProjectMessages(messageEvent, "project-2")).toBe(false);
     expect(realtimeEventTouchesTask(commentEvent, "task-1")).toBe(true);
     expect(realtimeEventTouchesTask(commentEvent, "task-2")).toBe(false);
+    expect(realtimeEventTouchesTask(dependencyEvent, "task-1")).toBe(true);
+    expect(realtimeEventTouchesTask(dependencyEvent, "task-2")).toBe(true);
+    expect(realtimeEventTouchesTask(dependencyEvent, "task-3")).toBe(false);
   });
 });

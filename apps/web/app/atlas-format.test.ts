@@ -30,6 +30,7 @@ describe("atlas format helpers", () => {
     expect(formatActivityTitle("ProjectTemplateCreated")).toBe("Template saved");
     expect(formatActivityTitle("ProjectTemplateUpdated")).toBe("Template updated");
     expect(formatActivityTitle("ProjectCreatedFromTemplate")).toBe("Project created from template");
+    expect(formatActivityTitle("TaskDependencyAdded")).toBe("Dependency added");
     expect(formatActivityTitle("TaskRecurrenceGenerated")).toBe("Recurring task created");
     expect(formatActivityTitle("TaskRecurrencePaused")).toBe("Recurring task paused");
     expect(formatActivityTitle("TaskRecurrenceSkipped")).toBe("Recurring task skipped");
@@ -80,6 +81,25 @@ describe("atlas format helpers", () => {
         projectId: "project-1",
       }),
     ).toBe("project template: Launch template");
+    expect(
+      formatActivityDetail({
+        entityType: "task_dependency",
+        eventType: "TaskDependencyAdded",
+        payload: { blockedTaskTitle: "Client review", blockingTaskTitle: "Design draft" },
+        taskId: "task-1",
+      }),
+    ).toBe("Task: Client review · blocked by Design draft");
+    expect(
+      formatActivityMetadata({
+        entityType: "task_dependency",
+        eventType: "TaskDependencyAdded",
+        payload: { blockedTaskTitle: "Client review", blockingTaskTitle: "Design draft" },
+        taskId: "task-1",
+      }),
+    ).toEqual([
+      { label: "Blocked", value: "Client review" },
+      { label: "Blocked by", value: "Design draft" },
+    ]);
     expect(
       formatActivityDetail({
         entityType: "task",

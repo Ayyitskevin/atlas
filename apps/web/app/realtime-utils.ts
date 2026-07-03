@@ -148,7 +148,12 @@ export function realtimeEventTouchesProjectMessages(event: RealtimeDomainEvent, 
 }
 
 export function realtimeEventTouchesTask(event: RealtimeDomainEvent, selectedTaskId: string) {
-  return Boolean(selectedTaskId && event.taskId === selectedTaskId);
+  if (!selectedTaskId) return false;
+  if (event.taskId === selectedTaskId) return true;
+  if (event.eventType === "TaskDependencyAdded" || event.eventType === "TaskDependencyRemoved") {
+    return dependencyPayloadTouchesTask(event.event.payload, selectedTaskId);
+  }
+  return false;
 }
 
 function parseSubscription(value: Record<string, unknown>): RealtimeSubscription | null {
@@ -166,4 +171,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 
 function stringOrNull(value: unknown) {
   return typeof value === "string" ? value : null;
+}
+
+function dependencyPayloadTouchesTask(payload: Record<string, unknown>, selectedTaskId: string) {
+  return payload.blockedTaskId === selectedTaskId || payload.blockingTaskId === selectedTaskId;
 }
