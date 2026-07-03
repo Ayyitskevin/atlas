@@ -407,6 +407,31 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
   }, 60_000);
 
   it("saves project templates and creates projects from them", async () => {
+    const currentUser = await prisma.user.findUniqueOrThrow({ where: { email } });
+    const createTemplateLabel = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { color: "#6366f1", name: "Template carryover " + randomUUID().slice(0, 8) },
+      url: "/api/v1/workspaces/" + workspaceId + "/labels",
+    });
+    expect(createTemplateLabel.statusCode).toBe(201);
+    const templateLabel = createTemplateLabel.json<{ id: string; name: string }>();
+
+    const assignTemplateTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { userId: currentUser.id },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/assign",
+    });
+    expect(assignTemplateTask.statusCode).toBe(200);
+
+    const assignTemplateLabel = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/labels/" + templateLabel.id,
+    });
+    expect(assignTemplateLabel.statusCode).toBe(200);
+
     const createTemplate = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
@@ -477,8 +502,20 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/projects/" + templatedProject.id + "/tasks",
     });
     expect(templatedTasks.statusCode).toBe(200);
-    expect(templatedTasks.json<{ items: Array<{ priority: string; sectionId: string; title: string }> }>().items).toContainEqual(
-      expect.objectContaining({ priority: "MEDIUM", sectionId: copiedSection.id, title: "Integration task" }),
+    const copiedTask = templatedTasks
+      .json<{ items: Array<{ assignees: Array<{ userId: string }>; id: string; priority: string; sectionId: string; title: string }> }>()
+      .items.find((item) => item.title === "Integration task");
+    expect(copiedTask).toEqual(expect.objectContaining({ priority: "MEDIUM", sectionId: copiedSection.id, title: "Integration task" }));
+    expect(copiedTask?.assignees).toContainEqual(expect.objectContaining({ userId: currentUser.id }));
+
+    const copiedTaskLabels = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + copiedTask!.id + "/labels",
+    });
+    expect(copiedTaskLabels.statusCode).toBe(200);
+    expect(copiedTaskLabels.json<{ items: Array<{ label: { name: string }; labelId: string }> }>().items).toContainEqual(
+      expect.objectContaining({ label: expect.objectContaining({ name: templateLabel.name }), labelId: templateLabel.id }),
     );
 
     const deleteTemplate = await app!.inject({

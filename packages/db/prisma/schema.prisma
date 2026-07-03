@@ -69,6 +69,7 @@ model User {
   ownedWorkspaces          Workspace[]           @relation("WorkspaceOwner")
   createdProjects          Project[]             @relation("ProjectCreator")
   createdProjectTemplates  ProjectTemplate[]     @relation("ProjectTemplateCreator")
+  projectTemplateTaskAssignees ProjectTemplateTaskAssignee[]
   projectMessages          ProjectMessage[]      @relation("ProjectMessageAuthor")
   pinnedProjectMessages    ProjectMessage[]      @relation("ProjectMessagePinnedBy")
   projectLinks             ProjectMember[]
@@ -300,10 +301,42 @@ model ProjectTemplateTask {
   createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
   template    ProjectTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
   section     ProjectTemplateSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+  assignees        ProjectTemplateTaskAssignee[]
+  labelAssignments ProjectTemplateTaskLabelAssignment[]
 
   @@index([workspaceId, templateId])
   @@index([workspaceId, sectionId, position])
   @@map("project_template_tasks")
+}
+
+model ProjectTemplateTaskAssignee {
+  id             String              @id @default(uuid()) @db.Uuid
+  workspaceId    String              @map("workspace_id") @db.Uuid
+  templateTaskId String              @map("template_task_id") @db.Uuid
+  userId         String              @map("user_id") @db.Uuid
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  templateTask   ProjectTemplateTask @relation(fields: [templateTaskId], references: [id], onDelete: Cascade)
+  user           User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([templateTaskId, userId])
+  @@index([workspaceId, userId])
+  @@index([workspaceId, templateTaskId])
+  @@map("project_template_task_assignees")
+}
+
+model ProjectTemplateTaskLabelAssignment {
+  id             String              @id @default(uuid()) @db.Uuid
+  workspaceId    String              @map("workspace_id") @db.Uuid
+  templateTaskId String              @map("template_task_id") @db.Uuid
+  labelId        String              @map("label_id") @db.Uuid
+  createdAt      DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  templateTask   ProjectTemplateTask @relation(fields: [templateTaskId], references: [id], onDelete: Cascade)
+  label          TaskLabel           @relation(fields: [labelId], references: [id], onDelete: Cascade)
+
+  @@unique([templateTaskId, labelId])
+  @@index([workspaceId, labelId])
+  @@index([workspaceId, templateTaskId])
+  @@map("project_template_task_label_assignments")
 }
 
 model Section {
@@ -406,6 +439,7 @@ model TaskLabel {
   deletedAt   DateTime?             @map("deleted_at") @db.Timestamptz(6)
   workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   assignments TaskLabelAssignment[]
+  templateAssignments ProjectTemplateTaskLabelAssignment[]
 
   @@unique([workspaceId, name])
   @@index([workspaceId, deletedAt])

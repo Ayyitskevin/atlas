@@ -1,3 +1,5 @@
+import { randomUUID } from "node:crypto";
+
 import type { PrismaClient, ProjectRole } from "@atlas/db";
 import type {
   AddProjectMemberRequest,
@@ -87,7 +89,26 @@ export class ProjectsRepository {
             include: {
               tasks: {
                 orderBy: { position: "asc" },
-                select: { description: true, position: true, priority: true, title: true },
+                select: {
+                  assignees: {
+                    select: { userId: true },
+                    where: {
+                      user: {
+                        deletedAt: null,
+                        disabledAt: null,
+                        workspaceLinks: { some: { deletedAt: null, workspaceId: input.workspaceId } },
+                      },
+                    },
+                  },
+                  description: true,
+                  labelAssignments: {
+                    select: { labelId: true },
+                    where: { label: { deletedAt: null, workspaceId: input.workspaceId } },
+                  },
+                  position: true,
+                  priority: true,
+                  title: true,
+                },
                 where: { deletedAt: null },
               },
             },
@@ -118,9 +139,11 @@ export class ProjectsRepository {
           },
         });
         if (!section.tasks.length) continue;
+        const templateTasks = section.tasks.map((task) => ({ id: randomUUID(), task }));
         await tx.projectTemplateTask.createMany({
-          data: section.tasks.map((task) => ({
+          data: templateTasks.map(({ id, task }) => ({
             description: task.description,
+            id,
             position: task.position,
             priority: task.priority,
             sectionId: templateSection.id,
@@ -129,6 +152,28 @@ export class ProjectsRepository {
             workspaceId: input.workspaceId,
           })),
         });
+
+        const templateTaskAssignees = templateTasks.flatMap(({ id, task }) =>
+          task.assignees.map((assignee) => ({
+            templateTaskId: id,
+            userId: assignee.userId,
+            workspaceId: input.workspaceId,
+          })),
+        );
+        if (templateTaskAssignees.length) {
+          await tx.projectTemplateTaskAssignee.createMany({ data: templateTaskAssignees, skipDuplicates: true });
+        }
+
+        const templateTaskLabelAssignments = templateTasks.flatMap(({ id, task }) =>
+          task.labelAssignments.map((assignment) => ({
+            labelId: assignment.labelId,
+            templateTaskId: id,
+            workspaceId: input.workspaceId,
+          })),
+        );
+        if (templateTaskLabelAssignments.length) {
+          await tx.projectTemplateTaskLabelAssignment.createMany({ data: templateTaskLabelAssignments, skipDuplicates: true });
+        }
       }
 
       return tx.projectTemplate.findUniqueOrThrow({ include: projectTemplateInclude, where: { id: template.id } });
@@ -144,6 +189,10 @@ export class ProjectsRepository {
           sections: {
             include: {
               tasks: {
+                include: {
+                  assignees: { select: { userId: true } },
+                  labelAssignments: { select: { labelId: true } },
+                },
                 orderBy: { position: "asc" },
                 where: { workspaceId: input.workspaceId },
               },
@@ -155,6 +204,23 @@ export class ProjectsRepository {
         where: { deletedAt: null, id: input.templateId, workspaceId: input.workspaceId },
       });
       if (!template) return null;
+
+      const [activeMembers, activeLabels] = await Promise.all([
+        tx.workspaceMember.findMany({
+          select: { userId: true },
+          where: {
+            deletedAt: null,
+            user: { deletedAt: null, disabledAt: null },
+            workspaceId: input.workspaceId,
+          },
+        }),
+        tx.taskLabel.findMany({
+          select: { id: true },
+          where: { deletedAt: null, workspaceId: input.workspaceId },
+        }),
+      ]);
+      const activeMemberIds = new Set(activeMembers.map((member) => member.userId));
+      const activeLabelIds = new Set(activeLabels.map((label) => label.id));
 
       const project = await tx.project.create({
         data: {
@@ -177,9 +243,11 @@ export class ProjectsRepository {
           },
         });
         if (!templateSection.tasks.length) continue;
+        const tasks = templateSection.tasks.map((task) => ({ id: randomUUID(), task }));
         await tx.task.createMany({
-          data: templateSection.tasks.map((task) => ({
+          data: tasks.map(({ id, task }) => ({
             description: task.description,
+            id,
             position: task.position,
             priority: task.priority,
             projectId: project.id,
@@ -188,6 +256,30 @@ export class ProjectsRepository {
             workspaceId: input.workspaceId,
           })),
         });
+
+        const assignees = tasks.flatMap(({ id, task }) =>
+          task.assignees
+            .filter((assignee) => activeMemberIds.has(assignee.userId))
+            .map((assignee) => ({
+              assignedById: input.createdById,
+              taskId: id,
+              userId: assignee.userId,
+              workspaceId: input.workspaceId,
+            })),
+        );
+        if (assignees.length) await tx.taskAssignee.createMany({ data: assignees, skipDuplicates: true });
+
+        const labelAssignments = tasks.flatMap(({ id, task }) =>
+          task.labelAssignments
+            .filter((assignment) => activeLabelIds.has(assignment.labelId))
+            .map((assignment) => ({
+              assignedById: input.createdById,
+              labelId: assignment.labelId,
+              taskId: id,
+              workspaceId: input.workspaceId,
+            })),
+        );
+        if (labelAssignments.length) await tx.taskLabelAssignment.createMany({ data: labelAssignments, skipDuplicates: true });
       }
 
       return tx.project.findUniqueOrThrow({ where: { id: project.id } });
