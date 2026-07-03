@@ -4,6 +4,8 @@ const envSchema = z.object({
   API_HOST: z.string().default("0.0.0.0"),
   API_PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().default("postgresql://atlas:atlas@localhost:5432/atlas"),
+  EMAIL_FROM: z.string().default("no-reply@atlas.local"),
+  EMAIL_PROVIDER: z.enum(["noop"]).default("noop"),
   JWT_ACCESS_SECRET: z.string().default("local-dev-access-secret-change-me"),
   JWT_REFRESH_SECRET: z.string().default("local-dev-refresh-secret-change-me"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),

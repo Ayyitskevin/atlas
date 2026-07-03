@@ -45,7 +45,7 @@ export const searchIndexQueue = new Queue<MutationEventJob, void, string>(WORKER
   },
 });
 
-export const emailStubQueue = new Queue<MutationEventJob, void, string>(WORKER_QUEUE_NAMES.emailStub, {
+export const emailDeliveryQueue = new Queue<MutationEventJob, void, string>(WORKER_QUEUE_NAMES.emailDelivery, {
   connection: queueConnection,
   defaultJobOptions: {
     attempts: 3,
@@ -59,10 +59,10 @@ export async function enqueueDomainSideEffects(event: MutationEventJob): Promise
   await Promise.all([
     notificationFanoutQueue.add(event.eventType, event),
     searchIndexQueue.add(event.eventType, event),
-    emailStubQueue.add(event.eventType, event),
+    emailDeliveryQueue.add(event.eventType, event),
   ]);
 }
 
 export async function closeDomainSideEffectQueues(): Promise<void> {
-  await Promise.all([notificationFanoutQueue.close(), searchIndexQueue.close(), emailStubQueue.close()]);
+  await Promise.all([notificationFanoutQueue.close(), searchIndexQueue.close(), emailDeliveryQueue.close()]);
 }
