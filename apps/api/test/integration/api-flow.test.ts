@@ -456,6 +456,103 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     });
     expect(unassignTask.statusCode).toBe(200);
 
+    const createLabel = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { color: "#22c55e", name: "Client" },
+      url: "/api/v1/workspaces/" + workspaceId + "/labels",
+    });
+    expect(createLabel.statusCode).toBe(201);
+    const labelBody = createLabel.json<{ color: string; id: string; name: string; workspaceId: string }>();
+    expect(labelBody).toMatchObject({ color: "#22c55e", name: "Client", workspaceId });
+
+    const duplicateLabel = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { color: "#ef4444", name: "Client" },
+      url: "/api/v1/workspaces/" + workspaceId + "/labels",
+    });
+    expect(duplicateLabel.statusCode).toBe(409);
+
+    const updateLabel = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: { color: "#0ea5e9", name: "Client Review" },
+      url: "/api/v1/workspaces/" + workspaceId + "/labels/" + labelBody.id,
+    });
+    expect(updateLabel.statusCode).toBe(200);
+    expect(updateLabel.json<{ color: string; name: string }>()).toMatchObject({ color: "#0ea5e9", name: "Client Review" });
+
+    const workspaceLabels = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/labels",
+    });
+    expect(workspaceLabels.statusCode).toBe(200);
+    expect(workspaceLabels.json<{ items: Array<{ id: string; name: string }> }>().items).toContainEqual(
+      expect.objectContaining({ id: labelBody.id, name: "Client Review" }),
+    );
+
+    const assignLabel = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/labels/" + labelBody.id,
+    });
+    expect(assignLabel.statusCode).toBe(200);
+    expect(assignLabel.json<{ label: { color: string; name: string }; labelId: string }>()).toMatchObject({
+      label: { color: "#0ea5e9", name: "Client Review" },
+      labelId: labelBody.id,
+    });
+
+    const taskLabels = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/labels",
+    });
+    expect(taskLabels.statusCode).toBe(200);
+    expect(taskLabels.json<{ items: Array<{ labelId: string }> }>().items).toContainEqual(expect.objectContaining({ labelId: labelBody.id }));
+    await expectActivityEvent({
+      entityId: taskId,
+      entityType: "task",
+      eventType: "TaskLabelAdded",
+      payload: { color: "#0ea5e9", labelId: labelBody.id, name: "Client Review", title: "Updated completed integration task" },
+      projectId,
+      taskId,
+      workspaceId,
+    });
+
+    const unassignLabel = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/labels/" + labelBody.id,
+    });
+    expect(unassignLabel.statusCode).toBe(200);
+    const taskLabelsAfterUnassign = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/labels",
+    });
+    expect(taskLabelsAfterUnassign.statusCode).toBe(200);
+    expect(taskLabelsAfterUnassign.json<{ items: Array<{ labelId: string }> }>().items).not.toContainEqual(
+      expect.objectContaining({ labelId: labelBody.id }),
+    );
+    await expectActivityEvent({
+      entityId: taskId,
+      entityType: "task",
+      eventType: "TaskLabelRemoved",
+      payload: { color: "#0ea5e9", labelId: labelBody.id, name: "Client Review", title: "Updated completed integration task" },
+      projectId,
+      taskId,
+      workspaceId,
+    });
+
+    const deleteLabel = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/labels/" + labelBody.id,
+    });
+    expect(deleteLabel.statusCode).toBe(200);
+
     const createSubtask = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",

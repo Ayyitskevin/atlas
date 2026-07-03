@@ -7,6 +7,7 @@ import {
   createCommentRequestSchema,
   createSectionRequestSchema,
   createSubtaskRequestSchema,
+  createTaskLabelRequestSchema,
   createTaskRequestSchema,
   cursorPaginationQuerySchema,
   moveTaskRequestSchema,
@@ -15,6 +16,7 @@ import {
   reorderSectionsRequestSchema,
   searchQuerySchema,
   updateCommentRequestSchema,
+  updateTaskLabelRequestSchema,
   updateNotificationPreferenceRequestSchema,
   updateSectionRequestSchema,
   updateSubtaskRequestSchema,
@@ -29,6 +31,8 @@ const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
 const projectParamsSchema = workspaceParamsSchema.extend({ projectId: z.string().uuid() });
 const sectionParamsSchema = projectParamsSchema.extend({ sectionId: z.string().uuid() });
 const taskParamsSchema = workspaceParamsSchema.extend({ taskId: z.string().uuid() });
+const labelParamsSchema = workspaceParamsSchema.extend({ labelId: z.string().uuid() });
+const taskLabelParamsSchema = taskParamsSchema.extend({ labelId: z.string().uuid() });
 const subtaskParamsSchema = workspaceParamsSchema.extend({ subtaskId: z.string().uuid() });
 const commentParamsSchema = workspaceParamsSchema.extend({ commentId: z.string().uuid() });
 const attachmentParamsSchema = workspaceParamsSchema.extend({ attachmentId: z.string().uuid() });
@@ -115,6 +119,42 @@ export class WorkController {
   completeTask = async (request: FastifyRequest) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
     return this.workService.completeTask(await requireAuth(request), workspaceId, taskId);
+  };
+
+  listLabels = async (request: FastifyRequest) => {
+    const { workspaceId } = parseParams(request, workspaceParamsSchema);
+    return this.workService.listLabels(await requireAuth(request), workspaceId);
+  };
+
+  createLabel = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { workspaceId } = parseParams(request, workspaceParamsSchema);
+    const result = await this.workService.createLabel(await requireAuth(request), workspaceId, parseBody(request, createTaskLabelRequestSchema));
+    return reply.status(201).send(result);
+  };
+
+  updateLabel = async (request: FastifyRequest) => {
+    const { labelId, workspaceId } = parseParams(request, labelParamsSchema);
+    return this.workService.updateLabel(await requireAuth(request), workspaceId, labelId, parseBody(request, updateTaskLabelRequestSchema));
+  };
+
+  deleteLabel = async (request: FastifyRequest) => {
+    const { labelId, workspaceId } = parseParams(request, labelParamsSchema);
+    return this.workService.deleteLabel(await requireAuth(request), workspaceId, labelId);
+  };
+
+  listTaskLabels = async (request: FastifyRequest) => {
+    const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
+    return this.workService.listTaskLabels(await requireAuth(request), workspaceId, taskId);
+  };
+
+  assignTaskLabel = async (request: FastifyRequest) => {
+    const { labelId, taskId, workspaceId } = parseParams(request, taskLabelParamsSchema);
+    return this.workService.assignTaskLabel(await requireAuth(request), workspaceId, taskId, labelId);
+  };
+
+  unassignTaskLabel = async (request: FastifyRequest) => {
+    const { labelId, taskId, workspaceId } = parseParams(request, taskLabelParamsSchema);
+    return this.workService.unassignTaskLabel(await requireAuth(request), workspaceId, taskId, labelId);
   };
 
   createSubtask = async (request: FastifyRequest, reply: FastifyReply) => {

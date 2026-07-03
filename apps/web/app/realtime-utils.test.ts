@@ -82,9 +82,11 @@ describe("realtime utilities", () => {
 
   it("classifies which selected data a domain event touches", () => {
     const taskEvent = { eventType: "TaskMoved", projectId: "project-1", taskId: "task-1" } as RealtimeDomainEvent;
+    const labelEvent = { eventType: "TaskLabelAdded", projectId: "project-1", taskId: "task-1" } as RealtimeDomainEvent;
     const commentEvent = { eventType: "CommentCreated", projectId: "project-1", taskId: "task-1" } as RealtimeDomainEvent;
 
     expect(realtimeEventTouchesProject(taskEvent, "project-1")).toBe(true);
+    expect(realtimeEventTouchesProject(labelEvent, "project-1")).toBe(true);
     expect(realtimeEventTouchesProject(commentEvent, "project-1")).toBe(false);
     expect(realtimeEventTouchesProject({ eventType: "SectionUpdated", projectId: "project-1", taskId: null } as RealtimeDomainEvent, "project-1")).toBe(true);
     expect(realtimeEventTouchesProjectList({ eventType: "ProjectUpdated", projectId: "project-1", taskId: null } as RealtimeDomainEvent)).toBe(true);

@@ -23,6 +23,7 @@ describe("atlas format helpers", () => {
   it("formats event and status labels", () => {
     expect(formatEventType("TaskCompleted")).toBe("Task Completed");
     expect(formatActivityTitle("AttachmentDeleted")).toBe("Attachment removed");
+    expect(formatActivityTitle("TaskLabelAdded")).toBe("Label added");
     expect(formatActivityTitle("CustomEvent")).toBe("Custom Event");
     expect(taskStatusLabel("IN_PROGRESS")).toBe("in progress");
     expect(workspaceRoleLabel("OWNER")).toBe("owner");
@@ -44,6 +45,14 @@ describe("atlas format helpers", () => {
     expect(formatActivityDetail({ entityType: "project", eventType: "ProjectUpdated", payload: {}, projectId: "project-1" })).toBe(
       "Project activity",
     );
+    expect(
+      formatActivityDetail({
+        entityType: "task",
+        eventType: "TaskLabelAdded",
+        payload: { name: "Client Review", title: "Prep launch QA" },
+        taskId: "task-1",
+      }),
+    ).toBe("Task: Prep launch QA · label Client Review");
   });
 
   it("formats task audit transitions from activity payloads", () => {

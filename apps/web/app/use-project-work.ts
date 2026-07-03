@@ -18,6 +18,8 @@ import type {
   Section,
   Subtask,
   Task,
+  TaskLabel,
+  TaskLabelAssignment,
   TaskPriority,
   TaskStatus,
 } from "./atlas-types";
@@ -52,29 +54,37 @@ export function useProjectWork({
   const [comments, setComments] = useState<Comment[]>([]);
   const [subtasks, setSubtasks] = useState<Subtask[]>([]);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [workspaceLabels, setWorkspaceLabels] = useState<TaskLabel[]>([]);
+  const [taskLabels, setTaskLabels] = useState<TaskLabelAssignment[]>([]);
   const [attachmentStatus, setAttachmentStatus] = useState("");
+  const [labelStatus, setLabelStatus] = useState("");
   const selectedTask = useMemo(() => tasks.find((task) => task.id === selectedTaskId), [selectedTaskId, tasks]);
 
   function clearBoardState() {
     setSections([]);
     setTasks([]);
+    setWorkspaceLabels([]);
   }
 
   function clearTaskDetailState() {
     setComments([]);
     setSubtasks([]);
     setAttachments([]);
+    setTaskLabels([]);
     setAttachmentStatus("");
+    setLabelStatus("");
   }
 
   async function loadProjectData(accessToken: string, workspaceId: string, projectId: string) {
-    const [sectionPage, taskPage] = await Promise.all([
+    const [sectionPage, taskPage, labelPage] = await Promise.all([
       api<Page<Section>>(`/workspaces/${workspaceId}/projects/${projectId}/sections`, {}, accessToken),
       api<Page<Task>>(`/workspaces/${workspaceId}/projects/${projectId}/tasks`, {}, accessToken),
+      api<Page<TaskLabel>>(`/workspaces/${workspaceId}/labels`, {}, accessToken),
       loadProjectMembers(accessToken, workspaceId, projectId),
     ]);
     setSections(sectionPage.items);
     setTasks(taskPage.items);
+    setWorkspaceLabels(labelPage.items);
   }
 
   async function createSection(event: FormEvent<HTMLFormElement>) {
@@ -193,6 +203,7 @@ export function useProjectWork({
       loadComments(auth.accessToken, selectedWorkspaceId, taskId),
       loadSubtasks(auth.accessToken, selectedWorkspaceId, taskId),
       loadAttachments(auth.accessToken, selectedWorkspaceId, taskId),
+      loadTaskLabels(auth.accessToken, selectedWorkspaceId, taskId),
     ]);
   }
 
@@ -218,6 +229,21 @@ export function useProjectWork({
     } catch (error) {
       setAttachments([]);
       setAttachmentStatus(errorMessage(error));
+    }
+  }
+
+  async function loadTaskLabels(accessToken: string, workspaceId: string, taskId: string) {
+    try {
+      const labelPage = await api<Page<TaskLabelAssignment>>(
+        "/workspaces/" + workspaceId + "/tasks/" + taskId + "/labels",
+        {},
+        accessToken,
+      );
+      setTaskLabels(labelPage.items);
+      setLabelStatus("");
+    } catch (error) {
+      setTaskLabels([]);
+      setLabelStatus(errorMessage(error));
     }
   }
 
@@ -411,6 +437,73 @@ export function useProjectWork({
     }
   }
 
+  async function createTaskLabel(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const name = String(form.get("name") ?? "").trim();
+    const color = String(form.get("color") ?? "#64748b");
+    if (!name) return;
+    try {
+      setLabelStatus("");
+      const label = await api<TaskLabel>(
+        "/workspaces/" + selectedWorkspaceId + "/labels",
+        { body: JSON.stringify({ color, name }), method: "POST" },
+        auth.accessToken,
+      );
+      await api<TaskLabelAssignment>(
+        "/workspaces/" + selectedWorkspaceId + "/tasks/" + selectedTaskId + "/labels/" + label.id,
+        { method: "POST" },
+        auth.accessToken,
+      );
+      await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
+      await loadTaskLabels(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, "task", selectedProjectId, selectedTaskId);
+      formElement.reset();
+    } catch (error) {
+      setLabelStatus(errorMessage(error));
+    }
+  }
+
+  async function assignTaskLabel(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const labelId = String(form.get("labelId") ?? "");
+    if (!labelId) return;
+    try {
+      setLabelStatus("");
+      await api<TaskLabelAssignment>(
+        "/workspaces/" + selectedWorkspaceId + "/tasks/" + selectedTaskId + "/labels/" + labelId,
+        { method: "POST" },
+        auth.accessToken,
+      );
+      await loadTaskLabels(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, "task", selectedProjectId, selectedTaskId);
+      formElement.reset();
+    } catch (error) {
+      setLabelStatus(errorMessage(error));
+    }
+  }
+
+  async function unassignTaskLabel(labelId: string) {
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
+    try {
+      setLabelStatus("");
+      await api<{ ok: boolean }>(
+        "/workspaces/" + selectedWorkspaceId + "/tasks/" + selectedTaskId + "/labels/" + labelId,
+        { method: "DELETE" },
+        auth.accessToken,
+      );
+      await loadTaskLabels(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, "task", selectedProjectId, selectedTaskId);
+    } catch (error) {
+      setLabelStatus(errorMessage(error));
+    }
+  }
+
   async function createComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
@@ -545,6 +638,7 @@ export function useProjectWork({
     createComment,
     createSection,
     createSubtask,
+    createTaskLabel,
     createTask,
     deleteAttachment,
     deleteComment,
@@ -556,17 +650,23 @@ export function useProjectWork({
     loadComments,
     loadProjectData,
     loadSubtasks,
+    loadTaskLabels,
     moveSection,
     moveTaskToSection,
     renameSection,
     sections,
     selectedTask,
     subtasks,
+    taskLabels,
     tasks,
     toggleSubtask,
+    assignTaskLabel,
     unassignTask,
+    unassignTaskLabel,
     updateComment,
     updateTaskDetails,
     uploadAttachment,
+    labelStatus,
+    workspaceLabels,
   };
 }

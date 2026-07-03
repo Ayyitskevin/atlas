@@ -70,6 +70,7 @@ model User {
   activityEvents           ActivityEvent[]       @relation("ActivityActor")
   notifications            Notification[]        @relation("NotificationRecipient")
   notificationPreferences  WorkspaceNotificationPreference[]
+  assignedTaskLabels       TaskLabelAssignment[] @relation("TaskLabelAssignedBy")
 
   @@index([deletedAt])
   @@map("users")
@@ -125,6 +126,8 @@ model Workspace {
   activity      ActivityEvent[]
   notifications Notification[]
   notificationPreferences WorkspaceNotificationPreference[]
+  taskLabels    TaskLabel[]
+  taskLabelAssignments TaskLabelAssignment[]
   workerJobOutcomes WorkerJobOutcome[]
 
   @@index([ownerId])
@@ -254,6 +257,7 @@ model Task {
   attachments   Attachment[]
   activity      ActivityEvent[]
   notifications Notification[]
+  labelAssignments TaskLabelAssignment[]
 
   @@index([workspaceId, projectId, deletedAt])
   @@index([workspaceId, sectionId, position])
@@ -275,6 +279,40 @@ model TaskAssignee {
   @@unique([taskId, userId])
   @@index([workspaceId, userId])
   @@map("task_assignees")
+}
+
+model TaskLabel {
+  id          String                @id @default(uuid()) @db.Uuid
+  workspaceId String                @map("workspace_id") @db.Uuid
+  name        String
+  color       String
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime              @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime?             @map("deleted_at") @db.Timestamptz(6)
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  assignments TaskLabelAssignment[]
+
+  @@unique([workspaceId, name])
+  @@index([workspaceId, deletedAt])
+  @@map("task_labels")
+}
+
+model TaskLabelAssignment {
+  id           String    @id @default(uuid()) @db.Uuid
+  workspaceId  String    @map("workspace_id") @db.Uuid
+  taskId       String    @map("task_id") @db.Uuid
+  labelId      String    @map("label_id") @db.Uuid
+  assignedById String?   @map("assigned_by_id") @db.Uuid
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  label        TaskLabel @relation(fields: [labelId], references: [id], onDelete: Cascade)
+  assignedBy   User?     @relation("TaskLabelAssignedBy", fields: [assignedById], references: [id])
+
+  @@unique([taskId, labelId])
+  @@index([workspaceId, labelId])
+  @@index([workspaceId, taskId])
+  @@map("task_label_assignments")
 }
 
 model Subtask {

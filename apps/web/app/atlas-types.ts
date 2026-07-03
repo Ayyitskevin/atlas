@@ -54,6 +54,24 @@ export type TaskAssignee = {
   workspaceId?: string;
 };
 
+export type TaskLabel = {
+  color: string;
+  createdAt?: string;
+  id: string;
+  name: string;
+  updatedAt?: string;
+  workspaceId: string;
+};
+
+export type TaskLabelAssignment = {
+  createdAt?: string;
+  id: string;
+  label: TaskLabel;
+  labelId: string;
+  taskId: string;
+  workspaceId: string;
+};
+
 export type Task = {
   assignees?: TaskAssignee[];
   completedAt?: string | null;

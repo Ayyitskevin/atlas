@@ -18,6 +18,10 @@ describe("taskNotificationCopy", () => {
       body: "A file was removed from \"Launch checklist\".",
       title: "Attachment removed",
     });
+    expect(taskNotificationCopy(event("TaskLabelAdded"), "Launch checklist")).toEqual({
+      body: "A label was added to \"Launch checklist\".",
+      title: "Label added",
+    });
   });
 
   it("falls back to generic task activity copy for unknown event types", () => {

@@ -9,6 +9,7 @@ import {
   createCommentRequestSchema,
   createSectionRequestSchema,
   createSubtaskRequestSchema,
+  createTaskLabelRequestSchema,
   createTaskRequestSchema,
   cursorPaginationQuerySchema,
   moveTaskRequestSchema,
@@ -22,6 +23,7 @@ import {
   updateNotificationPreferenceRequestSchema,
   updateSectionRequestSchema,
   updateSubtaskRequestSchema,
+  updateTaskLabelRequestSchema,
   updateTaskRequestSchema,
 } from "@atlas/shared";
 import { prisma } from "@atlas/db";
@@ -37,6 +39,8 @@ const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
 const projectParamsSchema = workspaceParamsSchema.extend({ projectId: z.string().uuid() });
 const sectionParamsSchema = projectParamsSchema.extend({ sectionId: z.string().uuid() });
 const taskParamsSchema = workspaceParamsSchema.extend({ taskId: z.string().uuid() });
+const labelParamsSchema = workspaceParamsSchema.extend({ labelId: z.string().uuid() });
+const taskLabelParamsSchema = taskParamsSchema.extend({ labelId: z.string().uuid() });
 const subtaskParamsSchema = workspaceParamsSchema.extend({ subtaskId: z.string().uuid() });
 const commentParamsSchema = workspaceParamsSchema.extend({ commentId: z.string().uuid() });
 const attachmentParamsSchema = workspaceParamsSchema.extend({ attachmentId: z.string().uuid() });
@@ -64,6 +68,14 @@ export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
   app.post("/workspaces/:workspaceId/tasks/:taskId/assign", { schema: openApiSchema({ body: userBodySchema, params: taskParamsSchema, tags: ["Tasks"] }) }, controller.assignTask);
   app.post("/workspaces/:workspaceId/tasks/:taskId/unassign", { schema: openApiSchema({ body: userBodySchema, params: taskParamsSchema, tags: ["Tasks"] }) }, controller.unassignTask);
   app.post("/workspaces/:workspaceId/tasks/:taskId/complete", { schema: openApiSchema({ params: taskParamsSchema, tags: ["Tasks"] }) }, controller.completeTask);
+
+  app.get("/workspaces/:workspaceId/labels", { schema: openApiSchema({ params: workspaceParamsSchema, tags: ["Labels"] }) }, controller.listLabels);
+  app.post("/workspaces/:workspaceId/labels", { schema: openApiSchema({ body: createTaskLabelRequestSchema, params: workspaceParamsSchema, tags: ["Labels"] }) }, controller.createLabel);
+  app.patch("/workspaces/:workspaceId/labels/:labelId", { schema: openApiSchema({ body: updateTaskLabelRequestSchema, params: labelParamsSchema, tags: ["Labels"] }) }, controller.updateLabel);
+  app.delete("/workspaces/:workspaceId/labels/:labelId", { schema: openApiSchema({ params: labelParamsSchema, tags: ["Labels"] }) }, controller.deleteLabel);
+  app.get("/workspaces/:workspaceId/tasks/:taskId/labels", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Labels"] }) }, controller.listTaskLabels);
+  app.post("/workspaces/:workspaceId/tasks/:taskId/labels/:labelId", { schema: openApiSchema({ params: taskLabelParamsSchema, tags: ["Labels"] }) }, controller.assignTaskLabel);
+  app.delete("/workspaces/:workspaceId/tasks/:taskId/labels/:labelId", { schema: openApiSchema({ params: taskLabelParamsSchema, tags: ["Labels"] }) }, controller.unassignTaskLabel);
 
   app.post("/workspaces/:workspaceId/tasks/:taskId/subtasks", { schema: openApiSchema({ body: createSubtaskRequestSchema, params: taskParamsSchema, tags: ["Subtasks"] }) }, controller.createSubtask);
   app.get("/workspaces/:workspaceId/tasks/:taskId/subtasks", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Subtasks"] }) }, controller.listSubtasks);

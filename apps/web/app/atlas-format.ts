@@ -26,6 +26,8 @@ const activityTitles: Record<string, string> = {
   TaskAssigned: "Task assigned",
   TaskCompleted: "Task completed",
   TaskCreated: "Task created",
+  TaskLabelAdded: "Label added",
+  TaskLabelRemoved: "Label removed",
   TaskMoved: "Task moved",
   TaskUnassigned: "Task unassigned",
   TaskUpdated: "Task updated",
@@ -136,6 +138,10 @@ function stringPayload(payload: Record<string, unknown>, key: string) {
 function taskActivityDetail(activity: ActivitySummaryInput, payload: Record<string, unknown>) {
   const title = stringPayload(payload, "title");
   const detail = title ? "Task: " + title : scopeLabel(activity);
+  const label = stringPayload(payload, "name");
+  if ((activity.eventType === "TaskLabelAdded" || activity.eventType === "TaskLabelRemoved") && label) {
+    return detail + " · label " + label;
+  }
   const status = taskStatusChange(payload);
   const priority = stringPayload(payload, "priority");
   const dueDate = stringPayload(payload, "dueDate");
@@ -152,9 +158,11 @@ function taskActivityMetadata(payload: Record<string, unknown>) {
   const status = taskStatusChange(payload);
   const priority = changedLabel(stringPayload(payload, "previousPriority"), stringPayload(payload, "priority"), taskStatusLabel);
   const dueDate = changedLabel(stringPayload(payload, "previousDueDate"), stringPayload(payload, "dueDate"), identityLabel);
+  const label = stringPayload(payload, "name");
   if (status) items.push({ label: "Status", value: status });
   if (priority) items.push({ label: "Priority", value: priority });
   if (dueDate) items.push({ label: "Due", value: dueDate });
+  if (label) items.push({ label: "Label", value: label });
   return items;
 }
 

@@ -2,21 +2,26 @@
 
 import type { FormEvent } from "react";
 
-import type { Attachment, Comment, Section, Subtask, Task, WorkspaceMember } from "./atlas-types";
+import type { Attachment, Comment, Section, Subtask, Task, TaskLabel, TaskLabelAssignment, WorkspaceMember } from "./atlas-types";
 import { TaskAssigneesPanel } from "./task-assignees-panel";
 import { TaskAttachmentsPanel } from "./task-attachments-panel";
 import { TaskCommentsPanel } from "./task-comments-panel";
 import { TaskDetailFormPanel } from "./task-detail-form-panel";
+import { TaskLabelsPanel } from "./task-labels-panel";
 import { TaskSubtasksPanel } from "./task-subtasks-panel";
 
 type TaskDetailPanelProps = {
   attachmentStatus: string;
   attachments: Attachment[];
   comments: Comment[];
+  labelStatus: string;
+  labels: TaskLabel[];
   members: WorkspaceMember[];
   onAssignTask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onAssignTaskLabel: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onCompleteTask: () => Promise<void>;
   onCreateComment: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onCreateTaskLabel: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onCreateSubtask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onDeleteAttachment: (attachmentId: string) => Promise<void>;
   onDeleteComment: (commentId: string) => Promise<void>;
@@ -25,22 +30,28 @@ type TaskDetailPanelProps = {
   onDownloadAttachment: (attachmentId: string) => Promise<void>;
   onToggleSubtask: (subtask: Subtask) => Promise<void>;
   onUnassignTask: (userId: string) => Promise<void>;
+  onUnassignTaskLabel: (labelId: string) => Promise<void>;
   onUpdateComment: (commentId: string, body: string) => Promise<void>;
   onUpdateTask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onUploadAttachment: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   sections: Section[];
   subtasks: Subtask[];
   task?: Task;
+  taskLabels: TaskLabelAssignment[];
 };
 
 export function TaskDetailPanel({
   attachmentStatus,
   attachments,
   comments,
+  labelStatus,
+  labels,
   members,
   onAssignTask,
+  onAssignTaskLabel,
   onCompleteTask,
   onCreateComment,
+  onCreateTaskLabel,
   onCreateSubtask,
   onDeleteAttachment,
   onDeleteComment,
@@ -49,12 +60,14 @@ export function TaskDetailPanel({
   onDownloadAttachment,
   onToggleSubtask,
   onUnassignTask,
+  onUnassignTaskLabel,
   onUpdateComment,
   onUpdateTask,
   onUploadAttachment,
   sections,
   subtasks,
   task,
+  taskLabels,
 }: TaskDetailPanelProps) {
   if (!task) {
     return (
@@ -86,6 +99,15 @@ export function TaskDetailPanel({
       />
 
       <TaskAssigneesPanel members={members} onAssignTask={onAssignTask} onUnassignTask={onUnassignTask} task={task} />
+
+      <TaskLabelsPanel
+        labelStatus={labelStatus}
+        labels={labels}
+        onAssignTaskLabel={onAssignTaskLabel}
+        onCreateTaskLabel={onCreateTaskLabel}
+        onUnassignTaskLabel={onUnassignTaskLabel}
+        taskLabels={taskLabels}
+      />
 
       <TaskSubtasksPanel
         onCreateSubtask={onCreateSubtask}

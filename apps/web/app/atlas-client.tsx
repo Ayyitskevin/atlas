@@ -157,6 +157,7 @@ export function AtlasClient({
     createComment,
     createSection,
     createSubtask,
+    createTaskLabel,
     createTask,
     deleteAttachment,
     deleteComment,
@@ -168,18 +169,24 @@ export function AtlasClient({
     loadComments,
     loadProjectData,
     loadSubtasks,
+    loadTaskLabels,
+    labelStatus,
     moveSection,
     moveTaskToSection,
     renameSection,
     sections,
     selectedTask,
     subtasks,
+    taskLabels,
     tasks,
     toggleSubtask,
+    assignTaskLabel,
     unassignTask,
+    unassignTaskLabel,
     updateComment,
     updateTaskDetails,
     uploadAttachment,
+    workspaceLabels,
   } = useProjectWork({
     activityScope,
     auth,
@@ -263,6 +270,7 @@ export function AtlasClient({
           loadComments(auth.accessToken, selectedWorkspaceId, selectedTaskId),
           loadSubtasks(auth.accessToken, selectedWorkspaceId, selectedTaskId),
           loadAttachments(auth.accessToken, selectedWorkspaceId, selectedTaskId),
+          loadTaskLabels(auth.accessToken, selectedWorkspaceId, selectedTaskId),
         ]).then(() => undefined),
       );
     }
@@ -797,10 +805,14 @@ export function AtlasClient({
             attachmentStatus={attachmentStatus}
             attachments={attachments}
             comments={comments}
+            labelStatus={labelStatus}
+            labels={workspaceLabels}
             members={workspaceMembers}
             onAssignTask={assignTask}
+            onAssignTaskLabel={assignTaskLabel}
             onCompleteTask={completeTask}
             onCreateComment={createComment}
+            onCreateTaskLabel={createTaskLabel}
             onCreateSubtask={createSubtask}
             onDeleteAttachment={deleteAttachment}
             onDeleteComment={deleteComment}
@@ -809,12 +821,14 @@ export function AtlasClient({
             onDownloadAttachment={downloadAttachment}
             onToggleSubtask={toggleSubtask}
             onUnassignTask={unassignTask}
+            onUnassignTaskLabel={unassignTaskLabel}
             onUpdateComment={updateComment}
             onUpdateTask={updateTaskDetails}
             onUploadAttachment={uploadAttachment}
             sections={sections}
             subtasks={subtasks}
             task={selectedTask}
+            taskLabels={taskLabels}
           />
         </section>
       </div>
