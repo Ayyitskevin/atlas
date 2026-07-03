@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   activityQuerySchema,
+  addTaskDependencyRequestSchema,
   attachmentDownloadResponseSchema,
   createAttachmentRequestSchema,
   createAttachmentResponseSchema,
@@ -43,6 +44,7 @@ const taskParamsSchema = workspaceParamsSchema.extend({ taskId: z.string().uuid(
 const taskWatcherParamsSchema = taskParamsSchema.extend({ userId: z.string().uuid() });
 const labelParamsSchema = workspaceParamsSchema.extend({ labelId: z.string().uuid() });
 const taskLabelParamsSchema = taskParamsSchema.extend({ labelId: z.string().uuid() });
+const taskDependencyParamsSchema = workspaceParamsSchema.extend({ dependencyId: z.string().uuid() });
 const subtaskParamsSchema = workspaceParamsSchema.extend({ subtaskId: z.string().uuid() });
 const commentParamsSchema = workspaceParamsSchema.extend({ commentId: z.string().uuid() });
 const attachmentParamsSchema = workspaceParamsSchema.extend({ attachmentId: z.string().uuid() });
@@ -82,6 +84,10 @@ export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
   app.get("/workspaces/:workspaceId/tasks/:taskId/labels", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Labels"] }) }, controller.listTaskLabels);
   app.post("/workspaces/:workspaceId/tasks/:taskId/labels/:labelId", { schema: openApiSchema({ params: taskLabelParamsSchema, tags: ["Labels"] }) }, controller.assignTaskLabel);
   app.delete("/workspaces/:workspaceId/tasks/:taskId/labels/:labelId", { schema: openApiSchema({ params: taskLabelParamsSchema, tags: ["Labels"] }) }, controller.unassignTaskLabel);
+
+  app.get("/workspaces/:workspaceId/tasks/:taskId/dependencies", { schema: openApiSchema({ params: taskParamsSchema, tags: ["Dependencies"] }) }, controller.listTaskDependencies);
+  app.post("/workspaces/:workspaceId/tasks/:taskId/dependencies", { schema: openApiSchema({ body: addTaskDependencyRequestSchema, params: taskParamsSchema, tags: ["Dependencies"] }) }, controller.addTaskDependency);
+  app.delete("/workspaces/:workspaceId/task-dependencies/:dependencyId", { schema: openApiSchema({ params: taskDependencyParamsSchema, tags: ["Dependencies"] }) }, controller.removeTaskDependency);
 
   app.post("/workspaces/:workspaceId/tasks/:taskId/subtasks", { schema: openApiSchema({ body: createSubtaskRequestSchema, params: taskParamsSchema, tags: ["Subtasks"] }) }, controller.createSubtask);
   app.get("/workspaces/:workspaceId/tasks/:taskId/subtasks", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Subtasks"] }) }, controller.listSubtasks);

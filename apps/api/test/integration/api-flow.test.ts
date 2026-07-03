@@ -1304,6 +1304,119 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     );
   }, 60_000);
 
+  it("manages task dependencies with cycle protection", async () => {
+    const blockingTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { sectionId, title: "Dependency blocker task" },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks",
+    });
+    expect(blockingTask.statusCode).toBe(201);
+    const blockingTaskId = blockingTask.json<{ id: string }>().id;
+
+    const addDependency = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { blockingTaskId },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/dependencies",
+    });
+    expect(addDependency.statusCode).toBe(201);
+    const dependencyBody = addDependency.json<{ blockedTaskId: string; blockingTaskId: string; id: string }>();
+    expect(dependencyBody).toMatchObject({ blockedTaskId: taskId, blockingTaskId });
+    const dependencyId = dependencyBody.id;
+
+    await expectActivityEvent({
+      entityId: dependencyId,
+      entityType: "task_dependency",
+      eventType: "TaskDependencyAdded",
+      payload: { blockedTaskId: taskId, blockingTaskId },
+      projectId,
+      taskId,
+      workspaceId,
+    });
+
+    const dependencies = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/dependencies",
+    });
+    expect(dependencies.statusCode).toBe(200);
+    const dependenciesBody = dependencies.json<{
+      blockedBy: Array<{ id: string; task: { id: string } }>;
+      blocks: Array<{ id: string }>;
+      isBlocked: boolean;
+    }>();
+    expect(dependenciesBody.isBlocked).toBe(true);
+    expect(dependenciesBody.blockedBy).toContainEqual(
+      expect.objectContaining({ id: dependencyId, task: expect.objectContaining({ id: blockingTaskId }) }),
+    );
+
+    const blockingSide = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockingTaskId + "/dependencies",
+    });
+    expect(blockingSide.statusCode).toBe(200);
+    expect(blockingSide.json<{ blocks: Array<{ task: { id: string } }> }>().blocks).toContainEqual(
+      expect.objectContaining({ task: expect.objectContaining({ id: taskId }) }),
+    );
+
+    // Re-adding the same edge is idempotent and returns the existing dependency.
+    const duplicate = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { blockingTaskId },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/dependencies",
+    });
+    expect(duplicate.statusCode).toBe(201);
+    expect(duplicate.json<{ id: string }>().id).toBe(dependencyId);
+
+    // A task cannot depend on itself.
+    const selfDependency = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { blockingTaskId: taskId },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/dependencies",
+    });
+    expect(selfDependency.statusCode).toBe(400);
+
+    // Reversing the edge would close a cycle and is rejected.
+    const cyclicDependency = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { blockingTaskId: taskId },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockingTaskId + "/dependencies",
+    });
+    expect(cyclicDependency.statusCode).toBe(409);
+
+    const removeDependency = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/task-dependencies/" + dependencyId,
+    });
+    expect(removeDependency.statusCode).toBe(200);
+    await expectActivityEvent({
+      entityId: dependencyId,
+      entityType: "task_dependency",
+      eventType: "TaskDependencyRemoved",
+      payload: { blockedTaskId: taskId, blockingTaskId },
+      projectId,
+      taskId,
+      workspaceId,
+    });
+
+    const dependenciesAfterRemove = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/dependencies",
+    });
+    expect(dependenciesAfterRemove.statusCode).toBe(200);
+    expect(dependenciesAfterRemove.json<{ blockedBy: Array<{ id: string }>; isBlocked: boolean }>()).toMatchObject({
+      blockedBy: [],
+      isBlocked: false,
+    });
+  }, 60_000);
+
   it("invalidates access tokens after logout", async () => {
     const logoutEmail = "atlas-logout-" + randomUUID() + "@example.com";
     const register = await app!.inject({

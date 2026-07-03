@@ -2,10 +2,11 @@
 
 import type { FormEvent } from "react";
 
-import type { Attachment, Comment, Section, Subtask, Task, TaskLabel, TaskLabelAssignment, TaskWatcher, WorkspaceMember } from "./atlas-types";
+import type { Attachment, Comment, Section, Subtask, Task, TaskDependencies, TaskLabel, TaskLabelAssignment, TaskWatcher, WorkspaceMember } from "./atlas-types";
 import { TaskAssigneesPanel } from "./task-assignees-panel";
 import { TaskAttachmentsPanel } from "./task-attachments-panel";
 import { TaskCommentsPanel } from "./task-comments-panel";
+import { TaskDependenciesPanel } from "./task-dependencies-panel";
 import { TaskDetailFormPanel } from "./task-detail-form-panel";
 import { TaskLabelsPanel } from "./task-labels-panel";
 import { TaskSubtasksPanel } from "./task-subtasks-panel";
@@ -15,9 +16,12 @@ type TaskDetailPanelProps = {
   attachmentStatus: string;
   attachments: Attachment[];
   comments: Comment[];
+  dependencies: TaskDependencies;
+  dependencyStatus: string;
   labelStatus: string;
   labels: TaskLabel[];
   members: WorkspaceMember[];
+  onAddDependency: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onAssignTask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onAssignTaskLabel: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onCompleteTask: () => Promise<void>;
@@ -29,6 +33,7 @@ type TaskDetailPanelProps = {
   onDeleteSubtask: (subtaskId: string) => Promise<void>;
   onDeleteTask: () => Promise<void>;
   onDownloadAttachment: (attachmentId: string) => Promise<void>;
+  onRemoveDependency: (dependencyId: string) => Promise<void>;
   onSkipRecurringTask: () => Promise<void>;
   onToggleSubtask: (subtask: Subtask) => Promise<void>;
   onUnassignTask: (userId: string) => Promise<void>;
@@ -43,6 +48,7 @@ type TaskDetailPanelProps = {
   task?: Task;
   taskLabels: TaskLabelAssignment[];
   taskWatchers: TaskWatcher[];
+  tasks: Task[];
   watcherStatus: string;
 };
 
@@ -50,9 +56,12 @@ export function TaskDetailPanel({
   attachmentStatus,
   attachments,
   comments,
+  dependencies,
+  dependencyStatus,
   labelStatus,
   labels,
   members,
+  onAddDependency,
   onAssignTask,
   onAssignTaskLabel,
   onCompleteTask,
@@ -64,6 +73,7 @@ export function TaskDetailPanel({
   onDeleteSubtask,
   onDeleteTask,
   onDownloadAttachment,
+  onRemoveDependency,
   onSkipRecurringTask,
   onToggleSubtask,
   onUnassignTask,
@@ -78,6 +88,7 @@ export function TaskDetailPanel({
   task,
   taskLabels,
   taskWatchers,
+  tasks,
   watcherStatus,
 }: TaskDetailPanelProps) {
   if (!task) {
@@ -127,6 +138,15 @@ export function TaskDetailPanel({
         onWatchTask={onWatchTask}
         watcherStatus={watcherStatus}
         watchers={taskWatchers}
+      />
+
+      <TaskDependenciesPanel
+        dependencies={dependencies}
+        dependencyStatus={dependencyStatus}
+        onAddDependency={onAddDependency}
+        onRemoveDependency={onRemoveDependency}
+        task={task}
+        tasks={tasks}
       />
 
       <TaskSubtasksPanel

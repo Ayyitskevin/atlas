@@ -32,6 +32,8 @@ export const domainEventTypeSchema = z.enum([
   "TaskLabelRemoved",
   "TaskWatched",
   "TaskUnwatched",
+  "TaskDependencyAdded",
+  "TaskDependencyRemoved",
   "TaskCompleted",
   "TaskRecurrenceGenerated",
   "TaskRecurrencePaused",

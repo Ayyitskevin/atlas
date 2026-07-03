@@ -309,6 +309,74 @@ export class WorkRepository {
     });
   }
 
+  listTaskDependencies(input: { taskId: string; workspaceId: string }) {
+    return this.prisma.taskDependency.findMany({
+      include: {
+        blockedTask: { select: { id: true, status: true, title: true } },
+        blockingTask: { select: { id: true, status: true, title: true } },
+      },
+      orderBy: { createdAt: "asc" },
+      where: {
+        blockedTask: { deletedAt: null },
+        blockingTask: { deletedAt: null },
+        OR: [{ blockingTaskId: input.taskId }, { blockedTaskId: input.taskId }],
+        workspaceId: input.workspaceId,
+      },
+    });
+  }
+
+  listProjectDependencyEdges(input: { projectId: string; workspaceId: string }) {
+    return this.prisma.taskDependency.findMany({
+      select: { blockedTaskId: true, blockingTaskId: true },
+      where: {
+        blockedTask: { deletedAt: null },
+        blockingTask: { deletedAt: null, projectId: input.projectId },
+        workspaceId: input.workspaceId,
+      },
+    });
+  }
+
+  findTaskDependencyByPair(input: { blockedTaskId: string; blockingTaskId: string; workspaceId: string }) {
+    return this.prisma.taskDependency.findFirst({
+      include: {
+        blockedTask: { select: { id: true, status: true, title: true } },
+        blockingTask: { select: { id: true, status: true, title: true } },
+      },
+      where: { blockedTaskId: input.blockedTaskId, blockingTaskId: input.blockingTaskId, workspaceId: input.workspaceId },
+    });
+  }
+
+  findTaskDependency(input: { dependencyId: string; workspaceId: string }) {
+    return this.prisma.taskDependency.findFirst({
+      include: {
+        blockedTask: { select: { id: true, projectId: true, status: true, title: true } },
+        blockingTask: { select: { id: true, status: true, title: true } },
+      },
+      where: { id: input.dependencyId, workspaceId: input.workspaceId },
+    });
+  }
+
+  createTaskDependency(input: { blockedTaskId: string; blockingTaskId: string; createdById: string; workspaceId: string }) {
+    return this.prisma.taskDependency.create({
+      data: {
+        blockedTaskId: input.blockedTaskId,
+        blockingTaskId: input.blockingTaskId,
+        createdById: input.createdById,
+        workspaceId: input.workspaceId,
+      },
+      include: {
+        blockedTask: { select: { id: true, status: true, title: true } },
+        blockingTask: { select: { id: true, status: true, title: true } },
+      },
+    });
+  }
+
+  deleteTaskDependency(input: { dependencyId: string; workspaceId: string }) {
+    return this.prisma.taskDependency.deleteMany({
+      where: { id: input.dependencyId, workspaceId: input.workspaceId },
+    });
+  }
+
   createSubtask(input: { assigneeId?: string | null; position: number; taskId: string; title: string; workspaceId: string }) {
     return this.prisma.subtask.create({ data: input });
   }

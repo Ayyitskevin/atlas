@@ -184,6 +184,11 @@ export function AtlasClient({
     selectedWorkspaceId,
   });
   const {
+    addTaskDependency,
+    dependencyStatus,
+    loadTaskDependencies,
+    removeTaskDependency,
+    taskDependencies,
     assignTask,
     attachmentStatus,
     attachments,
@@ -328,6 +333,7 @@ export function AtlasClient({
           loadAttachments(auth.accessToken, selectedWorkspaceId, selectedTaskId),
           loadTaskLabels(auth.accessToken, selectedWorkspaceId, selectedTaskId),
           loadTaskWatchers(auth.accessToken, selectedWorkspaceId, selectedTaskId),
+          loadTaskDependencies(auth.accessToken, selectedWorkspaceId, selectedTaskId),
         ]).then(() => undefined),
       );
     }
@@ -1055,9 +1061,12 @@ export function AtlasClient({
             attachmentStatus={attachmentStatus}
             attachments={attachments}
             comments={comments}
+            dependencies={taskDependencies}
+            dependencyStatus={dependencyStatus}
             labelStatus={labelStatus}
             labels={workspaceLabels}
             members={workspaceMembers}
+            onAddDependency={addTaskDependency}
             onAssignTask={assignTask}
             onAssignTaskLabel={assignTaskLabel}
             onCompleteTask={completeTask}
@@ -1069,6 +1078,7 @@ export function AtlasClient({
             onDeleteSubtask={deleteSubtask}
             onDeleteTask={deleteTask}
             onDownloadAttachment={downloadAttachment}
+            onRemoveDependency={removeTaskDependency}
             onSkipRecurringTask={skipRecurringTask}
             onToggleSubtask={toggleSubtask}
             onUnassignTask={unassignTask}
@@ -1083,6 +1093,7 @@ export function AtlasClient({
             task={selectedTask}
             taskLabels={taskLabels}
             taskWatchers={taskWatchers}
+            tasks={tasks}
             watcherStatus={watcherStatus}
           />
         </section>

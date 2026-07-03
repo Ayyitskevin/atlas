@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import {
   activityQuerySchema,
+  addTaskDependencyRequestSchema,
   createAttachmentRequestSchema,
   createCommentRequestSchema,
   createSectionRequestSchema,
@@ -35,6 +36,7 @@ const taskParamsSchema = workspaceParamsSchema.extend({ taskId: z.string().uuid(
 const taskWatcherParamsSchema = taskParamsSchema.extend({ userId: z.string().uuid() });
 const labelParamsSchema = workspaceParamsSchema.extend({ labelId: z.string().uuid() });
 const taskLabelParamsSchema = taskParamsSchema.extend({ labelId: z.string().uuid() });
+const taskDependencyParamsSchema = workspaceParamsSchema.extend({ dependencyId: z.string().uuid() });
 const subtaskParamsSchema = workspaceParamsSchema.extend({ subtaskId: z.string().uuid() });
 const commentParamsSchema = workspaceParamsSchema.extend({ commentId: z.string().uuid() });
 const attachmentParamsSchema = workspaceParamsSchema.extend({ attachmentId: z.string().uuid() });
@@ -178,6 +180,22 @@ export class WorkController {
   unassignTaskLabel = async (request: FastifyRequest) => {
     const { labelId, taskId, workspaceId } = parseParams(request, taskLabelParamsSchema);
     return this.workService.unassignTaskLabel(await requireAuth(request), workspaceId, taskId, labelId);
+  };
+
+  listTaskDependencies = async (request: FastifyRequest) => {
+    const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
+    return this.workService.listTaskDependencies(await requireAuth(request), workspaceId, taskId);
+  };
+
+  addTaskDependency = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
+    const result = await this.workService.addTaskDependency(await requireAuth(request), workspaceId, taskId, parseBody(request, addTaskDependencyRequestSchema));
+    return reply.status(201).send(result);
+  };
+
+  removeTaskDependency = async (request: FastifyRequest) => {
+    const { dependencyId, workspaceId } = parseParams(request, taskDependencyParamsSchema);
+    return this.workService.removeTaskDependency(await requireAuth(request), workspaceId, dependencyId);
   };
 
   createSubtask = async (request: FastifyRequest, reply: FastifyReply) => {

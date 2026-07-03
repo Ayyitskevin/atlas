@@ -147,6 +147,26 @@ export type TaskWatcher = {
   workspaceId: string;
 };
 
+export type TaskDependencyTask = {
+  id: string;
+  status: TaskStatus;
+  title: string;
+};
+
+export type TaskDependencyEdge = {
+  blockedTaskId: string;
+  blockingTaskId: string;
+  createdAt: string;
+  id: string;
+  task: TaskDependencyTask;
+};
+
+export type TaskDependencies = {
+  blockedBy: TaskDependencyEdge[];
+  blocks: TaskDependencyEdge[];
+  isBlocked: boolean;
+};
+
 export type Task = {
   assignees?: TaskAssignee[];
   completedAt?: string | null;

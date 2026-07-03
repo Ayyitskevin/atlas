@@ -1,6 +1,7 @@
 import {
   ATLAS_ERROR_CODES,
   type ActivityQuery,
+  type AddTaskDependencyRequest,
   type CreateAttachmentRequest,
   type CreateCommentRequest,
   type CreateSectionRequest,
@@ -31,6 +32,7 @@ import { createAttachmentObjectKey, createDownloadInstructions, createUploadInst
 import { DomainEventsRepository } from "../events/domain-events.repository.js";
 import { PermissionsService } from "../permissions/permissions.service.js";
 import { defaultListPosition } from "./position.js";
+import { wouldCreateDependencyCycle } from "./task-dependencies.js";
 import { nextRecurringDueDate } from "./task-recurrence.js";
 import { WorkRepository } from "./work.repository.js";
 
@@ -382,6 +384,96 @@ export class WorkService {
       payload: { color: label.color, labelId: label.id, name: label.name, title: task.title },
       projectId: task.projectId,
       taskId,
+      workspaceId,
+    });
+    return { ok: true };
+  }
+
+  async listTaskDependencies(ctx: AuthContext, workspaceId: string, taskId: string) {
+    await this.permissions.requireTaskRole(ctx, workspaceId, taskId, "VIEWER");
+    const rows = await this.workRepository.listTaskDependencies({ taskId, workspaceId });
+    const blockedBy = rows.filter((row) => row.blockedTaskId === taskId).map((row) => dependencyEdgeView(row, row.blockingTask));
+    const blocks = rows.filter((row) => row.blockingTaskId === taskId).map((row) => dependencyEdgeView(row, row.blockedTask));
+    const isBlocked = blockedBy.some((edge) => edge.task.status !== "DONE");
+    return { blockedBy, blocks, isBlocked };
+  }
+
+  async addTaskDependency(ctx: AuthContext, workspaceId: string, taskId: string, input: AddTaskDependencyRequest) {
+    const blockedTask = await this.getTask(ctx, workspaceId, taskId);
+    await this.permissions.requireProjectRole(ctx, workspaceId, blockedTask.projectId, "EDITOR");
+    if (input.blockingTaskId === taskId) {
+      throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "A task cannot depend on itself.");
+    }
+    const blockingTask = await this.workRepository.findTask(workspaceId, input.blockingTaskId);
+    if (!blockingTask) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Blocking task not found in this Workspace.");
+    if (blockingTask.projectId !== blockedTask.projectId) {
+      throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "Task dependencies must be within the same Project.");
+    }
+    const existing = await this.workRepository.findTaskDependencyByPair({
+      blockedTaskId: taskId,
+      blockingTaskId: input.blockingTaskId,
+      workspaceId,
+    });
+    if (existing) return existing;
+    const edges = await this.workRepository.listProjectDependencyEdges({ projectId: blockedTask.projectId, workspaceId });
+    if (wouldCreateDependencyCycle(edges, input.blockingTaskId, taskId)) {
+      throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "That dependency would create a circular dependency.");
+    }
+    try {
+      const dependency = await this.workRepository.createTaskDependency({
+        blockedTaskId: taskId,
+        blockingTaskId: input.blockingTaskId,
+        createdById: ctx.userId,
+        workspaceId,
+      });
+      await this.events.recordActivity({
+        actorUserId: ctx.userId,
+        entityId: dependency.id,
+        entityType: "task_dependency",
+        eventType: "TaskDependencyAdded",
+        payload: {
+          blockedTaskId: taskId,
+          blockedTaskTitle: blockedTask.title,
+          blockingTaskId: input.blockingTaskId,
+          blockingTaskTitle: blockingTask.title,
+        },
+        projectId: blockedTask.projectId,
+        taskId,
+        workspaceId,
+      });
+      return dependency;
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
+        const created = await this.workRepository.findTaskDependencyByPair({
+          blockedTaskId: taskId,
+          blockingTaskId: input.blockingTaskId,
+          workspaceId,
+        });
+        if (created) return created;
+      }
+      throw error;
+    }
+  }
+
+  async removeTaskDependency(ctx: AuthContext, workspaceId: string, dependencyId: string) {
+    const dependency = await this.workRepository.findTaskDependency({ dependencyId, workspaceId });
+    if (!dependency) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Task dependency not found.");
+    await this.permissions.requireProjectRole(ctx, workspaceId, dependency.blockedTask.projectId, "EDITOR");
+    const result = await this.workRepository.deleteTaskDependency({ dependencyId, workspaceId });
+    if (!result.count) return { ok: true };
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: dependencyId,
+      entityType: "task_dependency",
+      eventType: "TaskDependencyRemoved",
+      payload: {
+        blockedTaskId: dependency.blockedTaskId,
+        blockedTaskTitle: dependency.blockedTask.title,
+        blockingTaskId: dependency.blockingTaskId,
+        blockingTaskTitle: dependency.blockingTask.title,
+      },
+      projectId: dependency.blockedTask.projectId,
+      taskId: dependency.blockedTaskId,
       workspaceId,
     });
     return { ok: true };
@@ -918,6 +1010,19 @@ function dateTimePayloadValue(value?: Date | string | null) {
 function dateTimeOrNull(value?: Date | string | null) {
   if (!value) return null;
   return value instanceof Date ? value : new Date(value);
+}
+
+function dependencyEdgeView(
+  row: { blockedTaskId: string; blockingTaskId: string; createdAt: Date; id: string },
+  task: { id: string; status: string; title: string },
+) {
+  return {
+    blockedTaskId: row.blockedTaskId,
+    blockingTaskId: row.blockingTaskId,
+    createdAt: row.createdAt,
+    id: row.id,
+    task: { id: task.id, status: task.status, title: task.title },
+  };
 }
 
 function isPrismaUniqueConstraintError(error: unknown) {

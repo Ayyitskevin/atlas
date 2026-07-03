@@ -18,12 +18,15 @@ import type {
   Section,
   Subtask,
   Task,
+  TaskDependencies,
   TaskLabel,
   TaskLabelAssignment,
   TaskPriority,
   TaskStatus,
   TaskWatcher,
 } from "./atlas-types";
+
+const emptyTaskDependencies: TaskDependencies = { blockedBy: [], blocks: [], isBlocked: false };
 
 type UseProjectWorkInput = {
   activityScope: ActivityScope;
@@ -58,9 +61,11 @@ export function useProjectWork({
   const [workspaceLabels, setWorkspaceLabels] = useState<TaskLabel[]>([]);
   const [taskLabels, setTaskLabels] = useState<TaskLabelAssignment[]>([]);
   const [taskWatchers, setTaskWatchers] = useState<TaskWatcher[]>([]);
+  const [taskDependencies, setTaskDependencies] = useState<TaskDependencies>(emptyTaskDependencies);
   const [attachmentStatus, setAttachmentStatus] = useState("");
   const [labelStatus, setLabelStatus] = useState("");
   const [watcherStatus, setWatcherStatus] = useState("");
+  const [dependencyStatus, setDependencyStatus] = useState("");
   const selectedTask = useMemo(() => tasks.find((task) => task.id === selectedTaskId), [selectedTaskId, tasks]);
 
   function clearBoardState() {
@@ -75,9 +80,11 @@ export function useProjectWork({
     setAttachments([]);
     setTaskLabels([]);
     setTaskWatchers([]);
+    setTaskDependencies(emptyTaskDependencies);
     setAttachmentStatus("");
     setLabelStatus("");
     setWatcherStatus("");
+    setDependencyStatus("");
   }
 
   async function loadProjectData(accessToken: string, workspaceId: string, projectId: string) {
@@ -210,6 +217,7 @@ export function useProjectWork({
       loadAttachments(auth.accessToken, selectedWorkspaceId, taskId),
       loadTaskLabels(auth.accessToken, selectedWorkspaceId, taskId),
       loadTaskWatchers(auth.accessToken, selectedWorkspaceId, taskId),
+      loadTaskDependencies(auth.accessToken, selectedWorkspaceId, taskId),
     ]);
   }
 
@@ -265,6 +273,21 @@ export function useProjectWork({
     } catch (error) {
       setTaskWatchers([]);
       setWatcherStatus(errorMessage(error));
+    }
+  }
+
+  async function loadTaskDependencies(accessToken: string, workspaceId: string, taskId: string) {
+    try {
+      const dependencies = await api<TaskDependencies>(
+        "/workspaces/" + workspaceId + "/tasks/" + taskId + "/dependencies",
+        {},
+        accessToken,
+      );
+      setTaskDependencies(dependencies);
+      setDependencyStatus("");
+    } catch (error) {
+      setTaskDependencies(emptyTaskDependencies);
+      setDependencyStatus(errorMessage(error));
     }
   }
 
@@ -588,6 +611,44 @@ export function useProjectWork({
     }
   }
 
+  async function addTaskDependency(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const blockingTaskId = String(form.get("blockingTaskId") ?? "");
+    if (!blockingTaskId) return;
+    try {
+      setDependencyStatus("");
+      await api(
+        "/workspaces/" + selectedWorkspaceId + "/tasks/" + selectedTaskId + "/dependencies",
+        { body: JSON.stringify({ blockingTaskId }), method: "POST" },
+        auth.accessToken,
+      );
+      await loadTaskDependencies(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, "task", selectedProjectId, selectedTaskId);
+      formElement.reset();
+    } catch (error) {
+      setDependencyStatus(errorMessage(error));
+    }
+  }
+
+  async function removeTaskDependency(dependencyId: string) {
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
+    try {
+      setDependencyStatus("");
+      await api<{ ok: boolean }>(
+        "/workspaces/" + selectedWorkspaceId + "/task-dependencies/" + dependencyId,
+        { method: "DELETE" },
+        auth.accessToken,
+      );
+      await loadTaskDependencies(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, "task", selectedProjectId, selectedTaskId);
+    } catch (error) {
+      setDependencyStatus(errorMessage(error));
+    }
+  }
+
   async function createComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
@@ -711,6 +772,11 @@ export function useProjectWork({
   }
 
   return {
+    addTaskDependency,
+    dependencyStatus,
+    loadTaskDependencies,
+    removeTaskDependency,
+    taskDependencies,
     assignTask,
     attachmentStatus,
     attachments,

@@ -1,0 +1,31 @@
+import { z } from "zod";
+
+import { taskStatusSchema } from "../domain.js";
+
+export const addTaskDependencyRequestSchema = z.object({
+  blockingTaskId: z.string().uuid(),
+});
+
+export const taskDependencyTaskSchema = z.object({
+  id: z.string().uuid(),
+  status: taskStatusSchema,
+  title: z.string(),
+});
+
+export const taskDependencyEdgeSchema = z.object({
+  blockedTaskId: z.string().uuid(),
+  blockingTaskId: z.string().uuid(),
+  createdAt: z.string().datetime(),
+  id: z.string().uuid(),
+  task: taskDependencyTaskSchema,
+});
+
+export const taskDependenciesResponseSchema = z.object({
+  blockedBy: z.array(taskDependencyEdgeSchema),
+  blocks: z.array(taskDependencyEdgeSchema),
+  isBlocked: z.boolean(),
+});
+
+export type AddTaskDependencyRequest = z.infer<typeof addTaskDependencyRequestSchema>;
+export type TaskDependencyEdge = z.infer<typeof taskDependencyEdgeSchema>;
+export type TaskDependenciesResponse = z.infer<typeof taskDependenciesResponseSchema>;

@@ -83,6 +83,7 @@ model User {
   notifications            Notification[]        @relation("NotificationRecipient")
   notificationPreferences  WorkspaceNotificationPreference[]
   assignedTaskLabels       TaskLabelAssignment[] @relation("TaskLabelAssignedBy")
+  createdTaskDependencies  TaskDependency[]      @relation("TaskDependencyCreatedBy")
 
   @@index([deletedAt])
   @@map("users")
@@ -143,6 +144,7 @@ model Workspace {
   taskLabels    TaskLabel[]
   taskLabelAssignments TaskLabelAssignment[]
   taskWatchers  TaskWatcher[]
+  taskDependencies TaskDependency[]
   workerJobOutcomes WorkerJobOutcome[]
 
   @@index([ownerId])
@@ -390,6 +392,8 @@ model Task {
   activity      ActivityEvent[]
   notifications Notification[]
   labelAssignments TaskLabelAssignment[]
+  dependenciesAsBlocker TaskDependency[] @relation("TaskDependencyBlocking")
+  dependenciesAsBlocked TaskDependency[] @relation("TaskDependencyBlocked")
 
   @@index([workspaceId, projectId, deletedAt])
   @@index([workspaceId, sectionId, position])
@@ -466,6 +470,24 @@ model TaskLabelAssignment {
   @@index([workspaceId, labelId])
   @@index([workspaceId, taskId])
   @@map("task_label_assignments")
+}
+
+model TaskDependency {
+  id             String    @id @default(uuid()) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  blockingTaskId String    @map("blocking_task_id") @db.Uuid
+  blockedTaskId  String    @map("blocked_task_id") @db.Uuid
+  createdById    String?   @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  blockingTask   Task      @relation("TaskDependencyBlocking", fields: [blockingTaskId], references: [id], onDelete: Cascade)
+  blockedTask    Task      @relation("TaskDependencyBlocked", fields: [blockedTaskId], references: [id], onDelete: Cascade)
+  createdBy      User?     @relation("TaskDependencyCreatedBy", fields: [createdById], references: [id])
+
+  @@unique([blockingTaskId, blockedTaskId])
+  @@index([workspaceId, blockedTaskId])
+  @@index([workspaceId, blockingTaskId])
+  @@map("task_dependencies")
 }
 
 model Subtask {
