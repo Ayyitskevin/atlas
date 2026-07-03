@@ -571,6 +571,24 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       workspaceId,
     });
 
+    const watchedDoneWork = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/my-work?due=any&limit=10&scope=watching&status=done",
+    });
+    expect(watchedDoneWork.statusCode).toBe(200);
+    expect(watchedDoneWork.json<{ items: Array<{ id: string }> }>().items).toContainEqual(expect.objectContaining({ id: taskId }));
+
+    const assignedDoneWorkAfterUnassign = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/my-work?due=any&limit=10&scope=assigned&status=done",
+    });
+    expect(assignedDoneWorkAfterUnassign.statusCode).toBe(200);
+    expect(assignedDoneWorkAfterUnassign.json<{ items: Array<{ id: string }> }>().items).not.toContainEqual(
+      expect.objectContaining({ id: taskId }),
+    );
+
     const unwatchTask = await app!.inject({
       headers: authHeaders(accessToken),
       method: "DELETE",

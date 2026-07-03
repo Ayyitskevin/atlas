@@ -81,10 +81,12 @@ export function AtlasClient({
   );
   const {
     changeMyWorkDueFilter,
+    changeMyWorkScopeFilter,
     changeMyWorkStatusFilter,
     clearMyWork,
     loadMyWork,
     myWorkDueFilter,
+    myWorkScopeFilter,
     myWorkStatus,
     myWorkStatusFilter,
     myWorkTasks,
@@ -271,7 +273,7 @@ export function AtlasClient({
     const selectedProjectMembershipChanged = realtimeEventTouchesProjectMembers(event, selectedProjectId);
     const refreshes: Promise<void>[] = [
       loadNotifications(auth.accessToken, selectedWorkspaceId, notificationFilter),
-      loadMyWork(auth.accessToken, selectedWorkspaceId, myWorkStatusFilter, myWorkDueFilter),
+      loadMyWork(auth.accessToken, selectedWorkspaceId, myWorkStatusFilter, myWorkDueFilter, myWorkScopeFilter),
     ];
     if (!selectedProjectWasDeleted && !selectedProjectMembershipChanged) {
       refreshes.push(loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId));
@@ -457,7 +459,7 @@ export function AtlasClient({
       await loadNotifications(accessToken, workspaceId, notificationFilter);
       const [projectPage, , , members] = await Promise.all([
         api<Page<Project>>(`/workspaces/${workspaceId}/projects`, {}, accessToken),
-        loadMyWork(accessToken, workspaceId, myWorkStatusFilter, myWorkDueFilter),
+        loadMyWork(accessToken, workspaceId, myWorkStatusFilter, myWorkDueFilter, myWorkScopeFilter),
         loadNotificationPreferences(accessToken, workspaceId),
         loadWorkspaceMembers(accessToken, workspaceId),
       ]);
@@ -705,7 +707,9 @@ export function AtlasClient({
           onDueFilterChange={changeMyWorkDueFilter}
           onOpenTask={openMyWorkTask}
           onRefresh={refreshMyWork}
+          onScopeFilterChange={changeMyWorkScopeFilter}
           onStatusFilterChange={changeMyWorkStatusFilter}
+          scopeFilter={myWorkScopeFilter}
           statusFilter={myWorkStatusFilter}
           statusMessage={myWorkStatus}
           tasks={myWorkTasks}

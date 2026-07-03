@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { myWorkDueDateWhere, myWorkStatusWhere } from "../../src/modules/work/my-work-filters.js";
+import { myWorkDueDateWhere, myWorkScopeWhere, myWorkStatusWhere } from "../../src/modules/work/my-work-filters.js";
 
 const now = new Date("2026-06-30T15:45:00.000Z");
 
@@ -21,5 +21,20 @@ describe("my work filters", () => {
     });
     expect(myWorkDueDateWhere("unscheduled", now)).toEqual({ dueDate: null });
     expect(myWorkDueDateWhere("any", now)).toEqual({});
+  });
+
+  it("builds ownership scope filters", () => {
+    expect(myWorkScopeWhere("assigned", "user-1", "workspace-1")).toEqual({
+      assignees: { some: { userId: "user-1", workspaceId: "workspace-1" } },
+    });
+    expect(myWorkScopeWhere("watching", "user-1", "workspace-1")).toEqual({
+      watchers: { some: { userId: "user-1", workspaceId: "workspace-1" } },
+    });
+    expect(myWorkScopeWhere("all", "user-1", "workspace-1")).toEqual({
+      OR: [
+        { assignees: { some: { userId: "user-1", workspaceId: "workspace-1" } } },
+        { watchers: { some: { userId: "user-1", workspaceId: "workspace-1" } } },
+      ],
+    });
   });
 });

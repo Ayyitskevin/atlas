@@ -1,7 +1,7 @@
 "use client";
 
 import { dateInputValue, taskStatusLabel } from "./atlas-format";
-import type { MyWorkDueFilter, MyWorkStatusFilter, MyWorkTask } from "./atlas-types";
+import type { MyWorkDueFilter, MyWorkScopeFilter, MyWorkStatusFilter, MyWorkTask } from "./atlas-types";
 
 const dueFilters: Array<{ label: string; value: MyWorkDueFilter }> = [
   { label: "Any due date", value: "any" },
@@ -17,12 +17,20 @@ const statusFilters: Array<{ label: string; value: MyWorkStatusFilter }> = [
   { label: "All", value: "all" },
 ];
 
+const scopeFilters: Array<{ label: string; value: MyWorkScopeFilter }> = [
+  { label: "Assigned", value: "assigned" },
+  { label: "Watching", value: "watching" },
+  { label: "Assigned or watching", value: "all" },
+];
+
 type MyWorkPanelProps = {
   dueFilter: MyWorkDueFilter;
   onDueFilterChange: (value: MyWorkDueFilter) => void;
   onOpenTask: (task: MyWorkTask) => Promise<void>;
   onRefresh: () => Promise<void>;
+  onScopeFilterChange: (value: MyWorkScopeFilter) => void;
   onStatusFilterChange: (value: MyWorkStatusFilter) => void;
+  scopeFilter: MyWorkScopeFilter;
   statusFilter: MyWorkStatusFilter;
   statusMessage: string;
   tasks: MyWorkTask[];
@@ -34,7 +42,9 @@ export function MyWorkPanel({
   onDueFilterChange,
   onOpenTask,
   onRefresh,
+  onScopeFilterChange,
   onStatusFilterChange,
+  scopeFilter,
   statusFilter,
   statusMessage,
   tasks,
@@ -45,7 +55,7 @@ export function MyWorkPanel({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold uppercase text-slate-500">My work</h2>
-          <p className="text-sm text-slate-600">Assigned tasks across accessible projects</p>
+          <p className="text-sm text-slate-600">Assigned and watched tasks across accessible projects</p>
         </div>
         <button
           className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
@@ -57,7 +67,22 @@ export function MyWorkPanel({
         </button>
       </div>
 
-      <div className="grid gap-2 md:grid-cols-2">
+      <div className="grid gap-2 md:grid-cols-3">
+        <label className="grid gap-1 text-xs font-medium uppercase text-slate-500">
+          Scope
+          <select
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm normal-case text-slate-700"
+            disabled={!workspaceSelected}
+            onChange={(event) => onScopeFilterChange(event.target.value as MyWorkScopeFilter)}
+            value={scopeFilter}
+          >
+            {scopeFilters.map((filter) => (
+              <option key={filter.value} value={filter.value}>
+                {filter.label}
+              </option>
+            ))}
+          </select>
+        </label>
         <label className="grid gap-1 text-xs font-medium uppercase text-slate-500">
           Status
           <select

@@ -1,5 +1,5 @@
 import type { Prisma } from "@atlas/db";
-import type { MyWorkDueFilter, MyWorkStatusFilter } from "@atlas/shared";
+import type { MyWorkDueFilter, MyWorkScopeFilter, MyWorkStatusFilter } from "@atlas/shared";
 
 export function myWorkStatusWhere(status: MyWorkStatusFilter): Prisma.TaskWhereInput {
   if (status === "done") return { status: "DONE" };
@@ -16,6 +16,15 @@ export function myWorkDueDateWhere(due: MyWorkDueFilter, now = new Date()): Pris
   if (due === "next7") return { dueDate: { gte: today, lt: addUtcDays(today, 8) } };
   if (due === "unscheduled") return { dueDate: null };
   return {};
+}
+
+export function myWorkScopeWhere(scope: MyWorkScopeFilter, userId: string, workspaceId: string): Prisma.TaskWhereInput {
+  const assigned: Prisma.TaskWhereInput = { assignees: { some: { userId, workspaceId } } };
+  const watching: Prisma.TaskWhereInput = { watchers: { some: { userId, workspaceId } } };
+
+  if (scope === "assigned") return assigned;
+  if (scope === "watching") return watching;
+  return { OR: [assigned, watching] };
 }
 
 function startOfUtcDay(value: Date): Date {

@@ -1,8 +1,8 @@
 import type { Prisma, PrismaClient, TaskPriority, TaskStatus } from "@atlas/db";
-import type { MyWorkDueFilter, MyWorkStatusFilter, SearchResultType } from "@atlas/shared";
+import type { MyWorkDueFilter, MyWorkScopeFilter, MyWorkStatusFilter, SearchResultType } from "@atlas/shared";
 
 import { paginationArgs } from "../../shared/pagination.js";
-import { myWorkDueDateWhere, myWorkStatusWhere } from "./my-work-filters.js";
+import { myWorkDueDateWhere, myWorkScopeWhere, myWorkStatusWhere } from "./my-work-filters.js";
 import { completedAtForStatusTransition } from "./task-state.js";
 
 export class WorkRepository {
@@ -104,6 +104,7 @@ export class WorkRepository {
     cursor?: string;
     due: MyWorkDueFilter;
     limit: number;
+    scope: MyWorkScopeFilter;
     status: MyWorkStatusFilter;
     userId: string;
     workspaceId: string;
@@ -118,7 +119,7 @@ export class WorkRepository {
       where: {
         ...myWorkStatusWhere(input.status),
         ...myWorkDueDateWhere(input.due),
-        assignees: { some: { userId: input.userId, workspaceId: input.workspaceId } },
+        ...myWorkScopeWhere(input.scope, input.userId, input.workspaceId),
         deletedAt: null,
         project: this.accessibleProjectWhere(input.userId, input.workspaceId),
         workspaceId: input.workspaceId,

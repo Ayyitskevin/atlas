@@ -31,9 +31,11 @@ export const moveTaskRequestSchema = z.object({
 
 export const myWorkStatusFilterSchema = z.enum(["open", "done", "all"]);
 export const myWorkDueFilterSchema = z.enum(["any", "overdue", "today", "next7", "unscheduled"]);
+export const myWorkScopeFilterSchema = z.enum(["assigned", "watching", "all"]);
 
 export const myWorkQuerySchema = cursorPaginationQuerySchema.extend({
   due: myWorkDueFilterSchema.default("any"),
+  scope: myWorkScopeFilterSchema.default("assigned"),
   status: myWorkStatusFilterSchema.default("open"),
 });
 
@@ -42,4 +44,5 @@ export type UpdateTaskRequest = z.infer<typeof updateTaskRequestSchema>;
 export type MoveTaskRequest = z.infer<typeof moveTaskRequestSchema>;
 export type MyWorkDueFilter = z.infer<typeof myWorkDueFilterSchema>;
 export type MyWorkQuery = z.infer<typeof myWorkQuerySchema>;
+export type MyWorkScopeFilter = z.infer<typeof myWorkScopeFilterSchema>;
 export type MyWorkStatusFilter = z.infer<typeof myWorkStatusFilterSchema>;
