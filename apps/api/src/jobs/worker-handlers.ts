@@ -3,16 +3,18 @@ import { taskNotificationCopy } from "./notification-copy.js";
 import { WORKER_QUEUE_NAMES, type WorkerQueueName } from "./queue-names.js";
 import type { MutationEventJob } from "./queues.js";
 
-type TaskWithAssignees = {
+type TaskWithNotificationTargets = {
   assignees: Array<{ userId: string }>;
   id: string;
   title: string;
+  watchers: Array<{ userId: string }>;
 };
 
-type TaskWithAssigneeUsers = {
+type TaskWithNotificationTargetUsers = {
   assignees: Array<{ user: { email: string; id: string; name: string } }>;
   id: string;
   title: string;
+  watchers: Array<{ user: { email: string; id: string; name: string } }>;
 };
 
 export type NotificationFanoutStore = {
@@ -30,16 +32,19 @@ export type NotificationFanoutStore = {
     }): Promise<{ count: number }>;
   };
   task: {
-    findFirst(input: { include: { assignees: true }; where: { id: string; workspaceId: string } }): Promise<TaskWithAssignees | null>;
+    findFirst(input: { include: { assignees: true; watchers: true }; where: { id: string; workspaceId: string } }): Promise<TaskWithNotificationTargets | null>;
   };
 };
 
 export type EmailDeliveryStore = {
   task: {
     findFirst(input: {
-      include: { assignees: { include: { user: { select: { email: true; id: true; name: true } } } } };
+      include: {
+        assignees: { include: { user: { select: { email: true; id: true; name: true } } } };
+        watchers: { include: { user: { select: { email: true; id: true; name: true } } } };
+      };
       where: { id: string; workspaceId: string };
-    }): Promise<TaskWithAssigneeUsers | null>;
+    }): Promise<TaskWithNotificationTargetUsers | null>;
   };
   workspaceNotificationPreference: {
     findMany(input: {
@@ -101,19 +106,19 @@ export async function handleNotificationFanoutJob(
   }
 
   const task = await store.task.findFirst({
-    include: { assignees: true },
+    include: { assignees: true, watchers: true },
     where: { id: event.taskId, workspaceId: event.workspaceId },
   });
   if (!task) {
     return recordWorkerOutcome(job, baseOutcome(WORKER_QUEUE_NAMES.notificationFanout, event, "skipped", "Task no longer exists."), outcomeStore);
   }
 
-  const recipients = task.assignees.filter((assignee) => assignee.userId !== event.actorUserId);
-  if (!recipients.length) {
+  const recipientIds = taskRecipientIds(task, event.actorUserId);
+  if (!recipientIds.length) {
     return recordWorkerOutcome(
       job,
       {
-        ...baseOutcome(WORKER_QUEUE_NAMES.notificationFanout, event, "skipped", "No eligible task assignees."),
+        ...baseOutcome(WORKER_QUEUE_NAMES.notificationFanout, event, "skipped", "No eligible task assignees or watchers."),
         recipientCount: 0,
       },
       outcomeStore,
@@ -122,9 +127,9 @@ export async function handleNotificationFanoutJob(
 
   const copy = taskNotificationCopy(event, task.title);
   const result = await store.notification.createMany({
-    data: recipients.map((recipient) => ({
+    data: recipientIds.map((recipientId) => ({
       body: copy.body,
-      recipientId: recipient.userId,
+      recipientId,
       taskId: task.id,
       title: copy.title,
       type: `task.${event.eventType}`,
@@ -174,6 +179,9 @@ export async function handleEmailDeliveryJob(
       assignees: {
         include: { user: { select: { email: true, id: true, name: true } } },
       },
+      watchers: {
+        include: { user: { select: { email: true, id: true, name: true } } },
+      },
     },
     where: { id: event.taskId, workspaceId: event.workspaceId },
   });
@@ -181,12 +189,12 @@ export async function handleEmailDeliveryJob(
     return recordWorkerOutcome(job, baseOutcome(WORKER_QUEUE_NAMES.emailDelivery, event, "skipped", "Task no longer exists."), outcomeStore);
   }
 
-  const eligibleRecipients = task.assignees.map((assignee) => assignee.user).filter((user) => user.id !== event.actorUserId);
+  const eligibleRecipients = taskRecipientUsers(task, event.actorUserId);
   if (!eligibleRecipients.length) {
     return recordWorkerOutcome(
       job,
       {
-        ...baseOutcome(WORKER_QUEUE_NAMES.emailDelivery, event, "skipped", "No eligible task assignees."),
+        ...baseOutcome(WORKER_QUEUE_NAMES.emailDelivery, event, "skipped", "No eligible task assignees or watchers."),
         provider: emailProvider.name,
         recipientCount: 0,
       },
@@ -211,7 +219,7 @@ export async function handleEmailDeliveryJob(
     return recordWorkerOutcome(
       job,
       {
-        ...baseOutcome(WORKER_QUEUE_NAMES.emailDelivery, event, "skipped", "No task assignees have email notifications enabled."),
+        ...baseOutcome(WORKER_QUEUE_NAMES.emailDelivery, event, "skipped", "No task assignees or watchers have email notifications enabled."),
         provider: emailProvider.name,
         recipientCount: 0,
       },
@@ -301,7 +309,7 @@ async function persistWorkerOutcome(
 
 function taskEmailDraft(
   event: MutationEventJob,
-  task: Pick<TaskWithAssigneeUsers, "id" | "title">,
+  task: Pick<TaskWithNotificationTargetUsers, "id" | "title">,
   recipients: Array<{ email: string; name: string }>,
 ): EmailDraft {
   const copy = taskNotificationCopy(event, task.title);
@@ -319,6 +327,17 @@ function taskEmailDraft(
       name: recipient.name,
     })),
   };
+}
+
+function taskRecipientIds(task: Pick<TaskWithNotificationTargets, "assignees" | "watchers">, actorUserId: string) {
+  return [...new Set([...task.assignees.map((assignee) => assignee.userId), ...task.watchers.map((watcher) => watcher.userId)])].filter(
+    (userId) => userId !== actorUserId,
+  );
+}
+
+function taskRecipientUsers(task: Pick<TaskWithNotificationTargetUsers, "assignees" | "watchers">, actorUserId: string) {
+  const users = [...task.assignees.map((assignee) => assignee.user), ...task.watchers.map((watcher) => watcher.user)];
+  return [...new Map(users.filter((user) => user.id !== actorUserId).map((user) => [user.id, user])).values()];
 }
 
 function baseOutcome(queue: WorkerQueueName, event: MutationEventJob, status: WorkerOutcome["status"], reason?: string): WorkerOutcome {

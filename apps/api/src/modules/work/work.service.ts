@@ -249,6 +249,47 @@ export class WorkService {
     return { ok: true };
   }
 
+  async listTaskWatchers(ctx: AuthContext, workspaceId: string, taskId: string) {
+    await this.permissions.requireTaskRole(ctx, workspaceId, taskId, "VIEWER");
+    return pageFromLimit(await this.workRepository.listTaskWatchers({ taskId, workspaceId }), 100);
+  }
+
+  async watchTask(ctx: AuthContext, workspaceId: string, taskId: string, userId: string) {
+    const task = await this.getTask(ctx, workspaceId, taskId);
+    if (userId !== ctx.userId) await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
+    await this.requireWorkspaceMembers(workspaceId, [userId]);
+    const watcher = await this.workRepository.watchTask({ taskId, userId, watchedById: ctx.userId, workspaceId });
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: taskId,
+      entityType: "task",
+      eventType: "TaskWatched",
+      payload: { title: task.title, user: watcher.user, userId },
+      projectId: task.projectId,
+      taskId,
+      workspaceId,
+    });
+    return watcher;
+  }
+
+  async unwatchTask(ctx: AuthContext, workspaceId: string, taskId: string, userId: string) {
+    const task = await this.getTask(ctx, workspaceId, taskId);
+    if (userId !== ctx.userId) await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
+    const result = await this.workRepository.unwatchTask({ taskId, userId, workspaceId });
+    if (!result.count) return { ok: true };
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: taskId,
+      entityType: "task",
+      eventType: "TaskUnwatched",
+      payload: { title: task.title, userId },
+      projectId: task.projectId,
+      taskId,
+      workspaceId,
+    });
+    return { ok: true };
+  }
+
   async listLabels(ctx: AuthContext, workspaceId: string) {
     await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
     return pageFromLimit(await this.workRepository.listLabels({ workspaceId }), 100);

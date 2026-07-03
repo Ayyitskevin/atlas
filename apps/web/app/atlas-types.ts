@@ -84,6 +84,16 @@ export type TaskLabelAssignment = {
   workspaceId: string;
 };
 
+export type TaskWatcher = {
+  createdAt: string;
+  id: string;
+  taskId: string;
+  user: User;
+  userId: string;
+  watchedById?: string | null;
+  workspaceId: string;
+};
+
 export type Task = {
   assignees?: TaskAssignee[];
   completedAt?: string | null;

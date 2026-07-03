@@ -34,6 +34,8 @@ const activityTitles: Record<string, string> = {
   TaskMoved: "Task moved",
   TaskUnassigned: "Task unassigned",
   TaskUpdated: "Task updated",
+  TaskUnwatched: "Follower removed",
+  TaskWatched: "Follower added",
   WorkspaceCreated: "Workspace created",
 };
 
@@ -144,6 +146,11 @@ function taskActivityDetail(activity: ActivitySummaryInput, payload: Record<stri
   const label = stringPayload(payload, "name");
   if ((activity.eventType === "TaskLabelAdded" || activity.eventType === "TaskLabelRemoved") && label) {
     return detail + " · label " + label;
+  }
+  if (activity.eventType === "TaskWatched" || activity.eventType === "TaskUnwatched") {
+    const user = objectPayload(payload, "user");
+    const name = user ? stringPayload(user, "name") ?? stringPayload(user, "email") : null;
+    return name ? detail + " · follower " + name : detail;
   }
   const status = taskStatusChange(payload);
   const priority = stringPayload(payload, "priority");

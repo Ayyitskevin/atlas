@@ -20,6 +20,10 @@ export function taskNotificationCopy(event: MutationEventJob, taskTitle: string)
       return { body: "A label was added to " + quote(title) + ".", title: "Label added" };
     case "TaskLabelRemoved":
       return { body: "A label was removed from " + quote(title) + ".", title: "Label removed" };
+    case "TaskWatched":
+      return { body: "A follower was added to " + quote(title) + ".", title: "Follower added" };
+    case "TaskUnwatched":
+      return { body: "A follower was removed from " + quote(title) + ".", title: "Follower removed" };
     case "SubtaskCreated":
       return { body: "A subtask was added to " + quote(title) + ".", title: "Subtask added" };
     case "SubtaskUpdated":

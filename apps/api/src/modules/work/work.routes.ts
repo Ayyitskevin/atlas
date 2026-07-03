@@ -19,6 +19,7 @@ import {
   reorderSectionsRequestSchema,
   searchResponseSchema,
   searchQuerySchema,
+  taskWatcherUserRequestSchema,
   updateCommentRequestSchema,
   updateNotificationPreferenceRequestSchema,
   updateSectionRequestSchema,
@@ -39,6 +40,7 @@ const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
 const projectParamsSchema = workspaceParamsSchema.extend({ projectId: z.string().uuid() });
 const sectionParamsSchema = projectParamsSchema.extend({ sectionId: z.string().uuid() });
 const taskParamsSchema = workspaceParamsSchema.extend({ taskId: z.string().uuid() });
+const taskWatcherParamsSchema = taskParamsSchema.extend({ userId: z.string().uuid() });
 const labelParamsSchema = workspaceParamsSchema.extend({ labelId: z.string().uuid() });
 const taskLabelParamsSchema = taskParamsSchema.extend({ labelId: z.string().uuid() });
 const subtaskParamsSchema = workspaceParamsSchema.extend({ subtaskId: z.string().uuid() });
@@ -67,6 +69,9 @@ export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
   app.post("/workspaces/:workspaceId/tasks/:taskId/move", { schema: openApiSchema({ body: moveTaskRequestSchema, params: taskParamsSchema, tags: ["Tasks"] }) }, controller.moveTask);
   app.post("/workspaces/:workspaceId/tasks/:taskId/assign", { schema: openApiSchema({ body: userBodySchema, params: taskParamsSchema, tags: ["Tasks"] }) }, controller.assignTask);
   app.post("/workspaces/:workspaceId/tasks/:taskId/unassign", { schema: openApiSchema({ body: userBodySchema, params: taskParamsSchema, tags: ["Tasks"] }) }, controller.unassignTask);
+  app.get("/workspaces/:workspaceId/tasks/:taskId/watchers", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Tasks"] }) }, controller.listTaskWatchers);
+  app.post("/workspaces/:workspaceId/tasks/:taskId/watchers", { schema: openApiSchema({ body: taskWatcherUserRequestSchema, params: taskParamsSchema, tags: ["Tasks"] }) }, controller.watchTask);
+  app.delete("/workspaces/:workspaceId/tasks/:taskId/watchers/:userId", { schema: openApiSchema({ params: taskWatcherParamsSchema, tags: ["Tasks"] }) }, controller.unwatchTask);
   app.post("/workspaces/:workspaceId/tasks/:taskId/complete", { schema: openApiSchema({ params: taskParamsSchema, tags: ["Tasks"] }) }, controller.completeTask);
 
   app.get("/workspaces/:workspaceId/labels", { schema: openApiSchema({ params: workspaceParamsSchema, tags: ["Labels"] }) }, controller.listLabels);

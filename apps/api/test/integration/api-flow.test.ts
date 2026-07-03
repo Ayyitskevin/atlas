@@ -540,6 +540,62 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     });
     expect(unassignTask.statusCode).toBe(200);
 
+    const watchTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { userId: currentUser.id },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/watchers",
+    });
+    expect(watchTask.statusCode).toBe(200);
+    expect(watchTask.json<{ user: { id: string }; userId: string }>()).toMatchObject({
+      user: { id: currentUser.id },
+      userId: currentUser.id,
+    });
+
+    const taskWatchers = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/watchers",
+    });
+    expect(taskWatchers.statusCode).toBe(200);
+    expect(taskWatchers.json<{ items: Array<{ userId: string }> }>().items).toContainEqual(
+      expect.objectContaining({ userId: currentUser.id }),
+    );
+    await expectActivityEvent({
+      entityId: taskId,
+      entityType: "task",
+      eventType: "TaskWatched",
+      payload: { title: "Updated completed integration task", userId: currentUser.id },
+      projectId,
+      taskId,
+      workspaceId,
+    });
+
+    const unwatchTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/watchers/" + currentUser.id,
+    });
+    expect(unwatchTask.statusCode).toBe(200);
+    const taskWatchersAfterUnwatch = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/watchers",
+    });
+    expect(taskWatchersAfterUnwatch.statusCode).toBe(200);
+    expect(taskWatchersAfterUnwatch.json<{ items: Array<{ userId: string }> }>().items).not.toContainEqual(
+      expect.objectContaining({ userId: currentUser.id }),
+    );
+    await expectActivityEvent({
+      entityId: taskId,
+      entityType: "task",
+      eventType: "TaskUnwatched",
+      payload: { title: "Updated completed integration task", userId: currentUser.id },
+      projectId,
+      taskId,
+      workspaceId,
+    });
+
     const createLabel = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",

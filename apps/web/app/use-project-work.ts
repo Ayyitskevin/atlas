@@ -22,6 +22,7 @@ import type {
   TaskLabelAssignment,
   TaskPriority,
   TaskStatus,
+  TaskWatcher,
 } from "./atlas-types";
 
 type UseProjectWorkInput = {
@@ -56,8 +57,10 @@ export function useProjectWork({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [workspaceLabels, setWorkspaceLabels] = useState<TaskLabel[]>([]);
   const [taskLabels, setTaskLabels] = useState<TaskLabelAssignment[]>([]);
+  const [taskWatchers, setTaskWatchers] = useState<TaskWatcher[]>([]);
   const [attachmentStatus, setAttachmentStatus] = useState("");
   const [labelStatus, setLabelStatus] = useState("");
+  const [watcherStatus, setWatcherStatus] = useState("");
   const selectedTask = useMemo(() => tasks.find((task) => task.id === selectedTaskId), [selectedTaskId, tasks]);
 
   function clearBoardState() {
@@ -71,8 +74,10 @@ export function useProjectWork({
     setSubtasks([]);
     setAttachments([]);
     setTaskLabels([]);
+    setTaskWatchers([]);
     setAttachmentStatus("");
     setLabelStatus("");
+    setWatcherStatus("");
   }
 
   async function loadProjectData(accessToken: string, workspaceId: string, projectId: string) {
@@ -204,6 +209,7 @@ export function useProjectWork({
       loadSubtasks(auth.accessToken, selectedWorkspaceId, taskId),
       loadAttachments(auth.accessToken, selectedWorkspaceId, taskId),
       loadTaskLabels(auth.accessToken, selectedWorkspaceId, taskId),
+      loadTaskWatchers(auth.accessToken, selectedWorkspaceId, taskId),
     ]);
   }
 
@@ -244,6 +250,21 @@ export function useProjectWork({
     } catch (error) {
       setTaskLabels([]);
       setLabelStatus(errorMessage(error));
+    }
+  }
+
+  async function loadTaskWatchers(accessToken: string, workspaceId: string, taskId: string) {
+    try {
+      const watcherPage = await api<Page<TaskWatcher>>(
+        "/workspaces/" + workspaceId + "/tasks/" + taskId + "/watchers",
+        {},
+        accessToken,
+      );
+      setTaskWatchers(watcherPage.items);
+      setWatcherStatus("");
+    } catch (error) {
+      setTaskWatchers([]);
+      setWatcherStatus(errorMessage(error));
     }
   }
 
@@ -504,6 +525,44 @@ export function useProjectWork({
     }
   }
 
+  async function watchTask(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const userId = String(form.get("userId") ?? "");
+    if (!userId) return;
+    try {
+      setWatcherStatus("");
+      await api<TaskWatcher>(
+        "/workspaces/" + selectedWorkspaceId + "/tasks/" + selectedTaskId + "/watchers",
+        { body: JSON.stringify({ userId }), method: "POST" },
+        auth.accessToken,
+      );
+      await loadTaskWatchers(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, "task", selectedProjectId, selectedTaskId);
+      formElement.reset();
+    } catch (error) {
+      setWatcherStatus(errorMessage(error));
+    }
+  }
+
+  async function unwatchTask(userId: string) {
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
+    try {
+      setWatcherStatus("");
+      await api<{ ok: boolean }>(
+        "/workspaces/" + selectedWorkspaceId + "/tasks/" + selectedTaskId + "/watchers/" + userId,
+        { method: "DELETE" },
+        auth.accessToken,
+      );
+      await loadTaskWatchers(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, "task", selectedProjectId, selectedTaskId);
+    } catch (error) {
+      setWatcherStatus(errorMessage(error));
+    }
+  }
+
   async function createComment(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
@@ -651,6 +710,7 @@ export function useProjectWork({
     loadProjectData,
     loadSubtasks,
     loadTaskLabels,
+    loadTaskWatchers,
     moveSection,
     moveTaskToSection,
     renameSection,
@@ -658,14 +718,18 @@ export function useProjectWork({
     selectedTask,
     subtasks,
     taskLabels,
+    taskWatchers,
     tasks,
     toggleSubtask,
     assignTaskLabel,
     unassignTask,
     unassignTaskLabel,
+    unwatchTask,
     updateComment,
     updateTaskDetails,
     uploadAttachment,
+    watchTask,
+    watcherStatus,
     labelStatus,
     workspaceLabels,
   };

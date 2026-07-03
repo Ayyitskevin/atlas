@@ -59,6 +59,7 @@ describe("worker handlers", () => {
         ],
         id: randomUUID(),
         title: "Launch checklist",
+        watchers: [],
       },
       emailEnabledUserIds: [recipientId],
     });
@@ -92,6 +93,7 @@ describe("worker handlers", () => {
         ],
         id: taskId,
         title: "Launch checklist",
+        watchers: [],
       },
       emailEnabledUserIds: [recipientId],
     });
@@ -118,6 +120,39 @@ describe("worker handlers", () => {
     expectLoggedOutcome(job, { provider: "test-email", providerMessageId: "message-1", status: "delivered" });
   });
 
+  it("sends task notification emails to opted-in watchers", async () => {
+    const actorUserId = randomUUID();
+    const watcherId = randomUUID();
+    const taskId = randomUUID();
+    const send = vi.fn<EmailProvider["send"]>().mockResolvedValue({
+      acceptedRecipientCount: 1,
+      provider: "test-email",
+      providerMessageId: "message-2",
+      stubbed: false,
+    });
+    const provider = testEmailProvider(send);
+    const store = emailStore({
+      task: {
+        assignees: [{ user: { email: "actor@example.com", id: actorUserId, name: "Actor" } }],
+        id: taskId,
+        title: "Launch checklist",
+        watchers: [{ user: { email: "watcher@example.com", id: watcherId, name: "Watcher" } }],
+      },
+      emailEnabledUserIds: [watcherId],
+    });
+    const job = jobFor(eventJob({ actorUserId, eventType: "CommentCreated", taskId }));
+
+    await expect(handleEmailDeliveryJob(job, store, provider)).resolves.toMatchObject({
+      provider: "test-email",
+      providerMessageId: "message-2",
+      recipientCount: 1,
+      status: "delivered",
+    });
+    expect(send).toHaveBeenCalledWith(expect.objectContaining({
+      to: [{ email: "watcher@example.com", name: "Watcher" }],
+    }));
+  });
+
   it("skips task notification email when eligible assignees have not opted in", async () => {
     const actorUserId = randomUUID();
     const send = vi.fn<EmailProvider["send"]>();
@@ -130,20 +165,21 @@ describe("worker handlers", () => {
         ],
         id: randomUUID(),
         title: "Launch checklist",
+        watchers: [],
       },
     });
     const job = jobFor(eventJob({ actorUserId, eventType: "TaskUpdated" }));
 
     await expect(handleEmailDeliveryJob(job, store, provider)).resolves.toMatchObject({
       provider: "test-email",
-      reason: "No task assignees have email notifications enabled.",
+      reason: "No task assignees or watchers have email notifications enabled.",
       recipientCount: 0,
       status: "skipped",
     });
     expect(send).not.toHaveBeenCalled();
     expectLoggedOutcome(job, {
       provider: "test-email",
-      reason: "No task assignees have email notifications enabled.",
+      reason: "No task assignees or watchers have email notifications enabled.",
       recipientCount: 0,
       status: "skipped",
     });
@@ -159,6 +195,7 @@ describe("worker handlers", () => {
         assignees: [{ user: { email: "teammate@example.com", id: recipientId, name: "Teammate" } }],
         id: randomUUID(),
         title: "Launch checklist",
+        watchers: [],
       },
       emailEnabledUserIds: [recipientId],
     });
@@ -196,6 +233,7 @@ describe("worker handlers", () => {
         assignees: [{ userId: actorUserId }, { userId: recipientId }],
         id: taskId,
         title: "Launch checklist",
+        watchers: [],
       },
     });
     const job = jobFor(eventJob({ actorUserId, eventType: "TaskUpdated", taskId }));
@@ -220,6 +258,36 @@ describe("worker handlers", () => {
     expectLoggedOutcome(job, { recipientCount: 1, status: "delivered" });
   });
 
+  it("creates notifications for task watchers and deduplicates assignees", async () => {
+    const actorUserId = randomUUID();
+    const recipientId = randomUUID();
+    const taskId = randomUUID();
+    const store = notificationStore({
+      task: {
+        assignees: [{ userId: actorUserId }, { userId: recipientId }],
+        id: taskId,
+        title: "Launch checklist",
+        watchers: [{ userId: recipientId }],
+      },
+    });
+    const job = jobFor(eventJob({ actorUserId, eventType: "CommentCreated", taskId }));
+
+    await expect(handleNotificationFanoutJob(job, store)).resolves.toMatchObject({
+      recipientCount: 1,
+      status: "delivered",
+    });
+    expect(store.notification.createMany).toHaveBeenCalledWith({
+      data: [
+        expect.objectContaining({
+          recipientId,
+          title: "New comment",
+          type: "task.CommentCreated",
+        }),
+      ],
+      skipDuplicates: true,
+    });
+  });
+
   it("skips notification fanout when no eligible assignees remain", async () => {
     const actorUserId = randomUUID();
     const store = notificationStore({
@@ -227,12 +295,13 @@ describe("worker handlers", () => {
         assignees: [{ userId: actorUserId }],
         id: randomUUID(),
         title: "Solo task",
+        watchers: [],
       },
     });
     const job = jobFor(eventJob({ actorUserId }));
 
     await expect(handleNotificationFanoutJob(job, store)).resolves.toMatchObject({
-      reason: "No eligible task assignees.",
+      reason: "No eligible task assignees or watchers.",
       recipientCount: 0,
       status: "skipped",
     });

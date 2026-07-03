@@ -2,13 +2,14 @@
 
 import type { FormEvent } from "react";
 
-import type { Attachment, Comment, Section, Subtask, Task, TaskLabel, TaskLabelAssignment, WorkspaceMember } from "./atlas-types";
+import type { Attachment, Comment, Section, Subtask, Task, TaskLabel, TaskLabelAssignment, TaskWatcher, WorkspaceMember } from "./atlas-types";
 import { TaskAssigneesPanel } from "./task-assignees-panel";
 import { TaskAttachmentsPanel } from "./task-attachments-panel";
 import { TaskCommentsPanel } from "./task-comments-panel";
 import { TaskDetailFormPanel } from "./task-detail-form-panel";
 import { TaskLabelsPanel } from "./task-labels-panel";
 import { TaskSubtasksPanel } from "./task-subtasks-panel";
+import { TaskWatchersPanel } from "./task-watchers-panel";
 
 type TaskDetailPanelProps = {
   attachmentStatus: string;
@@ -31,13 +32,17 @@ type TaskDetailPanelProps = {
   onToggleSubtask: (subtask: Subtask) => Promise<void>;
   onUnassignTask: (userId: string) => Promise<void>;
   onUnassignTaskLabel: (labelId: string) => Promise<void>;
+  onUnwatchTask: (userId: string) => Promise<void>;
   onUpdateComment: (commentId: string, body: string) => Promise<void>;
   onUpdateTask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onUploadAttachment: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onWatchTask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   sections: Section[];
   subtasks: Subtask[];
   task?: Task;
   taskLabels: TaskLabelAssignment[];
+  taskWatchers: TaskWatcher[];
+  watcherStatus: string;
 };
 
 export function TaskDetailPanel({
@@ -61,13 +66,17 @@ export function TaskDetailPanel({
   onToggleSubtask,
   onUnassignTask,
   onUnassignTaskLabel,
+  onUnwatchTask,
   onUpdateComment,
   onUpdateTask,
   onUploadAttachment,
+  onWatchTask,
   sections,
   subtasks,
   task,
   taskLabels,
+  taskWatchers,
+  watcherStatus,
 }: TaskDetailPanelProps) {
   if (!task) {
     return (
@@ -107,6 +116,14 @@ export function TaskDetailPanel({
         onCreateTaskLabel={onCreateTaskLabel}
         onUnassignTaskLabel={onUnassignTaskLabel}
         taskLabels={taskLabels}
+      />
+
+      <TaskWatchersPanel
+        members={members}
+        onUnwatchTask={onUnwatchTask}
+        onWatchTask={onWatchTask}
+        watcherStatus={watcherStatus}
+        watchers={taskWatchers}
       />
 
       <TaskSubtasksPanel

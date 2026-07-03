@@ -22,6 +22,10 @@ describe("taskNotificationCopy", () => {
       body: "A label was added to \"Launch checklist\".",
       title: "Label added",
     });
+    expect(taskNotificationCopy(event("TaskWatched"), "Launch checklist")).toEqual({
+      body: "A follower was added to \"Launch checklist\".",
+      title: "Follower added",
+    });
   });
 
   it("falls back to generic task activity copy for unknown event types", () => {

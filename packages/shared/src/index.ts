@@ -15,5 +15,6 @@ export * from "./schemas/projects.js";
 export * from "./schemas/search.js";
 export * from "./schemas/sections.js";
 export * from "./schemas/subtasks.js";
+export * from "./schemas/task-watchers.js";
 export * from "./schemas/tasks.js";
 export * from "./schemas/workspaces.js";

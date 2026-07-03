@@ -24,6 +24,7 @@ describe("atlas format helpers", () => {
     expect(formatEventType("TaskCompleted")).toBe("Task Completed");
     expect(formatActivityTitle("AttachmentDeleted")).toBe("Attachment removed");
     expect(formatActivityTitle("TaskLabelAdded")).toBe("Label added");
+    expect(formatActivityTitle("TaskWatched")).toBe("Follower added");
     expect(formatActivityTitle("ProjectMessageCreated")).toBe("Message posted");
     expect(formatActivityTitle("CustomEvent")).toBe("Custom Event");
     expect(taskStatusLabel("IN_PROGRESS")).toBe("in progress");
@@ -62,6 +63,14 @@ describe("atlas format helpers", () => {
         projectId: "project-1",
       }),
     ).toBe("project message: Weekly update");
+    expect(
+      formatActivityDetail({
+        entityType: "task",
+        eventType: "TaskWatched",
+        payload: { title: "Prep launch QA", user: { email: "watcher@example.com", name: "Watcher" } },
+        taskId: "task-1",
+      }),
+    ).toBe("Task: Prep launch QA · follower Watcher");
   });
 
   it("formats task audit transitions from activity payloads", () => {

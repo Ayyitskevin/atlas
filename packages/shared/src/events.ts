@@ -24,6 +24,8 @@ export const domainEventTypeSchema = z.enum([
   "TaskUnassigned",
   "TaskLabelAdded",
   "TaskLabelRemoved",
+  "TaskWatched",
+  "TaskUnwatched",
   "TaskCompleted",
   "SubtaskCreated",
   "SubtaskUpdated",

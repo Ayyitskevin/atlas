@@ -177,6 +177,29 @@ export class WorkRepository {
     });
   }
 
+  listTaskWatchers(input: { taskId: string; workspaceId: string }) {
+    return this.prisma.taskWatcher.findMany({
+      include: { user: { select: { email: true, id: true, name: true } } },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      where: { taskId: input.taskId, workspaceId: input.workspaceId },
+    });
+  }
+
+  watchTask(input: { taskId: string; userId: string; watchedById: string; workspaceId: string }) {
+    return this.prisma.taskWatcher.upsert({
+      create: input,
+      include: { user: { select: { email: true, id: true, name: true } } },
+      update: { watchedById: input.watchedById },
+      where: { taskId_userId: { taskId: input.taskId, userId: input.userId } },
+    });
+  }
+
+  unwatchTask(input: { taskId: string; userId: string; workspaceId: string }) {
+    return this.prisma.taskWatcher.deleteMany({
+      where: { taskId: input.taskId, userId: input.userId, workspaceId: input.workspaceId },
+    });
+  }
+
   listLabels(input: { workspaceId: string }) {
     return this.prisma.taskLabel.findMany({
       orderBy: [{ name: "asc" }, { id: "asc" }],

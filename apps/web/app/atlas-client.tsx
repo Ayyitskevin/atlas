@@ -190,6 +190,7 @@ export function AtlasClient({
     loadProjectData,
     loadSubtasks,
     loadTaskLabels,
+    loadTaskWatchers,
     labelStatus,
     moveSection,
     moveTaskToSection,
@@ -198,14 +199,18 @@ export function AtlasClient({
     selectedTask,
     subtasks,
     taskLabels,
+    taskWatchers,
     tasks,
     toggleSubtask,
     assignTaskLabel,
     unassignTask,
     unassignTaskLabel,
+    unwatchTask,
     updateComment,
     updateTaskDetails,
     uploadAttachment,
+    watchTask,
+    watcherStatus,
     workspaceLabels,
   } = useProjectWork({
     activityScope,
@@ -295,6 +300,7 @@ export function AtlasClient({
           loadSubtasks(auth.accessToken, selectedWorkspaceId, selectedTaskId),
           loadAttachments(auth.accessToken, selectedWorkspaceId, selectedTaskId),
           loadTaskLabels(auth.accessToken, selectedWorkspaceId, selectedTaskId),
+          loadTaskWatchers(auth.accessToken, selectedWorkspaceId, selectedTaskId),
         ]).then(() => undefined),
       );
     }
@@ -867,13 +873,17 @@ export function AtlasClient({
             onToggleSubtask={toggleSubtask}
             onUnassignTask={unassignTask}
             onUnassignTaskLabel={unassignTaskLabel}
+            onUnwatchTask={unwatchTask}
             onUpdateComment={updateComment}
             onUpdateTask={updateTaskDetails}
             onUploadAttachment={uploadAttachment}
+            onWatchTask={watchTask}
             sections={sections}
             subtasks={subtasks}
             task={selectedTask}
             taskLabels={taskLabels}
+            taskWatchers={taskWatchers}
+            watcherStatus={watcherStatus}
           />
         </section>
       </div>

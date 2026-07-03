@@ -15,6 +15,7 @@ import {
   notificationQuerySchema,
   reorderSectionsRequestSchema,
   searchQuerySchema,
+  taskWatcherUserRequestSchema,
   updateCommentRequestSchema,
   updateTaskLabelRequestSchema,
   updateNotificationPreferenceRequestSchema,
@@ -31,6 +32,7 @@ const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
 const projectParamsSchema = workspaceParamsSchema.extend({ projectId: z.string().uuid() });
 const sectionParamsSchema = projectParamsSchema.extend({ sectionId: z.string().uuid() });
 const taskParamsSchema = workspaceParamsSchema.extend({ taskId: z.string().uuid() });
+const taskWatcherParamsSchema = taskParamsSchema.extend({ userId: z.string().uuid() });
 const labelParamsSchema = workspaceParamsSchema.extend({ labelId: z.string().uuid() });
 const taskLabelParamsSchema = taskParamsSchema.extend({ labelId: z.string().uuid() });
 const subtaskParamsSchema = workspaceParamsSchema.extend({ subtaskId: z.string().uuid() });
@@ -114,6 +116,22 @@ export class WorkController {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
     const { userId } = parseBody(request, userBodySchema);
     return this.workService.unassignTask(await requireAuth(request), workspaceId, taskId, userId);
+  };
+
+  listTaskWatchers = async (request: FastifyRequest) => {
+    const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
+    return this.workService.listTaskWatchers(await requireAuth(request), workspaceId, taskId);
+  };
+
+  watchTask = async (request: FastifyRequest) => {
+    const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
+    const { userId } = parseBody(request, taskWatcherUserRequestSchema);
+    return this.workService.watchTask(await requireAuth(request), workspaceId, taskId, userId);
+  };
+
+  unwatchTask = async (request: FastifyRequest) => {
+    const { taskId, userId, workspaceId } = parseParams(request, taskWatcherParamsSchema);
+    return this.workService.unwatchTask(await requireAuth(request), workspaceId, taskId, userId);
   };
 
   completeTask = async (request: FastifyRequest) => {
