@@ -160,6 +160,8 @@ export type Task = {
   recurrenceFrequency?: TaskRecurrenceFrequency | null;
   recurrenceGeneratedFromTaskId?: string | null;
   recurrenceInterval?: number | null;
+  recurrencePausedAt?: string | null;
+  recurrenceSkippedAt?: string | null;
   sectionId: string;
   status: TaskStatus;
   title: string;

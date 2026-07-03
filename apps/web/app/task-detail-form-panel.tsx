@@ -12,12 +12,18 @@ const recurrenceFrequencies: TaskRecurrenceFrequency[] = ["DAILY", "WEEKLY", "MO
 type TaskDetailFormPanelProps = {
   onCompleteTask: () => Promise<void>;
   onDeleteTask: () => Promise<void>;
+  onSkipRecurringTask: () => Promise<void>;
   onUpdateTask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   sections: Section[];
   task: Task;
 };
 
-export function TaskDetailFormPanel({ onCompleteTask, onDeleteTask, onUpdateTask, sections, task }: TaskDetailFormPanelProps) {
+export function TaskDetailFormPanel({ onCompleteTask, onDeleteTask, onSkipRecurringTask, onUpdateTask, sections, task }: TaskDetailFormPanelProps) {
+  const isRecurring = Boolean(task.recurrenceFrequency);
+  const isPaused = Boolean(task.recurrencePausedAt);
+  const isSkipped = Boolean(task.recurrenceSkippedAt);
+  const canSkipOccurrence = isRecurring && !isPaused && !isSkipped && task.status !== "DONE";
+
   return (
     <form className="grid gap-3" key={task.id + "-details-" + task.version} onSubmit={(event) => void onUpdateTask(event)}>
       <label className="grid gap-1 text-sm font-medium text-slate-700">
@@ -89,6 +95,17 @@ export function TaskDetailFormPanel({ onCompleteTask, onDeleteTask, onUpdateTask
             type="number"
           />
         </label>
+        <label className="flex min-h-10 items-center gap-2 self-end rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">
+          <input
+            className="h-4 w-4 rounded border-slate-300"
+            defaultChecked={isPaused}
+            disabled={!isRecurring}
+            name="recurrencePaused"
+            type="checkbox"
+            value="true"
+          />
+          Pause repeat
+        </label>
       </div>
       <div className="flex flex-wrap gap-2">
         <button className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white" type="submit">
@@ -101,6 +118,14 @@ export function TaskDetailFormPanel({ onCompleteTask, onDeleteTask, onUpdateTask
           type="button"
         >
           Complete
+        </button>
+        <button
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!canSkipOccurrence}
+          onClick={() => void onSkipRecurringTask()}
+          type="button"
+        >
+          Skip occurrence
         </button>
         <button className="rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700" onClick={() => void onDeleteTask()} type="button">
           Delete

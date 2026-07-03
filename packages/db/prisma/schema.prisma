@@ -372,6 +372,8 @@ model Task {
   recurrenceFrequency TaskRecurrenceFrequency? @map("recurrence_frequency")
   recurrenceInterval Int? @map("recurrence_interval")
   recurrenceGeneratedFromTaskId String? @unique @map("recurrence_generated_from_task_id") @db.Uuid
+  recurrencePausedAt DateTime? @map("recurrence_paused_at") @db.Timestamptz(6)
+  recurrenceSkippedAt DateTime? @map("recurrence_skipped_at") @db.Timestamptz(6)
   version       Int             @default(0)
   createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -392,6 +394,7 @@ model Task {
   @@index([workspaceId, projectId, deletedAt])
   @@index([workspaceId, sectionId, position])
   @@index([workspaceId, recurrenceFrequency])
+  @@index([workspaceId, recurrencePausedAt])
   @@index([workspaceId, status])
   @@index([workspaceId, dueDate])
   @@map("tasks")

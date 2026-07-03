@@ -36,6 +36,9 @@ const projectRefreshEvents = new Set([
   "TaskLabelRemoved",
   "TaskMoved",
   "TaskRecurrenceGenerated",
+  "TaskRecurrencePaused",
+  "TaskRecurrenceResumed",
+  "TaskRecurrenceSkipped",
   "TaskUnassigned",
   "TaskUpdated",
 ]);

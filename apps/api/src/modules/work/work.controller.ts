@@ -139,6 +139,11 @@ export class WorkController {
     return this.workService.completeTask(await requireAuth(request), workspaceId, taskId);
   };
 
+  skipRecurringTask = async (request: FastifyRequest) => {
+    const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
+    return this.workService.skipRecurringTask(await requireAuth(request), workspaceId, taskId);
+  };
+
   listLabels = async (request: FastifyRequest) => {
     const { workspaceId } = parseParams(request, workspaceParamsSchema);
     return this.workService.listLabels(await requireAuth(request), workspaceId);

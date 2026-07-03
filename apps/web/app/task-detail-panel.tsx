@@ -29,6 +29,7 @@ type TaskDetailPanelProps = {
   onDeleteSubtask: (subtaskId: string) => Promise<void>;
   onDeleteTask: () => Promise<void>;
   onDownloadAttachment: (attachmentId: string) => Promise<void>;
+  onSkipRecurringTask: () => Promise<void>;
   onToggleSubtask: (subtask: Subtask) => Promise<void>;
   onUnassignTask: (userId: string) => Promise<void>;
   onUnassignTaskLabel: (labelId: string) => Promise<void>;
@@ -63,6 +64,7 @@ export function TaskDetailPanel({
   onDeleteSubtask,
   onDeleteTask,
   onDownloadAttachment,
+  onSkipRecurringTask,
   onToggleSubtask,
   onUnassignTask,
   onUnassignTaskLabel,
@@ -102,6 +104,7 @@ export function TaskDetailPanel({
       <TaskDetailFormPanel
         onCompleteTask={onCompleteTask}
         onDeleteTask={onDeleteTask}
+        onSkipRecurringTask={onSkipRecurringTask}
         onUpdateTask={onUpdateTask}
         sections={sections}
         task={task}

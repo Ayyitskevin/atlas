@@ -26,6 +26,10 @@ describe("taskNotificationCopy", () => {
       body: "A follower was added to \"Launch checklist\".",
       title: "Follower added",
     });
+    expect(taskNotificationCopy(event("TaskRecurrenceSkipped"), "Launch checklist")).toEqual({
+      body: "\"Launch checklist\" was skipped and advanced to the next occurrence.",
+      title: "Recurring task skipped",
+    });
   });
 
   it("falls back to generic task activity copy for unknown event types", () => {

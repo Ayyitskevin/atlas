@@ -721,6 +721,125 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       taskId: generatedTask!.id,
       workspaceId,
     });
+
+    const createPausedRecurringTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: {
+        dueDate: "2026-07-11",
+        recurrenceFrequency: "DAILY",
+        recurrenceInterval: 1,
+        sectionId,
+        title: "Paused recurring integration review",
+      },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks",
+    });
+    expect(createPausedRecurringTask.statusCode).toBe(201);
+    const pausedRecurringTask = createPausedRecurringTask.json<{ id: string; version: number }>();
+
+    const pauseRecurringTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: { recurrencePaused: true, version: pausedRecurringTask.version },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + pausedRecurringTask.id,
+    });
+    expect(pauseRecurringTask.statusCode).toBe(200);
+    const pausedRecurringTaskBody = pauseRecurringTask.json<{ recurrencePausedAt: string; version: number }>();
+    expect(pausedRecurringTaskBody.recurrencePausedAt).toEqual(expect.any(String));
+    await expectActivityEvent({
+      entityId: pausedRecurringTask.id,
+      entityType: "task",
+      eventType: "TaskRecurrencePaused",
+      payload: {
+        recurrenceFrequency: "DAILY",
+        recurrencePausedAt: expect.any(String),
+        status: "TODO",
+        title: "Paused recurring integration review",
+      },
+      projectId,
+      taskId: pausedRecurringTask.id,
+      workspaceId,
+    });
+
+    const completePausedRecurringTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + pausedRecurringTask.id + "/complete",
+    });
+    expect(completePausedRecurringTask.statusCode).toBe(200);
+
+    const tasksAfterPausedCompletion = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks?limit=100",
+    });
+    expect(tasksAfterPausedCompletion.statusCode).toBe(200);
+    expect(
+      tasksAfterPausedCompletion
+        .json<{ items: Array<{ recurrenceGeneratedFromTaskId: string | null }> }>()
+        .items.some((item) => item.recurrenceGeneratedFromTaskId === pausedRecurringTask.id),
+    ).toBe(false);
+
+    const createSkippedRecurringTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: {
+        dueDate: "2026-07-12",
+        recurrenceFrequency: "WEEKLY",
+        recurrenceInterval: 1,
+        sectionId,
+        title: "Skipped recurring integration review",
+      },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks",
+    });
+    expect(createSkippedRecurringTask.statusCode).toBe(201);
+    const skippedRecurringTask = createSkippedRecurringTask.json<{ id: string }>();
+
+    const skipRecurringTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + skippedRecurringTask.id + "/skip",
+    });
+    expect(skipRecurringTask.statusCode).toBe(200);
+    const skippedRecurringTaskBody = skipRecurringTask.json<{ recurrenceSkippedAt: string; status: string }>();
+    expect(skippedRecurringTaskBody).toMatchObject({ recurrenceSkippedAt: expect.any(String), status: "DONE" });
+    await expectActivityEvent({
+      entityId: skippedRecurringTask.id,
+      entityType: "task",
+      eventType: "TaskRecurrenceSkipped",
+      payload: {
+        previousStatus: "TODO",
+        recurrenceFrequency: "WEEKLY",
+        recurrenceSkippedAt: expect.any(String),
+        status: "DONE",
+        title: "Skipped recurring integration review",
+      },
+      projectId,
+      taskId: skippedRecurringTask.id,
+      workspaceId,
+    });
+
+    const tasksAfterSkip = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks?limit=100",
+    });
+    expect(tasksAfterSkip.statusCode).toBe(200);
+    const generatedSkippedTask = tasksAfterSkip
+      .json<{
+        items: Array<{
+          dueDate: string | null;
+          id: string;
+          recurrenceGeneratedFromTaskId: string | null;
+          title: string;
+        }>;
+      }>()
+      .items.find((item) => item.recurrenceGeneratedFromTaskId === skippedRecurringTask.id);
+    expect(generatedSkippedTask).toMatchObject({
+      dueDate: expect.stringMatching(/^2026-07-19/),
+      recurrenceGeneratedFromTaskId: skippedRecurringTask.id,
+      title: "Skipped recurring integration review",
+    });
   }, 60_000);
 
   it("updates task details, assignments, subtasks, and comments", async () => {

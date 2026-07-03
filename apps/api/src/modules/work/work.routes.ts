@@ -73,6 +73,7 @@ export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
   app.post("/workspaces/:workspaceId/tasks/:taskId/watchers", { schema: openApiSchema({ body: taskWatcherUserRequestSchema, params: taskParamsSchema, tags: ["Tasks"] }) }, controller.watchTask);
   app.delete("/workspaces/:workspaceId/tasks/:taskId/watchers/:userId", { schema: openApiSchema({ params: taskWatcherParamsSchema, tags: ["Tasks"] }) }, controller.unwatchTask);
   app.post("/workspaces/:workspaceId/tasks/:taskId/complete", { schema: openApiSchema({ params: taskParamsSchema, tags: ["Tasks"] }) }, controller.completeTask);
+  app.post("/workspaces/:workspaceId/tasks/:taskId/skip", { schema: openApiSchema({ params: taskParamsSchema, tags: ["Tasks"] }) }, controller.skipRecurringTask);
 
   app.get("/workspaces/:workspaceId/labels", { schema: openApiSchema({ params: workspaceParamsSchema, tags: ["Labels"] }) }, controller.listLabels);
   app.post("/workspaces/:workspaceId/labels", { schema: openApiSchema({ body: createTaskLabelRequestSchema, params: workspaceParamsSchema, tags: ["Labels"] }) }, controller.createLabel);

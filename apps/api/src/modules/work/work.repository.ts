@@ -145,6 +145,8 @@ export class WorkRepository {
       priority?: TaskPriority;
       recurrenceFrequency?: TaskRecurrenceFrequency | null;
       recurrenceInterval?: number | null;
+      recurrencePausedAt?: Date | null;
+      recurrenceSkippedAt?: Date | null;
       status?: TaskStatus;
       title?: string;
     };

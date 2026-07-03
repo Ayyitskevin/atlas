@@ -33,6 +33,10 @@ describe("task schemas", () => {
       recurrenceInterval: null,
       version: 3,
     });
+    expect(updateTaskRequestSchema.parse({ recurrencePaused: true, version: 4 })).toEqual({
+      recurrencePaused: true,
+      version: 4,
+    });
     expect(updateTaskRequestSchema.safeParse({ recurrenceFrequency: "MONTHLY", recurrenceInterval: 400, version: 3 }).success).toBe(false);
   });
 });

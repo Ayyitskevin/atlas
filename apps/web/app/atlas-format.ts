@@ -39,6 +39,9 @@ const activityTitles: Record<string, string> = {
   TaskLabelRemoved: "Label removed",
   TaskMoved: "Task moved",
   TaskRecurrenceGenerated: "Recurring task created",
+  TaskRecurrencePaused: "Recurring task paused",
+  TaskRecurrenceResumed: "Recurring task resumed",
+  TaskRecurrenceSkipped: "Recurring task skipped",
   TaskUnassigned: "Task unassigned",
   TaskUpdated: "Task updated",
   TaskUnwatched: "Follower removed",
@@ -171,11 +174,13 @@ function taskActivityDetail(activity: ActivitySummaryInput, payload: Record<stri
   const priority = stringPayload(payload, "priority");
   const dueDate = stringPayload(payload, "dueDate");
   const recurrence = stringPayload(payload, "recurrenceFrequency");
+  const recurrenceState = taskRecurrenceState(activity.eventType, payload);
   const parts = [
     status,
     priority ? taskStatusLabel(priority) + " priority" : null,
     dueDate ? "due " + dueDate : null,
     recurrence ? taskRecurrenceLabel(recurrence, numberPayload(payload, "recurrenceInterval")) : null,
+    recurrenceState,
   ].filter(isString);
   return parts.length ? detail + " · " + parts.join(" · ") : detail;
 }
@@ -187,12 +192,24 @@ function taskActivityMetadata(payload: Record<string, unknown>) {
   const dueDate = changedLabel(stringPayload(payload, "previousDueDate"), stringPayload(payload, "dueDate"), identityLabel);
   const label = stringPayload(payload, "name");
   const recurrence = stringPayload(payload, "recurrenceFrequency");
+  const recurrenceState = taskRecurrenceState("", payload);
   if (status) items.push({ label: "Status", value: status });
   if (priority) items.push({ label: "Priority", value: priority });
   if (dueDate) items.push({ label: "Due", value: dueDate });
   if (recurrence) items.push({ label: "Repeat", value: taskRecurrenceLabel(recurrence, numberPayload(payload, "recurrenceInterval")) });
+  if (recurrenceState) items.push({ label: "Repeat state", value: recurrenceState });
   if (label) items.push({ label: "Label", value: label });
   return items;
+}
+
+function taskRecurrenceState(eventType: string, payload: Record<string, unknown>) {
+  const pausedAt = stringPayload(payload, "recurrencePausedAt");
+  const previousPausedAt = stringPayload(payload, "previousRecurrencePausedAt");
+  const skippedAt = stringPayload(payload, "recurrenceSkippedAt");
+  if (skippedAt || eventType === "TaskRecurrenceSkipped") return "skipped";
+  if (pausedAt) return "paused";
+  if (previousPausedAt && !pausedAt) return "resumed";
+  return null;
 }
 
 function projectActivityDetail(activity: ActivitySummaryInput, payload: Record<string, unknown>) {

@@ -23,6 +23,7 @@ export const updateTaskRequestSchema = z.object({
   priority: taskPrioritySchema.optional(),
   recurrenceFrequency: taskRecurrenceFrequencySchema.nullable().optional(),
   recurrenceInterval: taskRecurrenceIntervalSchema.nullable().optional(),
+  recurrencePaused: z.boolean().optional(),
   status: taskStatusSchema.optional(),
   title: z.string().min(1).max(500).optional(),
   version: z.number().int().nonnegative(),

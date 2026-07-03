@@ -162,7 +162,7 @@ export class WorkService {
   async updateTask(ctx: AuthContext, workspaceId: string, taskId: string, input: UpdateTaskRequest) {
     const task = await this.getTask(ctx, workspaceId, taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
-    const recurrence = this.updateRecurrence(input, task);
+    const recurrence = this.updateRecurrence(input, task, new Date());
     const count = await this.workRepository.updateTask({
       data: {
         description: input.description,
@@ -179,7 +179,10 @@ export class WorkService {
     if (!count) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.STALE_VERSION, "Task has changed since it was loaded.");
     const updated = await this.workRepository.findTask(workspaceId, taskId);
     if (!updated) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Task not found.");
-    const eventType = updated.status === "DONE" && task.status !== "DONE" ? "TaskCompleted" : "TaskUpdated";
+    const eventType =
+      updated.status === "DONE" && task.status !== "DONE"
+        ? "TaskCompleted"
+        : recurrencePauseEventType(task, updated) ?? "TaskUpdated";
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: taskId,
@@ -388,6 +391,44 @@ export class WorkService {
     const task = await this.getTask(ctx, workspaceId, taskId);
     if (task.status === "DONE") return task;
     return this.updateTask(ctx, workspaceId, taskId, { status: "DONE", version: task.version });
+  }
+
+  async skipRecurringTask(ctx: AuthContext, workspaceId: string, taskId: string) {
+    const task = await this.getTask(ctx, workspaceId, taskId);
+    await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
+    if (!task.recurrenceFrequency || !task.recurrenceInterval) {
+      throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "Only recurring tasks can be skipped.");
+    }
+    if (task.recurrencePausedAt) {
+      throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "Paused recurring tasks must be resumed before they can be skipped.");
+    }
+    if (task.recurrenceSkippedAt) return task;
+    if (task.status === "DONE") {
+      throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "Completed recurring tasks cannot be skipped.");
+    }
+
+    const now = new Date();
+    const count = await this.workRepository.updateTask({
+      data: { recurrenceSkippedAt: now, status: "DONE" },
+      taskId,
+      version: task.version,
+      workspaceId,
+    });
+    if (!count) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.STALE_VERSION, "Task has changed since it was loaded.");
+    const skipped = await this.workRepository.findTask(workspaceId, taskId);
+    if (!skipped) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Task not found.");
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: taskId,
+      entityType: "task",
+      eventType: "TaskRecurrenceSkipped",
+      payload: taskAuditPayload(skipped, task),
+      projectId: task.projectId,
+      taskId,
+      workspaceId,
+    });
+    await this.createNextRecurringTask(ctx, workspaceId, skipped);
+    return skipped;
   }
 
   async createSubtask(ctx: AuthContext, workspaceId: string, taskId: string, input: CreateSubtaskRequest) {
@@ -690,21 +731,53 @@ export class WorkService {
 
   private updateRecurrence(
     input: UpdateTaskRequest,
-    task: { recurrenceFrequency?: TaskRecurrenceFrequency | null; recurrenceInterval?: number | null },
+    task: {
+      recurrenceFrequency?: TaskRecurrenceFrequency | null;
+      recurrenceInterval?: number | null;
+      recurrencePausedAt?: Date | string | null;
+    },
+    now: Date,
   ) {
-    if (input.recurrenceFrequency === null) return { recurrenceFrequency: null, recurrenceInterval: null };
-    if (input.recurrenceFrequency !== undefined) {
-      return {
-        recurrenceFrequency: input.recurrenceFrequency,
-        recurrenceInterval: input.recurrenceInterval ?? task.recurrenceInterval ?? 1,
-      };
+    if (input.recurrenceFrequency === null) {
+      return { recurrenceFrequency: null, recurrenceInterval: null, recurrencePausedAt: null };
     }
-    if (input.recurrenceInterval === null) return { recurrenceFrequency: null, recurrenceInterval: null };
-    if (input.recurrenceInterval !== undefined) {
-      if (!task.recurrenceFrequency) {
+    const recurrence = {
+      recurrenceFrequency: task.recurrenceFrequency ?? null,
+      recurrenceInterval: task.recurrenceInterval ?? null,
+      recurrencePausedAt: dateTimeOrNull(task.recurrencePausedAt),
+    };
+    if (input.recurrenceFrequency !== undefined) {
+      recurrence.recurrenceFrequency = input.recurrenceFrequency;
+      recurrence.recurrenceInterval = input.recurrenceInterval ?? task.recurrenceInterval ?? 1;
+    }
+    if (input.recurrenceInterval === null) {
+      return { recurrenceFrequency: null, recurrenceInterval: null, recurrencePausedAt: null };
+    }
+    if (input.recurrenceInterval !== undefined && input.recurrenceFrequency === undefined) {
+      if (!recurrence.recurrenceFrequency) {
         throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "Recurring tasks require a recurrence frequency.");
       }
-      return { recurrenceInterval: input.recurrenceInterval };
+      recurrence.recurrenceInterval = input.recurrenceInterval;
+    }
+    if (input.recurrencePaused === true) {
+      if (!recurrence.recurrenceFrequency) {
+        throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "Only recurring tasks can be paused.");
+      }
+      recurrence.recurrencePausedAt = recurrence.recurrencePausedAt ?? now;
+    }
+    if (input.recurrencePaused === false) {
+      recurrence.recurrencePausedAt = null;
+    }
+    if (!recurrence.recurrenceFrequency) {
+      recurrence.recurrenceInterval = null;
+      recurrence.recurrencePausedAt = null;
+    }
+    if (
+      input.recurrenceFrequency !== undefined ||
+      input.recurrenceInterval !== undefined ||
+      input.recurrencePaused !== undefined
+    ) {
+      return recurrence;
     }
     return {};
   }
@@ -721,11 +794,12 @@ export class WorkService {
       projectId: string;
       recurrenceFrequency?: TaskRecurrenceFrequency | null;
       recurrenceInterval?: number | null;
+      recurrencePausedAt?: Date | string | null;
       sectionId: string;
       title: string;
     },
   ) {
-    if (!task.recurrenceFrequency || !task.recurrenceInterval) return null;
+    if (!task.recurrenceFrequency || !task.recurrenceInterval || task.recurrencePausedAt) return null;
     try {
       const nextTask = await this.workRepository.createRecurringTask({
         assigneeIds: task.assignees.map((assignee) => assignee.userId),
@@ -769,6 +843,8 @@ function taskAuditPayload(
     priority: string;
     recurrenceFrequency?: string | null;
     recurrenceInterval?: number | null;
+    recurrencePausedAt?: Date | string | null;
+    recurrenceSkippedAt?: Date | string | null;
     sectionId: string;
     status: string;
     title: string;
@@ -778,6 +854,8 @@ function taskAuditPayload(
     priority: string;
     recurrenceFrequency?: string | null;
     recurrenceInterval?: number | null;
+    recurrencePausedAt?: Date | string | null;
+    recurrenceSkippedAt?: Date | string | null;
     status: string;
     title: string;
   },
@@ -787,6 +865,8 @@ function taskAuditPayload(
     priority: task.priority,
     recurrenceFrequency: task.recurrenceFrequency ?? null,
     recurrenceInterval: task.recurrenceInterval ?? null,
+    recurrencePausedAt: dateTimePayloadValue(task.recurrencePausedAt),
+    recurrenceSkippedAt: dateTimePayloadValue(task.recurrenceSkippedAt),
     sectionId: task.sectionId,
     status: task.status,
     title: task.title,
@@ -801,14 +881,43 @@ function taskAuditPayload(
   if ((previous.recurrenceInterval ?? null) !== (task.recurrenceInterval ?? null)) {
     payload.previousRecurrenceInterval = previous.recurrenceInterval ?? null;
   }
+  const previousRecurrencePausedAt = dateTimePayloadValue(previous.recurrencePausedAt);
+  if (previousRecurrencePausedAt !== payload.recurrencePausedAt) {
+    payload.previousRecurrencePausedAt = previousRecurrencePausedAt;
+  }
+  const previousRecurrenceSkippedAt = dateTimePayloadValue(previous.recurrenceSkippedAt);
+  if (previousRecurrenceSkippedAt !== payload.recurrenceSkippedAt) {
+    payload.previousRecurrenceSkippedAt = previousRecurrenceSkippedAt;
+  }
   const previousDueDate = datePayloadValue(previous.dueDate);
   if (previousDueDate !== payload.dueDate) payload.previousDueDate = previousDueDate;
   return payload;
 }
 
+function recurrencePauseEventType(
+  previous: { recurrencePausedAt?: Date | string | null },
+  task: { recurrencePausedAt?: Date | string | null },
+): "TaskRecurrencePaused" | "TaskRecurrenceResumed" | null {
+  const wasPaused = Boolean(previous.recurrencePausedAt);
+  const isPaused = Boolean(task.recurrencePausedAt);
+  if (!wasPaused && isPaused) return "TaskRecurrencePaused";
+  if (wasPaused && !isPaused) return "TaskRecurrenceResumed";
+  return null;
+}
+
 function datePayloadValue(value?: Date | string | null) {
   if (!value) return null;
   return value instanceof Date ? value.toISOString().slice(0, 10) : value.slice(0, 10);
+}
+
+function dateTimePayloadValue(value?: Date | string | null) {
+  if (!value) return null;
+  return value instanceof Date ? value.toISOString() : value;
+}
+
+function dateTimeOrNull(value?: Date | string | null) {
+  if (!value) return null;
+  return value instanceof Date ? value : new Date(value);
 }
 
 function isPrismaUniqueConstraintError(error: unknown) {

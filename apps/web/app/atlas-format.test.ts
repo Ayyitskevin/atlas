@@ -31,6 +31,8 @@ describe("atlas format helpers", () => {
     expect(formatActivityTitle("ProjectTemplateUpdated")).toBe("Template updated");
     expect(formatActivityTitle("ProjectCreatedFromTemplate")).toBe("Project created from template");
     expect(formatActivityTitle("TaskRecurrenceGenerated")).toBe("Recurring task created");
+    expect(formatActivityTitle("TaskRecurrencePaused")).toBe("Recurring task paused");
+    expect(formatActivityTitle("TaskRecurrenceSkipped")).toBe("Recurring task skipped");
     expect(formatActivityTitle("CustomEvent")).toBe("Custom Event");
     expect(taskStatusLabel("IN_PROGRESS")).toBe("in progress");
     expect(taskRecurrenceLabel("WEEKLY", 2)).toBe("every 2 weeks");
@@ -112,6 +114,23 @@ describe("atlas format helpers", () => {
       { label: "Due", value: "2026-07-05" },
       { label: "Repeat", value: "every 2 weeks" },
     ]);
+
+    const pausedActivity = {
+      entityType: "task",
+      eventType: "TaskRecurrencePaused",
+      payload: {
+        priority: "MEDIUM",
+        recurrenceFrequency: "DAILY",
+        recurrenceInterval: 1,
+        recurrencePausedAt: "2026-07-03T20:30:00.000Z",
+        status: "TODO",
+        title: "Daily review",
+      },
+      taskId: "task-2",
+    };
+
+    expect(formatActivityDetail(pausedActivity)).toBe("Task: Daily review · todo · medium priority · daily · paused");
+    expect(formatActivityMetadata(pausedActivity)).toContainEqual({ label: "Repeat state", value: "paused" });
   });
 
   it("formats project and project member audit metadata", () => {

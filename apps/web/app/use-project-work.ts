@@ -312,6 +312,7 @@ export function useProjectWork({
       const dueDate = String(form.get("dueDate") ?? "");
       const recurrenceFrequency = String(form.get("recurrenceFrequency") ?? "");
       const recurrenceInterval = Number(form.get("recurrenceInterval") ?? 1);
+      const recurrencePaused = recurrenceFrequency ? form.get("recurrencePaused") === "true" : false;
       const updated = await api<Task>(
         "/workspaces/" + selectedWorkspaceId + "/tasks/" + currentTask.id,
         {
@@ -321,6 +322,7 @@ export function useProjectWork({
             priority: String(form.get("priority")) as TaskPriority,
             recurrenceFrequency: recurrenceFrequency || null,
             recurrenceInterval: recurrenceFrequency ? recurrenceInterval : null,
+            recurrencePaused,
             status: String(form.get("status")) as TaskStatus,
             title: String(form.get("title")),
             version: currentTask.version,
@@ -332,6 +334,23 @@ export function useProjectWork({
       replaceTask(updated);
       await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
       await loadActivity(auth.accessToken, selectedWorkspaceId, "task", selectedProjectId, updated.id);
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
+  }
+
+  async function skipRecurringTask() {
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTask) return;
+    try {
+      setMessage("");
+      const skipped = await api<Task>(
+        "/workspaces/" + selectedWorkspaceId + "/tasks/" + selectedTask.id + "/skip",
+        { method: "POST" },
+        auth.accessToken,
+      );
+      replaceTask(skipped);
+      await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, "task", selectedProjectId, skipped.id);
     } catch (error) {
       setMessage(errorMessage(error));
     }
@@ -722,6 +741,7 @@ export function useProjectWork({
     renameSection,
     sections,
     selectedTask,
+    skipRecurringTask,
     subtasks,
     taskLabels,
     taskWatchers,

@@ -12,6 +12,12 @@ export function taskNotificationCopy(event: MutationEventJob, taskTitle: string)
       return { body: quote(title) + " was marked complete.", title: "Task completed" };
     case "TaskRecurrenceGenerated":
       return { body: quote(title) + " was created from a recurring task.", title: "Recurring task created" };
+    case "TaskRecurrencePaused":
+      return { body: "The recurrence for " + quote(title) + " was paused.", title: "Recurring task paused" };
+    case "TaskRecurrenceResumed":
+      return { body: "The recurrence for " + quote(title) + " was resumed.", title: "Recurring task resumed" };
+    case "TaskRecurrenceSkipped":
+      return { body: quote(title) + " was skipped and advanced to the next occurrence.", title: "Recurring task skipped" };
     case "TaskMoved":
       return { body: quote(title) + " moved to another section.", title: "Task moved" };
     case "TaskAssigned":

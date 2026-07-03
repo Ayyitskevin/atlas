@@ -215,6 +215,7 @@ export function AtlasClient({
     renameSection,
     sections,
     selectedTask,
+    skipRecurringTask,
     subtasks,
     taskLabels,
     taskWatchers,
@@ -1068,6 +1069,7 @@ export function AtlasClient({
             onDeleteSubtask={deleteSubtask}
             onDeleteTask={deleteTask}
             onDownloadAttachment={downloadAttachment}
+            onSkipRecurringTask={skipRecurringTask}
             onToggleSubtask={toggleSubtask}
             onUnassignTask={unassignTask}
             onUnassignTaskLabel={unassignTaskLabel}
