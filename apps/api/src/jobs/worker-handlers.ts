@@ -41,6 +41,12 @@ export type EmailDeliveryStore = {
       where: { id: string; workspaceId: string };
     }): Promise<TaskWithAssigneeUsers | null>;
   };
+  workspaceNotificationPreference: {
+    findMany(input: {
+      select: { userId: true };
+      where: { emailEnabled: true; userId: { in: string[] }; workspaceId: string };
+    }): Promise<Array<{ userId: string }>>;
+  };
 };
 
 export type WorkerJobLike = {
@@ -136,10 +142,31 @@ export async function handleEmailDeliveryJob(
     return recordWorkerOutcome(job, baseOutcome(WORKER_QUEUE_NAMES.emailDelivery, event, "skipped", "Task no longer exists."));
   }
 
-  const recipients = task.assignees.map((assignee) => assignee.user).filter((user) => user.id !== event.actorUserId);
-  if (!recipients.length) {
+  const eligibleRecipients = task.assignees.map((assignee) => assignee.user).filter((user) => user.id !== event.actorUserId);
+  if (!eligibleRecipients.length) {
     return recordWorkerOutcome(job, {
       ...baseOutcome(WORKER_QUEUE_NAMES.emailDelivery, event, "skipped", "No eligible task assignees."),
+      provider: emailProvider.name,
+      recipientCount: 0,
+    });
+  }
+
+  const optedInUserIds = new Set(
+    (
+      await store.workspaceNotificationPreference.findMany({
+        select: { userId: true },
+        where: {
+          emailEnabled: true,
+          userId: { in: eligibleRecipients.map((recipient) => recipient.id) },
+          workspaceId: event.workspaceId,
+        },
+      })
+    ).map((preference) => preference.userId),
+  );
+  const recipients = eligibleRecipients.filter((recipient) => optedInUserIds.has(recipient.id));
+  if (!recipients.length) {
+    return recordWorkerOutcome(job, {
+      ...baseOutcome(WORKER_QUEUE_NAMES.emailDelivery, event, "skipped", "No task assignees have email notifications enabled."),
       provider: emailProvider.name,
       recipientCount: 0,
     });

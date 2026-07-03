@@ -148,6 +148,14 @@ export type Notification = {
   type: string;
 };
 
+export type NotificationPreference = {
+  emailEnabled: boolean;
+  inAppEnabled: true;
+  updatedAt: string | null;
+  userId: string;
+  workspaceId: string;
+};
+
 export type WorkspaceRole = "ADMIN" | "GUEST" | "MEMBER" | "OWNER";
 
 export type WorkspaceMember = {

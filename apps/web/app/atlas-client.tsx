@@ -22,6 +22,7 @@ import {
 import { TaskDetailPanel } from "./task-detail-panel";
 import { useActivity } from "./use-activity";
 import { useMyWork } from "./use-my-work";
+import { useNotificationPreferences } from "./use-notification-preferences";
 import { useNotifications } from "./use-notifications";
 import { useOutbox } from "./use-outbox";
 import { useProjectMembers } from "./use-project-members";
@@ -96,6 +97,13 @@ export function AtlasClient({
     setNotificationFilter,
     unreadCount,
   } = useNotifications(auth, selectedWorkspaceId, setMessage);
+  const {
+    clearNotificationPreferences,
+    loadNotificationPreferences,
+    notificationPreference,
+    notificationPreferenceStatus,
+    updateNotificationEmailPreference,
+  } = useNotificationPreferences(auth, selectedWorkspaceId, setMessage);
   const {
     changeOutboxStatus,
     clearOutboxState,
@@ -217,6 +225,11 @@ export function AtlasClient({
 
   useEffect(() => {
     if (!auth?.accessToken || !selectedWorkspaceId) return;
+    void loadNotificationPreferences(auth.accessToken, selectedWorkspaceId);
+  }, [auth?.accessToken, selectedWorkspaceId]);
+
+  useEffect(() => {
+    if (!auth?.accessToken || !selectedWorkspaceId) return;
     void loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId);
   }, [auth?.accessToken, selectedWorkspaceId, selectedProjectId, selectedTaskId, activityScope]);
 
@@ -296,6 +309,7 @@ export function AtlasClient({
         clearProjectState();
         clearTaskDetailState();
         clearNotifications();
+        clearNotificationPreferences();
         clearMyWork();
         clearSearch();
         clearActivity();
@@ -393,14 +407,16 @@ export function AtlasClient({
     clearProjectMemberState();
     clearOutboxState();
     clearMyWork();
+    clearNotificationPreferences();
     clearSearch();
     clearActivity();
     setActivityScope("project");
     try {
       await loadNotifications(accessToken, workspaceId, notificationFilter);
-      const [projectPage, , members] = await Promise.all([
+      const [projectPage, , , members] = await Promise.all([
         api<Page<Project>>(`/workspaces/${workspaceId}/projects`, {}, accessToken),
         loadMyWork(accessToken, workspaceId, myWorkStatusFilter, myWorkDueFilter),
+        loadNotificationPreferences(accessToken, workspaceId),
         loadWorkspaceMembers(accessToken, workspaceId),
       ]);
       setProjects(projectPage.items);
@@ -538,6 +554,7 @@ export function AtlasClient({
     clearBoardState();
     clearTaskDetailState();
     clearNotifications();
+    clearNotificationPreferences();
     clearMyWork();
     clearWorkspaceAdminState();
     clearOutboxState();
@@ -660,12 +677,15 @@ export function AtlasClient({
         />
 
         <NotificationsPanel
+          emailNotificationsEnabled={notificationPreference?.emailEnabled ?? false}
           filter={notificationFilter}
           notifications={notifications}
+          onEmailNotificationsChange={updateNotificationEmailPreference}
           onFilterChange={setNotificationFilter}
           onMarkAllRead={markAllNotificationsRead}
           onMarkRead={markNotificationRead}
           onOpenTask={chooseTask}
+          preferenceStatus={notificationPreferenceStatus}
           tasks={tasks}
           unreadCount={unreadCount}
           workspaceSelected={Boolean(selectedWorkspaceId)}

@@ -10,6 +10,7 @@ import {
   type MoveTaskRequest,
   type MyWorkQuery,
   type NotificationQuery,
+  type UpdateNotificationPreferenceRequest,
   type ReorderSectionsRequest,
   searchCursorSchema,
   type SearchQuery,
@@ -456,6 +457,32 @@ export class WorkService {
     );
   }
 
+  async getNotificationPreferences(ctx: AuthContext, workspaceId: string) {
+    await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
+    const preference = await this.workRepository.findNotificationPreference({ userId: ctx.userId, workspaceId });
+    return notificationPreferenceResponse({
+      emailEnabled: preference?.emailEnabled ?? false,
+      updatedAt: preference?.updatedAt ?? null,
+      userId: ctx.userId,
+      workspaceId,
+    });
+  }
+
+  async updateNotificationPreferences(ctx: AuthContext, workspaceId: string, input: UpdateNotificationPreferenceRequest) {
+    await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
+    const preference = await this.workRepository.upsertNotificationPreference({
+      emailEnabled: input.emailEnabled,
+      userId: ctx.userId,
+      workspaceId,
+    });
+    return notificationPreferenceResponse({
+      emailEnabled: preference.emailEnabled,
+      updatedAt: preference.updatedAt,
+      userId: ctx.userId,
+      workspaceId,
+    });
+  }
+
   async markNotificationRead(ctx: AuthContext, workspaceId: string, notificationId: string) {
     await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
     await this.workRepository.markNotificationRead({ notificationId, recipientId: ctx.userId, workspaceId });
@@ -571,4 +598,19 @@ function searchResultUpdatedAt(item: SearchResultItem) {
 
 function searchResultRank(type: SearchResultType) {
   return searchResultTypeRank[type] ?? 0;
+}
+
+function notificationPreferenceResponse(input: {
+  emailEnabled: boolean;
+  updatedAt: Date | null;
+  userId: string;
+  workspaceId: string;
+}) {
+  return {
+    emailEnabled: input.emailEnabled,
+    inAppEnabled: true as const,
+    updatedAt: input.updatedAt?.toISOString() ?? null,
+    userId: input.userId,
+    workspaceId: input.workspaceId,
+  };
 }

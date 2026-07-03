@@ -5,24 +5,30 @@ import type { Notification, Task } from "./atlas-types";
 type NotificationFilter = "all" | "unread";
 
 type NotificationsPanelProps = {
+  emailNotificationsEnabled: boolean;
   filter: NotificationFilter;
   notifications: Notification[];
+  onEmailNotificationsChange: (enabled: boolean) => Promise<void>;
   onFilterChange: (filter: NotificationFilter) => void;
   onMarkAllRead: () => Promise<void>;
   onMarkRead: (notificationId: string) => Promise<void>;
   onOpenTask: (taskId: string) => Promise<void>;
+  preferenceStatus: string;
   tasks: Task[];
   unreadCount: number;
   workspaceSelected: boolean;
 };
 
 export function NotificationsPanel({
+  emailNotificationsEnabled,
   filter,
   notifications,
+  onEmailNotificationsChange,
   onFilterChange,
   onMarkAllRead,
   onMarkRead,
   onOpenTask,
+  preferenceStatus,
   tasks,
   unreadCount,
   workspaceSelected,
@@ -60,6 +66,23 @@ export function NotificationsPanel({
             Mark all read
           </button>
         </div>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
+        <div>
+          <p className="font-medium text-slate-900">Task email updates</p>
+          {preferenceStatus ? <p className="text-xs text-slate-500">{preferenceStatus}</p> : null}
+        </div>
+        <label className="inline-flex items-center gap-2 font-medium text-slate-700">
+          <input
+            checked={emailNotificationsEnabled}
+            className="h-4 w-4 rounded border-slate-300"
+            disabled={!workspaceSelected}
+            onChange={(event) => void onEmailNotificationsChange(event.target.checked)}
+            type="checkbox"
+          />
+          Email
+        </label>
       </div>
 
       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">

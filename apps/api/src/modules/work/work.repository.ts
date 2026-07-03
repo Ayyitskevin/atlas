@@ -315,6 +315,20 @@ export class WorkRepository {
     });
   }
 
+  findNotificationPreference(input: { userId: string; workspaceId: string }) {
+    return this.prisma.workspaceNotificationPreference.findUnique({
+      where: { workspaceId_userId: { userId: input.userId, workspaceId: input.workspaceId } },
+    });
+  }
+
+  upsertNotificationPreference(input: { emailEnabled: boolean; userId: string; workspaceId: string }) {
+    return this.prisma.workspaceNotificationPreference.upsert({
+      create: input,
+      update: { emailEnabled: input.emailEnabled },
+      where: { workspaceId_userId: { userId: input.userId, workspaceId: input.workspaceId } },
+    });
+  }
+
   searchWorkspace(input: { after?: SearchWorkspaceCursor; limit: number; q: string; type?: SearchResultType; userId: string; workspaceId: string }) {
     const accessibleProject = this.accessibleProjectWhere(input.userId, input.workspaceId);
     const tasks = input.type && input.type !== "task" ? [] : this.prisma.task.findMany({

@@ -27,15 +27,17 @@ describe("worker handlers", () => {
 
   it("records email delivery as an explicit no-op provider outcome", async () => {
     const actorUserId = randomUUID();
+    const recipientId = randomUUID();
     const store = emailStore({
       task: {
         assignees: [
           { user: { email: "actor@example.com", id: actorUserId, name: "Actor" } },
-          { user: { email: "teammate@example.com", id: randomUUID(), name: "Teammate" } },
+          { user: { email: "teammate@example.com", id: recipientId, name: "Teammate" } },
         ],
         id: randomUUID(),
         title: "Launch checklist",
       },
+      emailEnabledUserIds: [recipientId],
     });
     const job = jobFor(eventJob({ actorUserId, eventType: "CommentCreated" }));
 
@@ -68,6 +70,7 @@ describe("worker handlers", () => {
         id: taskId,
         title: "Launch checklist",
       },
+      emailEnabledUserIds: [recipientId],
     });
     const job = jobFor(eventJob({ actorUserId, eventType: "TaskUpdated", taskId }));
 
@@ -92,16 +95,49 @@ describe("worker handlers", () => {
     expectLoggedOutcome(job, { provider: "test-email", providerMessageId: "message-1", status: "delivered" });
   });
 
+  it("skips task notification email when eligible assignees have not opted in", async () => {
+    const actorUserId = randomUUID();
+    const send = vi.fn<EmailProvider["send"]>();
+    const provider = testEmailProvider(send);
+    const store = emailStore({
+      task: {
+        assignees: [
+          { user: { email: "actor@example.com", id: actorUserId, name: "Actor" } },
+          { user: { email: "teammate@example.com", id: randomUUID(), name: "Teammate" } },
+        ],
+        id: randomUUID(),
+        title: "Launch checklist",
+      },
+    });
+    const job = jobFor(eventJob({ actorUserId, eventType: "TaskUpdated" }));
+
+    await expect(handleEmailDeliveryJob(job, store, provider)).resolves.toMatchObject({
+      provider: "test-email",
+      reason: "No task assignees have email notifications enabled.",
+      recipientCount: 0,
+      status: "skipped",
+    });
+    expect(send).not.toHaveBeenCalled();
+    expectLoggedOutcome(job, {
+      provider: "test-email",
+      reason: "No task assignees have email notifications enabled.",
+      recipientCount: 0,
+      status: "skipped",
+    });
+  });
+
   it("logs and rethrows email provider failures for BullMQ retries", async () => {
     const providerError = new Error("SMTP service unavailable");
     const send = vi.fn<EmailProvider["send"]>().mockRejectedValue(providerError);
     const provider = testEmailProvider(send);
+    const recipientId = randomUUID();
     const store = emailStore({
       task: {
-        assignees: [{ user: { email: "teammate@example.com", id: randomUUID(), name: "Teammate" } }],
+        assignees: [{ user: { email: "teammate@example.com", id: recipientId, name: "Teammate" } }],
         id: randomUUID(),
         title: "Launch checklist",
       },
+      emailEnabledUserIds: [recipientId],
     });
     const job = jobFor(eventJob({ eventType: "CommentCreated" }));
 
@@ -220,10 +256,18 @@ function notificationStore(input: { task?: Awaited<ReturnType<NotificationFanout
   } satisfies NotificationFanoutStore;
 }
 
-function emailStore(input: { task?: Awaited<ReturnType<EmailDeliveryStore["task"]["findFirst"]>> } = {}) {
+function emailStore(
+  input: {
+    emailEnabledUserIds?: string[];
+    task?: Awaited<ReturnType<EmailDeliveryStore["task"]["findFirst"]>>;
+  } = {},
+) {
   return {
     task: {
       findFirst: vi.fn().mockResolvedValue(input.task ?? null),
+    },
+    workspaceNotificationPreference: {
+      findMany: vi.fn().mockResolvedValue((input.emailEnabledUserIds ?? []).map((userId) => ({ userId }))),
     },
   } satisfies EmailDeliveryStore;
 }

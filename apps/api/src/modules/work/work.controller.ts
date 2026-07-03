@@ -15,6 +15,7 @@ import {
   reorderSectionsRequestSchema,
   searchQuerySchema,
   updateCommentRequestSchema,
+  updateNotificationPreferenceRequestSchema,
   updateSectionRequestSchema,
   updateSubtaskRequestSchema,
   updateTaskRequestSchema,
@@ -199,6 +200,20 @@ export class WorkController {
   listNotifications = async (request: FastifyRequest) => {
     const { workspaceId } = parseParams(request, workspaceParamsSchema);
     return this.workService.listNotifications(await requireAuth(request), workspaceId, parseQuery(request, notificationQuerySchema));
+  };
+
+  getNotificationPreferences = async (request: FastifyRequest) => {
+    const { workspaceId } = parseParams(request, workspaceParamsSchema);
+    return this.workService.getNotificationPreferences(await requireAuth(request), workspaceId);
+  };
+
+  updateNotificationPreferences = async (request: FastifyRequest) => {
+    const { workspaceId } = parseParams(request, workspaceParamsSchema);
+    return this.workService.updateNotificationPreferences(
+      await requireAuth(request),
+      workspaceId,
+      parseBody(request, updateNotificationPreferenceRequestSchema),
+    );
   };
 
   markNotificationRead = async (request: FastifyRequest) => {

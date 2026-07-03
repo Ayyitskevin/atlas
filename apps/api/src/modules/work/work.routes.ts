@@ -14,10 +14,12 @@ import {
   moveTaskRequestSchema,
   myWorkQuerySchema,
   notificationQuerySchema,
+  notificationPreferenceResponseSchema,
   reorderSectionsRequestSchema,
   searchResponseSchema,
   searchQuerySchema,
   updateCommentRequestSchema,
+  updateNotificationPreferenceRequestSchema,
   updateSectionRequestSchema,
   updateSubtaskRequestSchema,
   updateTaskRequestSchema,
@@ -83,6 +85,29 @@ export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
   app.get("/workspaces/:workspaceId/tasks/:taskId/activity", { schema: openApiSchema({ params: taskParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listTaskActivity);
 
   app.get("/workspaces/:workspaceId/notifications", { schema: openApiSchema({ params: workspaceParamsSchema, querystring: notificationQuerySchema, tags: ["Notifications"] }) }, controller.listNotifications);
+  app.get(
+    "/workspaces/:workspaceId/notification-preferences",
+    {
+      schema: openApiSchema({
+        params: workspaceParamsSchema,
+        response: { 200: notificationPreferenceResponseSchema },
+        tags: ["Notifications"],
+      }),
+    },
+    controller.getNotificationPreferences,
+  );
+  app.patch(
+    "/workspaces/:workspaceId/notification-preferences",
+    {
+      schema: openApiSchema({
+        body: updateNotificationPreferenceRequestSchema,
+        params: workspaceParamsSchema,
+        response: { 200: notificationPreferenceResponseSchema },
+        tags: ["Notifications"],
+      }),
+    },
+    controller.updateNotificationPreferences,
+  );
   app.post("/workspaces/:workspaceId/notifications/:notificationId/read", { schema: openApiSchema({ params: notificationParamsSchema, tags: ["Notifications"] }) }, controller.markNotificationRead);
   app.post("/workspaces/:workspaceId/notifications/read-all", { schema: openApiSchema({ params: workspaceParamsSchema, tags: ["Notifications"] }) }, controller.markAllNotificationsRead);
 

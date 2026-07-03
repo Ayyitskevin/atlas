@@ -69,6 +69,7 @@ model User {
   attachments              Attachment[]
   activityEvents           ActivityEvent[]       @relation("ActivityActor")
   notifications            Notification[]        @relation("NotificationRecipient")
+  notificationPreferences  WorkspaceNotificationPreference[]
 
   @@index([deletedAt])
   @@map("users")
@@ -123,6 +124,7 @@ model Workspace {
   projects      Project[]
   activity      ActivityEvent[]
   notifications Notification[]
+  notificationPreferences WorkspaceNotificationPreference[]
 
   @@index([ownerId])
   @@index([deletedAt])
@@ -406,4 +408,19 @@ model Notification {
 
   @@index([workspaceId, recipientId, status, createdAt])
   @@map("notifications")
+}
+
+model WorkspaceNotificationPreference {
+  id           String    @id @default(uuid()) @db.Uuid
+  workspaceId  String    @map("workspace_id") @db.Uuid
+  userId       String    @map("user_id") @db.Uuid
+  emailEnabled Boolean   @default(false) @map("email_enabled")
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("workspace_notification_preferences")
 }

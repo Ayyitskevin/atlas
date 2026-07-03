@@ -622,6 +622,51 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     );
   });
 
+  it("persists workspace notification email preferences", async () => {
+    const currentUser = await prisma.user.findUniqueOrThrow({ where: { email } });
+
+    const defaults = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/notification-preferences",
+    });
+    expect(defaults.statusCode).toBe(200);
+    expect(defaults.json()).toMatchObject({
+      emailEnabled: false,
+      inAppEnabled: true,
+      updatedAt: null,
+      userId: currentUser.id,
+      workspaceId,
+    });
+
+    const enabled = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: { emailEnabled: true },
+      url: "/api/v1/workspaces/" + workspaceId + "/notification-preferences",
+    });
+    expect(enabled.statusCode).toBe(200);
+    expect(enabled.json<{ emailEnabled: boolean; updatedAt: string | null }>()).toMatchObject({
+      emailEnabled: true,
+      updatedAt: expect.any(String),
+    });
+
+    await expect(
+      prisma.workspaceNotificationPreference.findUniqueOrThrow({
+        where: { workspaceId_userId: { userId: currentUser.id, workspaceId } },
+      }),
+    ).resolves.toMatchObject({ emailEnabled: true });
+
+    const disabled = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: { emailEnabled: false },
+      url: "/api/v1/workspaces/" + workspaceId + "/notification-preferences",
+    });
+    expect(disabled.statusCode).toBe(200);
+    expect(disabled.json<{ emailEnabled: boolean }>().emailEnabled).toBe(false);
+  });
+
   it("lists and revokes user sessions", async () => {
     const sessionsEmail = "atlas-sessions-" + randomUUID() + "@example.com";
     const register = await app!.inject({
