@@ -14,6 +14,7 @@
     "lint": "turbo run lint",
     "migrate": "pnpm --filter @atlas/db migrate",
     "seed": "pnpm --filter @atlas/db seed",
+    "smoke:demo:local": "node ./scripts/demo-smoke-local.mjs",
     "test": "turbo run test",
     "test:e2e": "pnpm --filter @atlas/api test:e2e",
     "test:integration": "pnpm --filter @atlas/api test:integration",
