@@ -52,6 +52,19 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     await prisma.$disconnect();
   });
 
+  it("reports readiness when database and redis are reachable", async () => {
+    const readiness = await app!.inject({
+      method: "GET",
+      url: "/readyz",
+    });
+
+    expect(readiness.statusCode).toBe(200);
+    expect(readiness.json()).toEqual({
+      checks: { api: "ok", database: "ok", redis: "ok" },
+      status: "ok",
+    });
+  });
+
   it("registers, creates a workspace, project, section, task, and comment", async () => {
     const register = await app!.inject({
       method: "POST",

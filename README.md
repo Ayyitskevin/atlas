@@ -58,6 +58,7 @@ Local URLs:
 - Web: http://localhost:3000
 - API: http://localhost:4000
 - API docs: http://localhost:4000/docs
+- API readiness: http://localhost:4000/readyz
 - WebSocket: ws://localhost:4000/api/v1/ws
 - MinIO console: http://localhost:9001
 
