@@ -40,6 +40,19 @@ docker compose up
 
 Then open http://localhost:3000, register a user, create a Workspace and Project, add Sections/Tasks, and open a second browser tab to see realtime updates.
 
+To load a richer demo workspace after the database is running and migrated:
+
+```bash
+corepack pnpm seed
+```
+
+Demo login:
+
+- Email: `kevin@example.com`
+- Password: `atlas-demo-password`
+
+The seeded `Atlas Demo Workspace` includes public and private projects, labels, watchers, pinned project messages, notification preferences, recurring work, an onboarding template, and a three-task launch dependency chain that exercises the board dependency map.
+
 Local URLs:
 
 - Web: http://localhost:3000
