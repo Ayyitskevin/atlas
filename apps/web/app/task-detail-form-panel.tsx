@@ -14,14 +14,24 @@ type TaskDetailFormPanelProps = {
   onDeleteTask: () => Promise<void>;
   onSkipRecurringTask: () => Promise<void>;
   onUpdateTask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  openBlockerCount: number;
   sections: Section[];
   task: Task;
 };
 
-export function TaskDetailFormPanel({ onCompleteTask, onDeleteTask, onSkipRecurringTask, onUpdateTask, sections, task }: TaskDetailFormPanelProps) {
+export function TaskDetailFormPanel({
+  onCompleteTask,
+  onDeleteTask,
+  onSkipRecurringTask,
+  onUpdateTask,
+  openBlockerCount,
+  sections,
+  task,
+}: TaskDetailFormPanelProps) {
   const isRecurring = Boolean(task.recurrenceFrequency);
   const isPaused = Boolean(task.recurrencePausedAt);
   const isSkipped = Boolean(task.recurrenceSkippedAt);
+  const completionBlocked = task.status !== "DONE" && openBlockerCount > 0;
   const canSkipOccurrence = isRecurring && !isPaused && !isSkipped && task.status !== "DONE";
 
   return (
@@ -39,7 +49,7 @@ export function TaskDetailFormPanel({ onCompleteTask, onDeleteTask, onSkipRecurr
           Status
           <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" defaultValue={task.status} name="status">
             {taskStatuses.map((status) => (
-              <option key={status} value={status}>
+              <option disabled={status === "DONE" && completionBlocked} key={status} value={status}>
                 {taskStatusLabel(status)}
               </option>
             ))}
@@ -113,7 +123,7 @@ export function TaskDetailFormPanel({ onCompleteTask, onDeleteTask, onSkipRecurr
         </button>
         <button
           className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-          disabled={task.status === "DONE"}
+          disabled={task.status === "DONE" || completionBlocked}
           onClick={() => void onCompleteTask()}
           type="button"
         >
@@ -131,6 +141,11 @@ export function TaskDetailFormPanel({ onCompleteTask, onDeleteTask, onSkipRecurr
           Delete
         </button>
       </div>
+      {completionBlocked ? (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Complete {openBlockerCount} blocking {openBlockerCount === 1 ? "task" : "tasks"} first.
+        </p>
+      ) : null}
     </form>
   );
 }

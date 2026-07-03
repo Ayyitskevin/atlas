@@ -1415,6 +1415,39 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
         .items.find((item) => item.id === blockedTaskId)?.dependencySummary,
     ).toMatchObject({ blockedByOpenCount: 1, isBlocked: true });
 
+    const completeBlockedTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockedTaskId + "/complete",
+    });
+    expect(completeBlockedTask.statusCode).toBe(409);
+    expect(completeBlockedTask.json<{ error: { details: { openBlockerCount?: number }; message: string } }>().error).toMatchObject({
+      details: { openBlockerCount: 1 },
+      message: "Complete open blocking tasks before completing this task.",
+    });
+
+    const completeBlockingTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockingTaskId + "/complete",
+    });
+    expect(completeBlockingTask.statusCode).toBe(200);
+
+    const dependenciesAfterBlockerDone = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockedTaskId + "/dependencies",
+    });
+    expect(dependenciesAfterBlockerDone.statusCode).toBe(200);
+    expect(dependenciesAfterBlockerDone.json<{ isBlocked: boolean }>().isBlocked).toBe(false);
+
+    const completeUnblockedTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockedTaskId + "/complete",
+    });
+    expect(completeUnblockedTask.statusCode).toBe(200);
+
     // Re-adding the same edge is idempotent and returns the existing dependency.
     const duplicate = await app!.inject({
       headers: authHeaders(accessToken),

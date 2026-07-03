@@ -174,6 +174,7 @@ export class WorkService {
   async updateTask(ctx: AuthContext, workspaceId: string, taskId: string, input: UpdateTaskRequest) {
     const task = await this.getTask(ctx, workspaceId, taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
+    if (input.status === "DONE" && task.status !== "DONE") await this.requireTaskNotBlocked(workspaceId, taskId);
     const recurrence = this.updateRecurrence(input, task, new Date());
     const count = await this.workRepository.updateTask({
       data: {
@@ -845,6 +846,19 @@ export class WorkService {
       ...task,
       dependencySummary: summaries.get(task.id) ?? emptyDependencySummary(),
     }));
+  }
+
+  private async requireTaskNotBlocked(workspaceId: string, taskId: string) {
+    const rows = await this.workRepository.listTaskDependencySummaryRows({ taskIds: [taskId], workspaceId });
+    const openBlockerCount = rows.filter((row) => row.blockedTaskId === taskId && row.blockingTask.status !== "DONE").length;
+    if (openBlockerCount) {
+      throw new AtlasHttpError(
+        409,
+        ATLAS_ERROR_CODES.CONFLICT,
+        "Complete open blocking tasks before completing this task.",
+        { openBlockerCount },
+      );
+    }
   }
 
   private createRecurrence(input: CreateTaskRequest) {

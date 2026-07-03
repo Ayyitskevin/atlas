@@ -100,6 +100,8 @@ export function TaskDetailPanel({
     );
   }
 
+  const openBlockerCount = dependencies.blockedBy.filter((edge) => edge.task.status !== "DONE").length;
+
   return (
     <aside className="grid content-start gap-4 rounded-lg border border-slate-200 bg-white p-4">
       <div className="flex items-start justify-between gap-3">
@@ -117,6 +119,7 @@ export function TaskDetailPanel({
         onDeleteTask={onDeleteTask}
         onSkipRecurringTask={onSkipRecurringTask}
         onUpdateTask={onUpdateTask}
+        openBlockerCount={openBlockerCount}
         sections={sections}
         task={task}
       />
