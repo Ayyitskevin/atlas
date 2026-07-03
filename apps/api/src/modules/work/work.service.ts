@@ -124,7 +124,7 @@ export class WorkService {
       entityId: task.id,
       entityType: "task",
       eventType: "TaskCreated",
-      payload: { title: task.title },
+      payload: taskAuditPayload(task),
       projectId,
       taskId: task.id,
       workspaceId,
@@ -169,12 +169,14 @@ export class WorkService {
     });
     if (!count) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.STALE_VERSION, "Task has changed since it was loaded.");
     const updated = await this.workRepository.findTask(workspaceId, taskId);
-    const eventType = input.status === "DONE" && task.status !== "DONE" ? "TaskCompleted" : "TaskUpdated";
+    if (!updated) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Task not found.");
+    const eventType = updated.status === "DONE" && task.status !== "DONE" ? "TaskCompleted" : "TaskUpdated";
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: taskId,
       entityType: "task",
       eventType,
+      payload: taskAuditPayload(updated, task),
       projectId: task.projectId,
       taskId,
       workspaceId,
@@ -194,16 +196,19 @@ export class WorkService {
     await this.requireSectionInProject(workspaceId, task.projectId, input.sectionId);
     const count = await this.workRepository.moveTask({ ...input, taskId, workspaceId });
     if (!count) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.STALE_VERSION, "Task has changed since it was loaded.");
+    const moved = await this.workRepository.findTask(workspaceId, taskId);
+    if (!moved) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Task not found.");
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: taskId,
       entityType: "task",
       eventType: "TaskMoved",
+      payload: { ...taskAuditPayload(moved), fromSectionId: task.sectionId, toSectionId: input.sectionId },
       projectId: task.projectId,
       taskId,
       workspaceId,
     });
-    return this.workRepository.findTask(workspaceId, taskId);
+    return moved;
   }
 
   async assignTask(ctx: AuthContext, workspaceId: string, taskId: string, userId: string) {
@@ -534,6 +539,31 @@ export class WorkService {
       throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "One or more assignees are not active members of this Workspace.");
     }
   }
+}
+
+function taskAuditPayload(
+  task: { dueDate?: Date | string | null; priority: string; sectionId: string; status: string; title: string },
+  previous?: { dueDate?: Date | string | null; priority: string; status: string; title: string },
+) {
+  const payload: Record<string, string | null> = {
+    dueDate: datePayloadValue(task.dueDate),
+    priority: task.priority,
+    sectionId: task.sectionId,
+    status: task.status,
+    title: task.title,
+  };
+  if (!previous) return payload;
+  if (previous.title !== task.title) payload.previousTitle = previous.title;
+  if (previous.status !== task.status) payload.previousStatus = previous.status;
+  if (previous.priority !== task.priority) payload.previousPriority = previous.priority;
+  const previousDueDate = datePayloadValue(previous.dueDate);
+  if (previousDueDate !== payload.dueDate) payload.previousDueDate = previousDueDate;
+  return payload;
+}
+
+function datePayloadValue(value?: Date | string | null) {
+  if (!value) return null;
+  return value instanceof Date ? value.toISOString().slice(0, 10) : value.slice(0, 10);
 }
 
 type SearchCursor = {

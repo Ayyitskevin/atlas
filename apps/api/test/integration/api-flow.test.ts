@@ -137,6 +137,15 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     });
     expect(task.statusCode).toBe(201);
     taskId = task.json<{ id: string }>().id;
+    await expectActivityEvent({
+      entityId: taskId,
+      entityType: "task",
+      eventType: "TaskCreated",
+      payload: { dueDate: null, priority: "MEDIUM", sectionId, status: "TODO", title: "Integration task" },
+      projectId,
+      taskId,
+      workspaceId,
+    });
 
     const comment = await app!.inject({
       headers: authHeaders(accessToken),
@@ -295,6 +304,49 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     });
     expect(updateTaskBody.dueDate?.startsWith("2026-07-02")).toBe(true);
     expect(updateTaskBody.version).toBe(currentTaskBody.version + 1);
+    await expectActivityEvent({
+      entityId: taskId,
+      entityType: "task",
+      eventType: "TaskUpdated",
+      payload: {
+        dueDate: "2026-07-02",
+        previousDueDate: null,
+        previousPriority: "MEDIUM",
+        previousStatus: "TODO",
+        previousTitle: "Integration task",
+        priority: "HIGH",
+        status: "IN_PROGRESS",
+        title: "Updated integration task",
+      },
+      projectId,
+      taskId,
+      workspaceId,
+    });
+
+    const moveTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { position: 3000, sectionId, version: updateTaskBody.version },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/move",
+    });
+    expect(moveTask.statusCode).toBe(200);
+    await expectActivityEvent({
+      entityId: taskId,
+      entityType: "task",
+      eventType: "TaskMoved",
+      payload: {
+        dueDate: "2026-07-02",
+        fromSectionId: sectionId,
+        priority: "HIGH",
+        sectionId,
+        status: "IN_PROGRESS",
+        title: "Updated integration task",
+        toSectionId: sectionId,
+      },
+      projectId,
+      taskId,
+      workspaceId,
+    });
 
     const completeTask = await app!.inject({
       headers: authHeaders(accessToken),
@@ -304,6 +356,21 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     expect(completeTask.statusCode).toBe(200);
     const completeTaskBody = completeTask.json<{ status: string; version: number }>();
     expect(completeTaskBody.status).toBe("DONE");
+    await expectActivityEvent({
+      entityId: taskId,
+      entityType: "task",
+      eventType: "TaskCompleted",
+      payload: {
+        dueDate: "2026-07-02",
+        previousStatus: "IN_PROGRESS",
+        priority: "HIGH",
+        status: "DONE",
+        title: "Updated integration task",
+      },
+      projectId,
+      taskId,
+      workspaceId,
+    });
 
     const completedEventCount = await prisma.activityEvent.count({
       where: { eventType: "TaskCompleted", taskId, workspaceId },
@@ -323,6 +390,21 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     expect(editCompletedTask.statusCode).toBe(200);
     expect(await prisma.activityEvent.count({ where: { eventType: "TaskCompleted", taskId, workspaceId } })).toBe(completedEventCount);
     await expectLatestTaskEvent(workspaceId, taskId, "TaskUpdated");
+    await expectActivityEvent({
+      entityId: taskId,
+      entityType: "task",
+      eventType: "TaskUpdated",
+      payload: {
+        dueDate: "2026-07-02",
+        previousTitle: "Updated integration task",
+        priority: "HIGH",
+        status: "DONE",
+        title: "Updated completed integration task",
+      },
+      projectId,
+      taskId,
+      workspaceId,
+    });
 
     const assignTask = await app!.inject({
       headers: authHeaders(accessToken),

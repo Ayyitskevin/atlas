@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   dateInputValue,
   formatActivityDetail,
+  formatActivityMetadata,
   formatActivityTitle,
   formatBytes,
   formatEventType,
@@ -43,6 +44,57 @@ describe("atlas format helpers", () => {
     expect(formatActivityDetail({ entityType: "project", eventType: "ProjectUpdated", payload: {}, projectId: "project-1" })).toBe(
       "Project activity",
     );
+  });
+
+  it("formats task audit transitions from activity payloads", () => {
+    const activity = {
+      entityType: "task",
+      eventType: "TaskCompleted",
+      payload: {
+        dueDate: "2026-07-05",
+        previousDueDate: null,
+        previousStatus: "IN_PROGRESS",
+        priority: "HIGH",
+        status: "DONE",
+        title: "Prep launch QA",
+      },
+      taskId: "task-1",
+    };
+
+    expect(formatActivityDetail(activity)).toBe("Task: Prep launch QA · in progress -> done · high priority · due 2026-07-05");
+    expect(formatActivityMetadata(activity)).toEqual([
+      { label: "Status", value: "in progress -> done" },
+      { label: "Priority", value: "high" },
+      { label: "Due", value: "2026-07-05" },
+    ]);
+  });
+
+  it("formats project and project member audit metadata", () => {
+    expect(
+      formatActivityDetail({
+        entityType: "project",
+        eventType: "ProjectUpdated",
+        payload: { archivedAt: null, name: "Atlas Launch", visibility: "PRIVATE" },
+        projectId: "project-1",
+      }),
+    ).toBe("Project: Atlas Launch · private");
+
+    const memberEvent = {
+      entityType: "project_member",
+      eventType: "ProjectMemberUpdated",
+      payload: {
+        previousRole: "VIEWER",
+        role: "EDITOR",
+        user: { email: "teammate@example.com", name: "Teammate" },
+      },
+      projectId: "project-1",
+    };
+
+    expect(formatActivityDetail(memberEvent)).toBe("Member: Teammate · viewer -> editor");
+    expect(formatActivityMetadata(memberEvent)).toEqual([
+      { label: "Member", value: "teammate@example.com" },
+      { label: "Role", value: "viewer -> editor" },
+    ]);
   });
 
   it("derives invitation status from lifecycle timestamps", () => {

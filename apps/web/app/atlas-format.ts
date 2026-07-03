@@ -40,12 +40,21 @@ type ActivitySummaryInput = {
   taskId?: string | null;
 };
 
+export type ActivityMetadataItem = {
+  label: string;
+  value: string;
+};
+
 export function formatActivityTitle(eventType: string) {
   return activityTitles[eventType] ?? formatEventType(eventType);
 }
 
 export function formatActivityDetail(activity: ActivitySummaryInput) {
   const payload = activity.payload ?? {};
+  if (activity.entityType === "task") return taskActivityDetail(activity, payload);
+  if (activity.entityType === "project") return projectActivityDetail(activity, payload);
+  if (activity.entityType === "project_member") return projectMemberActivityDetail(activity, payload);
+
   const name = stringPayload(payload, "title") ?? stringPayload(payload, "name") ?? stringPayload(payload, "fileName");
   if (activity.eventType === "AttachmentAdded" || activity.eventType === "AttachmentDeleted") {
     const size = numberPayload(payload, "sizeBytes");
@@ -53,6 +62,18 @@ export function formatActivityDetail(activity: ActivitySummaryInput) {
   }
   if (name) return entityLabel(activity.entityType) + ": " + name;
   return scopeLabel(activity);
+}
+
+export function formatActivityMetadata(activity: ActivitySummaryInput): ActivityMetadataItem[] {
+  const payload = activity.payload ?? {};
+  if (activity.entityType === "task") return taskActivityMetadata(payload);
+  if (activity.entityType === "project") return projectActivityMetadata(payload);
+  if (activity.entityType === "project_member") return projectMemberActivityMetadata(payload);
+  if (activity.eventType === "AttachmentAdded" || activity.eventType === "AttachmentDeleted") {
+    const size = numberPayload(payload, "sizeBytes");
+    return size ? [{ label: "Size", value: formatBytes(size) }] : [];
+  }
+  return [];
 }
 
 export function formatBytes(value: number) {
@@ -96,6 +117,11 @@ function numberPayload(payload: Record<string, unknown>, key: string) {
   return typeof value === "number" ? value : null;
 }
 
+function objectPayload(payload: Record<string, unknown>, key: string) {
+  const value = payload[key];
+  return isRecord(value) ? value : null;
+}
+
 function scopeLabel(activity: ActivitySummaryInput) {
   if (activity.taskId) return "Task activity";
   if (activity.projectId) return "Project activity";
@@ -105,6 +131,95 @@ function scopeLabel(activity: ActivitySummaryInput) {
 function stringPayload(payload: Record<string, unknown>, key: string) {
   const value = payload[key];
   return typeof value === "string" && value.trim() ? value : null;
+}
+
+function taskActivityDetail(activity: ActivitySummaryInput, payload: Record<string, unknown>) {
+  const title = stringPayload(payload, "title");
+  const detail = title ? "Task: " + title : scopeLabel(activity);
+  const status = taskStatusChange(payload);
+  const priority = stringPayload(payload, "priority");
+  const dueDate = stringPayload(payload, "dueDate");
+  const parts = [
+    status,
+    priority ? taskStatusLabel(priority) + " priority" : null,
+    dueDate ? "due " + dueDate : null,
+  ].filter(isString);
+  return parts.length ? detail + " · " + parts.join(" · ") : detail;
+}
+
+function taskActivityMetadata(payload: Record<string, unknown>) {
+  const items: ActivityMetadataItem[] = [];
+  const status = taskStatusChange(payload);
+  const priority = changedLabel(stringPayload(payload, "previousPriority"), stringPayload(payload, "priority"), taskStatusLabel);
+  const dueDate = changedLabel(stringPayload(payload, "previousDueDate"), stringPayload(payload, "dueDate"), identityLabel);
+  if (status) items.push({ label: "Status", value: status });
+  if (priority) items.push({ label: "Priority", value: priority });
+  if (dueDate) items.push({ label: "Due", value: dueDate });
+  return items;
+}
+
+function projectActivityDetail(activity: ActivitySummaryInput, payload: Record<string, unknown>) {
+  const name = stringPayload(payload, "name");
+  const detail = name ? "Project: " + name : scopeLabel(activity);
+  const visibility = stringPayload(payload, "visibility");
+  const archivedAt = stringPayload(payload, "archivedAt");
+  const parts = [
+    visibility ? projectVisibilityLabel(visibility) : null,
+    archivedAt ? "archived" : null,
+  ].filter(isString);
+  return parts.length ? detail + " · " + parts.join(" · ") : detail;
+}
+
+function projectActivityMetadata(payload: Record<string, unknown>) {
+  const items: ActivityMetadataItem[] = [];
+  const visibility = stringPayload(payload, "visibility");
+  const archivedAt = stringPayload(payload, "archivedAt");
+  if (visibility) items.push({ label: "Visibility", value: projectVisibilityLabel(visibility) });
+  if (archivedAt) items.push({ label: "Archived", value: archivedAt.slice(0, 10) });
+  return items;
+}
+
+function projectMemberActivityDetail(activity: ActivitySummaryInput, payload: Record<string, unknown>) {
+  const user = objectPayload(payload, "user");
+  const name = user ? stringPayload(user, "name") ?? stringPayload(user, "email") : null;
+  const role = changedLabel(stringPayload(payload, "previousRole"), stringPayload(payload, "role"), projectRoleLabel);
+  const detail = name ? "Member: " + name : scopeLabel(activity);
+  return role ? detail + " · " + role : detail;
+}
+
+function projectMemberActivityMetadata(payload: Record<string, unknown>) {
+  const items: ActivityMetadataItem[] = [];
+  const user = objectPayload(payload, "user");
+  const email = user ? stringPayload(user, "email") : null;
+  const role = changedLabel(stringPayload(payload, "previousRole"), stringPayload(payload, "role"), projectRoleLabel);
+  if (email) items.push({ label: "Member", value: email });
+  if (role) items.push({ label: "Role", value: role });
+  return items;
+}
+
+function taskStatusChange(payload: Record<string, unknown>) {
+  return changedLabel(stringPayload(payload, "previousStatus"), stringPayload(payload, "status"), taskStatusLabel);
+}
+
+function changedLabel(previous: string | null, current: string | null, formatter: (value: string) => string) {
+  if (previous && current && previous !== current) return formatter(previous) + " -> " + formatter(current);
+  return current ? formatter(current) : null;
+}
+
+function identityLabel(value: string) {
+  return value;
+}
+
+function projectVisibilityLabel(value: string) {
+  return value.toLowerCase();
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value && typeof value === "object" && !Array.isArray(value));
+}
+
+function isString(value: string | null): value is string {
+  return Boolean(value);
 }
 
 export function invitationStatus(invitation: {
