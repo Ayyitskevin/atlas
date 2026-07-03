@@ -5,13 +5,15 @@ const envSchema = z.object({
   API_PORT: z.coerce.number().int().positive().default(4000),
   DATABASE_URL: z.string().default("postgresql://atlas:atlas@localhost:5432/atlas"),
   EMAIL_FROM: z.string().default("no-reply@atlas.local"),
-  EMAIL_PROVIDER: z.enum(["noop"]).default("noop"),
+  EMAIL_PROVIDER: z.enum(["noop", "resend"]).default("noop"),
   JWT_ACCESS_SECRET: z.string().default("local-dev-access-secret-change-me"),
   JWT_REFRESH_SECRET: z.string().default("local-dev-refresh-secret-change-me"),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
   RATE_LIMIT_WINDOW: z.string().default("1 minute"),
   REDIS_URL: z.string().default("redis://localhost:6379"),
+  RESEND_API_KEY: z.string().optional(),
+  RESEND_API_URL: z.string().url().default("https://api.resend.com"),
   S3_ACCESS_KEY_ID: z.string().default("atlas"),
   S3_BUCKET: z.string().default("atlas-local"),
   S3_ENDPOINT: z.string().default("http://localhost:9000"),
@@ -19,6 +21,14 @@ const envSchema = z.object({
   S3_REGION: z.string().default("us-east-1"),
   S3_SECRET_ACCESS_KEY: z.string().default("atlas-password"),
   WEB_ORIGIN: z.string().default("http://localhost:3000"),
+}).superRefine((value, ctx) => {
+  if (value.EMAIL_PROVIDER === "resend" && !value.RESEND_API_KEY?.trim()) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "RESEND_API_KEY is required when EMAIL_PROVIDER=resend.",
+      path: ["RESEND_API_KEY"],
+    });
+  }
 });
 
 export const env = envSchema.parse(process.env);

@@ -15,7 +15,12 @@ import {
 } from "./worker-handlers.js";
 
 export function startWorkers() {
-  const emailProvider = createEmailProvider({ from: env.EMAIL_FROM, provider: env.EMAIL_PROVIDER });
+  const emailProvider = createEmailProvider({
+    from: env.EMAIL_FROM,
+    provider: env.EMAIL_PROVIDER,
+    resendApiKey: env.RESEND_API_KEY,
+    resendApiUrl: env.RESEND_API_URL,
+  });
   const notificationWorker = new Worker<MutationEventJob, WorkerOutcome, string>(
     WORKER_QUEUE_NAMES.notificationFanout,
     async (job) => handleNotificationFanoutJob(job, prisma, prisma),

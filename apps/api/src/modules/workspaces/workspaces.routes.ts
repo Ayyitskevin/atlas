@@ -29,7 +29,12 @@ export async function registerWorkspaceRoutes(app: FastifyInstance): Promise<voi
     new WorkspacesService(
       new WorkspacesRepository(prisma),
       new PermissionsService(prisma),
-      createEmailProvider({ from: env.EMAIL_FROM, provider: env.EMAIL_PROVIDER }),
+      createEmailProvider({
+        from: env.EMAIL_FROM,
+        provider: env.EMAIL_PROVIDER,
+        resendApiKey: env.RESEND_API_KEY,
+        resendApiUrl: env.RESEND_API_URL,
+      }),
       env.WEB_ORIGIN,
     ),
   );

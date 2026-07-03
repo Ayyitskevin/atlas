@@ -87,7 +87,7 @@ Core entities use UUID primary keys, `workspace_id` where tenant scoping is requ
 - `comments`: task comments with author and soft-delete fields.
 - `attachments`: metadata only; object key points to S3-compatible storage.
 - `activity_events`: append-only audit trail for task/project/workspace events.
-- `notifications`: in-app notifications and delivery state; email delivery is job-backed and stubbed.
+- `notifications`: in-app notifications and delivery state; task email delivery is job-backed and defaults to no-op until a real provider such as Resend is configured.
 
 ## Tenancy Model
 
