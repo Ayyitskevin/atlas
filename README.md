@@ -12,7 +12,7 @@ The current phase is deliberately foundation-first: production-minded domain bou
 - Workspace dashboard with project/task quick actions, project/member counts, recent notifications, activity, and assigned-work summary.
 - Task comments, scoped activity feeds, in-app notifications with a web inbox, and workspace search in the web shell.
 - Realtime WebSocket broadcasts for project/member/task/comment/activity mutations.
-- Durable domain event outbox feeding BullMQ workers for notification fanout, search indexing hooks, and email stubs.
+- Durable domain event outbox feeding BullMQ workers for notification fanout plus observable search-index and email-provider stubs.
 - Workspace-admin outbox inspection/detail, dispatch attempt history, and failed-event replay endpoints.
 - Task attachment metadata with S3-compatible signed upload/download URLs and local MinIO support.
 - Docker Compose local stack and Terraform scaffolding for staging-oriented infrastructure.
@@ -72,6 +72,8 @@ Run the API, web app, and workers in local development mode without Docker-manag
 ```bash
 corepack pnpm dev
 ```
+
+Worker note: search indexing and email delivery are intentionally stubbed until providers are chosen. Those workers return structured outcomes and write BullMQ job logs so local operators can distinguish delivered notification fanout from skipped or stubbed side effects.
 
 Run the dockerized E2E smoke test against a running API container:
 

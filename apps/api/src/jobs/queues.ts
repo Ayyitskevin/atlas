@@ -1,6 +1,7 @@
 import { Queue } from "bullmq";
 
 import { env } from "../config/env.js";
+import { WORKER_QUEUE_NAMES } from "./queue-names.js";
 
 export type MutationEventJob = {
   actorUserId: string;
@@ -24,7 +25,7 @@ export const queueConnection = {
   username: redisUrl.username || undefined,
 };
 
-export const notificationFanoutQueue = new Queue<MutationEventJob, void, string>("atlas-notification-fanout", {
+export const notificationFanoutQueue = new Queue<MutationEventJob, void, string>(WORKER_QUEUE_NAMES.notificationFanout, {
   connection: queueConnection,
   defaultJobOptions: {
     attempts: 5,
@@ -34,7 +35,7 @@ export const notificationFanoutQueue = new Queue<MutationEventJob, void, string>
   },
 });
 
-export const searchIndexQueue = new Queue<MutationEventJob, void, string>("atlas-search-index", {
+export const searchIndexQueue = new Queue<MutationEventJob, void, string>(WORKER_QUEUE_NAMES.searchIndex, {
   connection: queueConnection,
   defaultJobOptions: {
     attempts: 3,
@@ -44,7 +45,7 @@ export const searchIndexQueue = new Queue<MutationEventJob, void, string>("atlas
   },
 });
 
-export const emailStubQueue = new Queue<MutationEventJob, void, string>("atlas-email-stub", {
+export const emailStubQueue = new Queue<MutationEventJob, void, string>(WORKER_QUEUE_NAMES.emailStub, {
   connection: queueConnection,
   defaultJobOptions: {
     attempts: 3,
