@@ -8,6 +8,7 @@ import {
   type CursorPaginationQuery,
   type UpdateProjectMessageRequest,
   type UpdateProjectMemberRequest,
+  type UpdateProjectTemplateRequest,
   type UpdateProjectRequest,
 } from "@atlas/shared";
 import type { ProjectRole } from "@atlas/db";
@@ -104,6 +105,13 @@ export class ProjectsService {
     return { items: await this.projectsRepository.listTemplates(workspaceId) };
   }
 
+  async getTemplate(ctx: AuthContext, workspaceId: string, templateId: string) {
+    await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
+    const template = await this.projectsRepository.findTemplateDetail(workspaceId, templateId);
+    if (!template) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project template not found.");
+    return template;
+  }
+
   async createTemplateFromProject(
     ctx: AuthContext,
     workspaceId: string,
@@ -149,6 +157,28 @@ export class ProjectsService {
       workspaceId,
     });
     return project;
+  }
+
+  async updateTemplate(ctx: AuthContext, workspaceId: string, templateId: string, input: UpdateProjectTemplateRequest) {
+    await this.permissions.requireWorkspaceRole(ctx, workspaceId, "MEMBER");
+    const template = await this.projectsRepository.findTemplate(workspaceId, templateId);
+    if (!template) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project template not found.");
+    if (template.createdById !== ctx.userId) await this.permissions.requireWorkspaceRole(ctx, workspaceId, "ADMIN");
+
+    const updated = await this.projectsRepository.updateTemplate({ ...input, templateId, workspaceId });
+    if (!updated) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project template not found.");
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: updated.id,
+      entityType: "project_template",
+      eventType: "ProjectTemplateUpdated",
+      payload: projectTemplatePayload(updated, {
+        previousDescription: template.description ?? null,
+        previousName: template.name,
+      }),
+      workspaceId,
+    });
+    return updated;
   }
 
   async deleteTemplate(ctx: AuthContext, workspaceId: string, templateId: string) {

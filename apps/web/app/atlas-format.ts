@@ -23,6 +23,7 @@ const activityTitles: Record<string, string> = {
   ProjectMessageUpdated: "Message updated",
   ProjectTemplateCreated: "Template saved",
   ProjectTemplateDeleted: "Template deleted",
+  ProjectTemplateUpdated: "Template updated",
   ProjectUpdated: "Project updated",
   SectionCreated: "Section created",
   SectionDeleted: "Section removed",

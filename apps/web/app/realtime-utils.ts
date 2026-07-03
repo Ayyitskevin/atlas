@@ -61,7 +61,7 @@ const projectListRefreshEvents = new Set([
   "ProjectUpdated",
 ]);
 
-const projectTemplateRefreshEvents = new Set(["ProjectTemplateCreated", "ProjectTemplateDeleted"]);
+const projectTemplateRefreshEvents = new Set(["ProjectTemplateCreated", "ProjectTemplateDeleted", "ProjectTemplateUpdated"]);
 
 export function parseRealtimeMessage(raw: string): RealtimeMessage {
   let data: unknown;

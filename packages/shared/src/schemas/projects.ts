@@ -15,6 +15,11 @@ export const createProjectTemplateFromProjectRequestSchema = z.object({
   name: z.string().trim().min(1).max(160).optional(),
 });
 
+export const updateProjectTemplateRequestSchema = z.object({
+  description: z.string().trim().max(4000).nullable().optional(),
+  name: z.string().trim().min(1).max(160).optional(),
+});
+
 export const createProjectFromTemplateRequestSchema = z.object({
   description: z.string().trim().max(4000).optional(),
   name: z.string().trim().min(1).max(160),
@@ -32,6 +37,7 @@ export const updateProjectMemberRequestSchema = z.object({
 
 export type CreateProjectRequest = z.infer<typeof createProjectRequestSchema>;
 export type CreateProjectTemplateFromProjectRequest = z.infer<typeof createProjectTemplateFromProjectRequestSchema>;
+export type UpdateProjectTemplateRequest = z.infer<typeof updateProjectTemplateRequestSchema>;
 export type CreateProjectFromTemplateRequest = z.infer<typeof createProjectFromTemplateRequestSchema>;
 export type UpdateProjectRequest = z.infer<typeof updateProjectRequestSchema>;
 export type AddProjectMemberRequest = z.infer<typeof addProjectMemberRequestSchema>;

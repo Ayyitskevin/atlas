@@ -18,6 +18,7 @@ export const domainEventTypeSchema = z.enum([
   "ProjectTemplateCreated",
   "ProjectCreatedFromTemplate",
   "ProjectTemplateDeleted",
+  "ProjectTemplateUpdated",
   "SectionCreated",
   "SectionUpdated",
   "SectionDeleted",

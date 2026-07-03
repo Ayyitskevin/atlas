@@ -469,6 +469,56 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       expect.objectContaining({ id: templateBody.id, name: "Launch template" }),
     );
 
+    const templateDetail = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/project-templates/" + templateBody.id,
+    });
+    expect(templateDetail.statusCode).toBe(200);
+    const detailTask = templateDetail
+      .json<{
+        sections: Array<{
+          name: string;
+          tasks: Array<{
+            assignees: Array<{ userId: string }>;
+            labelAssignments: Array<{ label: { name: string }; labelId: string }>;
+            title: string;
+          }>;
+        }>;
+      }>()
+      .sections[0].tasks[0];
+    expect(detailTask).toMatchObject({ title: "Integration task" });
+    expect(detailTask.assignees).toContainEqual(expect.objectContaining({ userId: currentUser.id }));
+    expect(detailTask.labelAssignments).toContainEqual(
+      expect.objectContaining({ label: expect.objectContaining({ name: templateLabel.name }), labelId: templateLabel.id }),
+    );
+
+    const updateTemplate = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: { description: "Updated reusable launch checklist", name: "Launch template edited" },
+      url: "/api/v1/workspaces/" + workspaceId + "/project-templates/" + templateBody.id,
+    });
+    expect(updateTemplate.statusCode).toBe(200);
+    expect(updateTemplate.json<{ description: string; name: string }>()).toMatchObject({
+      description: "Updated reusable launch checklist",
+      name: "Launch template edited",
+    });
+    await expectActivityEvent({
+      entityId: templateBody.id,
+      entityType: "project_template",
+      eventType: "ProjectTemplateUpdated",
+      payload: {
+        description: "Updated reusable launch checklist",
+        name: "Launch template edited",
+        previousDescription: "Reusable launch checklist",
+        previousName: "Launch template",
+        sectionCount: 1,
+        taskCount: 1,
+      },
+      workspaceId,
+    });
+
     const createProjectFromTemplate = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
@@ -476,8 +526,12 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/project-templates/" + templateBody.id + "/projects",
     });
     expect(createProjectFromTemplate.statusCode).toBe(201);
-    const templatedProject = createProjectFromTemplate.json<{ id: string; name: string; visibility: string }>();
-    expect(templatedProject).toMatchObject({ name: "Launch from template", visibility: "PRIVATE" });
+    const templatedProject = createProjectFromTemplate.json<{ description: string | null; id: string; name: string; visibility: string }>();
+    expect(templatedProject).toMatchObject({
+      description: "Updated reusable launch checklist",
+      name: "Launch from template",
+      visibility: "PRIVATE",
+    });
     await expectActivityEvent({
       entityId: templatedProject.id,
       entityType: "project",
@@ -528,7 +582,7 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       entityId: templateBody.id,
       entityType: "project_template",
       eventType: "ProjectTemplateDeleted",
-      payload: { name: "Launch template", sectionCount: 1, taskCount: 1 },
+      payload: { name: "Launch template edited", sectionCount: 1, taskCount: 1 },
       workspaceId,
     });
 

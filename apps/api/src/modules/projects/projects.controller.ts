@@ -10,6 +10,7 @@ import {
   cursorPaginationQuerySchema,
   updateProjectMessageRequestSchema,
   updateProjectMemberRequestSchema,
+  updateProjectTemplateRequestSchema,
   updateProjectRequestSchema,
 } from "@atlas/shared";
 
@@ -62,6 +63,11 @@ export class ProjectsController {
     return this.projectsService.listTemplates(await requireAuth(request), workspaceId);
   };
 
+  getTemplate = async (request: FastifyRequest) => {
+    const { templateId, workspaceId } = parseParams(request, projectTemplateParamsSchema);
+    return this.projectsService.getTemplate(await requireAuth(request), workspaceId, templateId);
+  };
+
   createTemplateFromProject = async (request: FastifyRequest, reply: FastifyReply) => {
     const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
     const result = await this.projectsService.createTemplateFromProject(
@@ -82,6 +88,11 @@ export class ProjectsController {
       parseBody(request, createProjectFromTemplateRequestSchema),
     );
     return reply.status(201).send(result);
+  };
+
+  updateTemplate = async (request: FastifyRequest) => {
+    const { templateId, workspaceId } = parseParams(request, projectTemplateParamsSchema);
+    return this.projectsService.updateTemplate(await requireAuth(request), workspaceId, templateId, parseBody(request, updateProjectTemplateRequestSchema));
   };
 
   deleteTemplate = async (request: FastifyRequest) => {

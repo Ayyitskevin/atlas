@@ -1,11 +1,12 @@
 import { randomUUID } from "node:crypto";
 
-import type { PrismaClient, ProjectRole } from "@atlas/db";
+import type { Prisma, PrismaClient, ProjectRole } from "@atlas/db";
 import type {
   AddProjectMemberRequest,
   CreateProjectFromTemplateRequest,
   CreateProjectRequest,
   CreateProjectTemplateFromProjectRequest,
+  UpdateProjectTemplateRequest,
   UpdateProjectRequest,
 } from "@atlas/shared";
 
@@ -14,7 +15,29 @@ import { paginationArgs } from "../../shared/pagination.js";
 const projectTemplateInclude = {
   _count: { select: { sections: true, tasks: true } },
   createdBy: { select: { email: true, id: true, name: true } },
-};
+} satisfies Prisma.ProjectTemplateInclude;
+
+const projectTemplateDetailInclude = {
+  ...projectTemplateInclude,
+  sections: {
+    include: {
+      tasks: {
+        include: {
+          assignees: {
+            include: { user: { select: { email: true, id: true, name: true } } },
+            orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          },
+          labelAssignments: {
+            include: { label: true },
+            orderBy: [{ label: { name: "asc" } }, { id: "asc" }],
+          },
+        },
+        orderBy: { position: "asc" },
+      },
+    },
+    orderBy: { position: "asc" },
+  },
+} satisfies Prisma.ProjectTemplateInclude;
 
 export class ProjectsRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -77,6 +100,25 @@ export class ProjectsRepository {
       include: projectTemplateInclude,
       where: { deletedAt: null, id: templateId, workspaceId },
     });
+  }
+
+  findTemplateDetail(workspaceId: string, templateId: string) {
+    return this.prisma.projectTemplate.findFirst({
+      include: projectTemplateDetailInclude,
+      where: { deletedAt: null, id: templateId, workspaceId },
+    });
+  }
+
+  async updateTemplate(input: UpdateProjectTemplateRequest & { templateId: string; workspaceId: string }) {
+    const result = await this.prisma.projectTemplate.updateMany({
+      data: {
+        description: input.description,
+        name: input.name,
+      },
+      where: { deletedAt: null, id: input.templateId, workspaceId: input.workspaceId },
+    });
+    if (!result.count) return null;
+    return this.findTemplate(input.workspaceId, input.templateId);
   }
 
   async createTemplateFromProject(

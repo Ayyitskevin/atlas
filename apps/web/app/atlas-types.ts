@@ -66,6 +66,39 @@ export type ProjectTemplate = {
   workspaceId: string;
 };
 
+export type ProjectTemplateTaskAssignee = {
+  id: string;
+  user?: User;
+  userId: string;
+};
+
+export type ProjectTemplateTaskLabelAssignment = {
+  id: string;
+  label: TaskLabel;
+  labelId: string;
+};
+
+export type ProjectTemplateTask = {
+  assignees?: ProjectTemplateTaskAssignee[];
+  description?: string | null;
+  id: string;
+  labelAssignments?: ProjectTemplateTaskLabelAssignment[];
+  position?: number | string;
+  priority: TaskPriority;
+  title: string;
+};
+
+export type ProjectTemplateSection = {
+  id: string;
+  name: string;
+  position?: number | string;
+  tasks: ProjectTemplateTask[];
+};
+
+export type ProjectTemplateDetail = ProjectTemplate & {
+  sections: ProjectTemplateSection[];
+};
+
 export type Section = {
   id: string;
   name: string;

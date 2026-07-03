@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createProjectFromTemplateRequestSchema, createProjectTemplateFromProjectRequestSchema } from "./projects.js";
+import { createProjectFromTemplateRequestSchema, createProjectTemplateFromProjectRequestSchema, updateProjectTemplateRequestSchema } from "./projects.js";
 
 describe("project schemas", () => {
   it("validates project template snapshot requests", () => {
@@ -17,5 +17,14 @@ describe("project schemas", () => {
       visibility: "WORKSPACE",
     });
     expect(createProjectFromTemplateRequestSchema.safeParse({ name: "" }).success).toBe(false);
+  });
+
+  it("validates project template updates", () => {
+    expect(updateProjectTemplateRequestSchema.parse({ description: " Updated ", name: " Runbook " })).toEqual({
+      description: "Updated",
+      name: "Runbook",
+    });
+    expect(updateProjectTemplateRequestSchema.parse({ description: null })).toEqual({ description: null });
+    expect(updateProjectTemplateRequestSchema.safeParse({ name: "" }).success).toBe(false);
   });
 });

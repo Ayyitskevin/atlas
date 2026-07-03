@@ -28,6 +28,7 @@ describe("atlas format helpers", () => {
     expect(formatActivityTitle("TaskWatched")).toBe("Follower added");
     expect(formatActivityTitle("ProjectMessageCreated")).toBe("Message posted");
     expect(formatActivityTitle("ProjectTemplateCreated")).toBe("Template saved");
+    expect(formatActivityTitle("ProjectTemplateUpdated")).toBe("Template updated");
     expect(formatActivityTitle("ProjectCreatedFromTemplate")).toBe("Project created from template");
     expect(formatActivityTitle("TaskRecurrenceGenerated")).toBe("Recurring task created");
     expect(formatActivityTitle("CustomEvent")).toBe("Custom Event");

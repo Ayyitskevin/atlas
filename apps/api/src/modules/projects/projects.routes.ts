@@ -10,6 +10,7 @@ import {
   cursorPaginationQuerySchema,
   updateProjectMessageRequestSchema,
   updateProjectMemberRequestSchema,
+  updateProjectTemplateRequestSchema,
   updateProjectRequestSchema,
 } from "@atlas/shared";
 import { prisma } from "@atlas/db";
@@ -67,10 +68,20 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     { schema: openApiSchema({ params: workspaceParamsSchema, tags: ["Project Templates"] }) },
     controller.listTemplates,
   );
+  app.get(
+    "/workspaces/:workspaceId/project-templates/:templateId",
+    { schema: openApiSchema({ params: projectTemplateParamsSchema, tags: ["Project Templates"] }) },
+    controller.getTemplate,
+  );
   app.post(
     "/workspaces/:workspaceId/projects/:projectId/template",
     { schema: openApiSchema({ body: createProjectTemplateFromProjectRequestSchema, params: projectParamsSchema, tags: ["Project Templates"] }) },
     controller.createTemplateFromProject,
+  );
+  app.patch(
+    "/workspaces/:workspaceId/project-templates/:templateId",
+    { schema: openApiSchema({ body: updateProjectTemplateRequestSchema, params: projectTemplateParamsSchema, tags: ["Project Templates"] }) },
+    controller.updateTemplate,
   );
   app.post(
     "/workspaces/:workspaceId/project-templates/:templateId/projects",
