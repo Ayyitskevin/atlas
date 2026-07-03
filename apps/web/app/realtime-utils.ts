@@ -35,6 +35,7 @@ const projectRefreshEvents = new Set([
   "TaskLabelAdded",
   "TaskLabelRemoved",
   "TaskMoved",
+  "TaskRecurrenceGenerated",
   "TaskUnassigned",
   "TaskUpdated",
 ]);
@@ -52,12 +53,15 @@ const projectMessageRefreshEvents = new Set([
 const projectListRefreshEvents = new Set([
   "ProjectArchived",
   "ProjectCreated",
+  "ProjectCreatedFromTemplate",
   "ProjectDeleted",
   "ProjectMemberAdded",
   "ProjectMemberRemoved",
   "ProjectMemberUpdated",
   "ProjectUpdated",
 ]);
+
+const projectTemplateRefreshEvents = new Set(["ProjectTemplateCreated", "ProjectTemplateDeleted"]);
 
 export function parseRealtimeMessage(raw: string): RealtimeMessage {
   let data: unknown;
@@ -126,6 +130,10 @@ export function realtimeEventTouchesProject(event: RealtimeDomainEvent, selected
 
 export function realtimeEventTouchesProjectList(event: RealtimeDomainEvent) {
   return projectListRefreshEvents.has(event.eventType);
+}
+
+export function realtimeEventTouchesProjectTemplates(event: RealtimeDomainEvent) {
+  return projectTemplateRefreshEvents.has(event.eventType);
 }
 
 export function realtimeEventTouchesProjectMembers(event: RealtimeDomainEvent, selectedProjectId: string) {

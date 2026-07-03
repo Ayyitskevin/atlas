@@ -1,7 +1,9 @@
 import { z } from "zod";
 
-import { taskPrioritySchema, taskStatusSchema } from "../domain.js";
+import { taskPrioritySchema, taskRecurrenceFrequencySchema, taskStatusSchema } from "../domain.js";
 import { cursorPaginationQuerySchema } from "../pagination.js";
+
+const taskRecurrenceIntervalSchema = z.number().int().min(1).max(365);
 
 export const createTaskRequestSchema = z.object({
   assigneeIds: z.array(z.string().uuid()).default([]),
@@ -9,6 +11,8 @@ export const createTaskRequestSchema = z.object({
   dueDate: z.string().date().optional(),
   position: z.number().finite().optional(),
   priority: taskPrioritySchema.default("MEDIUM"),
+  recurrenceFrequency: taskRecurrenceFrequencySchema.optional(),
+  recurrenceInterval: taskRecurrenceIntervalSchema.optional(),
   sectionId: z.string().uuid(),
   title: z.string().min(1).max(500),
 });
@@ -17,6 +21,8 @@ export const updateTaskRequestSchema = z.object({
   description: z.string().max(20000).optional(),
   dueDate: z.string().date().nullable().optional(),
   priority: taskPrioritySchema.optional(),
+  recurrenceFrequency: taskRecurrenceFrequencySchema.nullable().optional(),
+  recurrenceInterval: taskRecurrenceIntervalSchema.nullable().optional(),
   status: taskStatusSchema.optional(),
   title: z.string().min(1).max(500).optional(),
   version: z.number().int().nonnegative(),

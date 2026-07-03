@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, TaskPriority, TaskStatus } from "@atlas/db";
+import type { Prisma, PrismaClient, TaskPriority, TaskRecurrenceFrequency, TaskStatus } from "@atlas/db";
 import type { MyWorkDueFilter, MyWorkScopeFilter, MyWorkStatusFilter, SearchResultType } from "@atlas/shared";
 
 import { paginationArgs } from "../../shared/pagination.js";
@@ -68,6 +68,8 @@ export class WorkRepository {
     dueDate?: string;
     position: number;
     priority: TaskPriority;
+    recurrenceFrequency?: TaskRecurrenceFrequency | null;
+    recurrenceInterval?: number | null;
     projectId: string;
     sectionId: string;
     title: string;
@@ -80,6 +82,8 @@ export class WorkRepository {
         position: input.position,
         priority: input.priority,
         projectId: input.projectId,
+        recurrenceFrequency: input.recurrenceFrequency ?? undefined,
+        recurrenceInterval: input.recurrenceFrequency ? input.recurrenceInterval ?? 1 : undefined,
         sectionId: input.sectionId,
         title: input.title,
         workspaceId: input.workspaceId,
@@ -135,7 +139,15 @@ export class WorkRepository {
   }
 
   async updateTask(input: {
-    data: { description?: string | null; dueDate?: string | null; priority?: TaskPriority; status?: TaskStatus; title?: string };
+    data: {
+      description?: string | null;
+      dueDate?: string | null;
+      priority?: TaskPriority;
+      recurrenceFrequency?: TaskRecurrenceFrequency | null;
+      recurrenceInterval?: number | null;
+      status?: TaskStatus;
+      title?: string;
+    };
     taskId: string;
     version: number;
     workspaceId: string;
@@ -150,6 +162,41 @@ export class WorkRepository {
       where: { deletedAt: null, id: input.taskId, version: input.version, workspaceId: input.workspaceId },
     });
     return result.count;
+  }
+
+  createRecurringTask(input: {
+    assigneeIds: string[];
+    description?: string | null;
+    dueDate: string | null;
+    generatedFromTaskId: string;
+    position: number;
+    priority: TaskPriority;
+    projectId: string;
+    recurrenceFrequency: TaskRecurrenceFrequency;
+    recurrenceInterval: number;
+    sectionId: string;
+    title: string;
+    workspaceId: string;
+  }) {
+    return this.prisma.task.create({
+      data: {
+        description: input.description,
+        dueDate: input.dueDate ? new Date(input.dueDate) : null,
+        position: input.position,
+        priority: input.priority,
+        projectId: input.projectId,
+        recurrenceFrequency: input.recurrenceFrequency,
+        recurrenceGeneratedFromTaskId: input.generatedFromTaskId,
+        recurrenceInterval: input.recurrenceInterval,
+        sectionId: input.sectionId,
+        title: input.title,
+        workspaceId: input.workspaceId,
+        assignees: {
+          create: input.assigneeIds.map((userId) => ({ userId, workspaceId: input.workspaceId })),
+        },
+      },
+      include: { assignees: true },
+    });
   }
 
   async moveTask(input: { position: number; sectionId: string; taskId: string; version: number; workspaceId: string }) {

@@ -406,6 +406,181 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     );
   }, 60_000);
 
+  it("saves project templates and creates projects from them", async () => {
+    const createTemplate = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { description: "Reusable launch checklist", name: "Launch template" },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/template",
+    });
+    expect(createTemplate.statusCode).toBe(201);
+    const templateBody = createTemplate.json<{
+      _count: { sections: number; tasks: number };
+      createdBy: { email: string; name: string };
+      id: string;
+      name: string;
+    }>();
+    expect(templateBody).toMatchObject({
+      _count: { sections: 1, tasks: 1 },
+      createdBy: { email, name: "Integration User" },
+      name: "Launch template",
+    });
+    await expectActivityEvent({
+      entityId: templateBody.id,
+      entityType: "project_template",
+      eventType: "ProjectTemplateCreated",
+      payload: { name: "Launch template", sectionCount: 1, sourceProjectId: projectId, taskCount: 1 },
+      projectId,
+      workspaceId,
+    });
+
+    const templates = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/project-templates",
+    });
+    expect(templates.statusCode).toBe(200);
+    expect(templates.json<{ items: Array<{ id: string; name: string }> }>().items).toContainEqual(
+      expect.objectContaining({ id: templateBody.id, name: "Launch template" }),
+    );
+
+    const createProjectFromTemplate = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { name: "Launch from template", visibility: "PRIVATE" },
+      url: "/api/v1/workspaces/" + workspaceId + "/project-templates/" + templateBody.id + "/projects",
+    });
+    expect(createProjectFromTemplate.statusCode).toBe(201);
+    const templatedProject = createProjectFromTemplate.json<{ id: string; name: string; visibility: string }>();
+    expect(templatedProject).toMatchObject({ name: "Launch from template", visibility: "PRIVATE" });
+    await expectActivityEvent({
+      entityId: templatedProject.id,
+      entityType: "project",
+      eventType: "ProjectCreatedFromTemplate",
+      payload: { name: "Launch from template", templateId: templateBody.id, visibility: "PRIVATE" },
+      projectId: templatedProject.id,
+      workspaceId,
+    });
+
+    const templatedSections = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + templatedProject.id + "/sections",
+    });
+    expect(templatedSections.statusCode).toBe(200);
+    const copiedSection = templatedSections.json<{ items: Array<{ id: string; name: string }> }>().items[0];
+    expect(copiedSection).toMatchObject({ name: "To Do" });
+
+    const templatedTasks = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + templatedProject.id + "/tasks",
+    });
+    expect(templatedTasks.statusCode).toBe(200);
+    expect(templatedTasks.json<{ items: Array<{ priority: string; sectionId: string; title: string }> }>().items).toContainEqual(
+      expect.objectContaining({ priority: "MEDIUM", sectionId: copiedSection.id, title: "Integration task" }),
+    );
+
+    const deleteTemplate = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/project-templates/" + templateBody.id,
+    });
+    expect(deleteTemplate.statusCode).toBe(200);
+    await expectActivityEvent({
+      entityId: templateBody.id,
+      entityType: "project_template",
+      eventType: "ProjectTemplateDeleted",
+      payload: { name: "Launch template", sectionCount: 1, taskCount: 1 },
+      workspaceId,
+    });
+
+    const templatesAfterDelete = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/project-templates",
+    });
+    expect(templatesAfterDelete.statusCode).toBe(200);
+    expect(templatesAfterDelete.json<{ items: Array<{ id: string }> }>().items).not.toContainEqual(
+      expect.objectContaining({ id: templateBody.id }),
+    );
+  }, 60_000);
+
+  it("generates the next recurring task when a recurring task is completed", async () => {
+    const createRecurringTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: {
+        dueDate: "2026-07-10",
+        recurrenceFrequency: "WEEKLY",
+        recurrenceInterval: 2,
+        sectionId,
+        title: "Recurring integration review",
+      },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks",
+    });
+    expect(createRecurringTask.statusCode).toBe(201);
+    const recurringTask = createRecurringTask.json<{
+      id: string;
+      recurrenceFrequency: string;
+      recurrenceInterval: number;
+      version: number;
+    }>();
+    expect(recurringTask).toMatchObject({ recurrenceFrequency: "WEEKLY", recurrenceInterval: 2 });
+
+    const completeRecurringTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + recurringTask.id + "/complete",
+    });
+    expect(completeRecurringTask.statusCode).toBe(200);
+    expect(completeRecurringTask.json<{ status: string }>().status).toBe("DONE");
+
+    const projectTasks = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks?limit=50",
+    });
+    expect(projectTasks.statusCode).toBe(200);
+    const generatedTask = projectTasks
+      .json<{
+        items: Array<{
+          dueDate: string | null;
+          id: string;
+          recurrenceFrequency: string | null;
+          recurrenceGeneratedFromTaskId: string | null;
+          recurrenceInterval: number | null;
+          status: string;
+          title: string;
+        }>;
+      }>()
+      .items.find((item) => item.recurrenceGeneratedFromTaskId === recurringTask.id);
+    expect(generatedTask).toMatchObject({
+      dueDate: expect.stringMatching(/^2026-07-24/),
+      recurrenceFrequency: "WEEKLY",
+      recurrenceGeneratedFromTaskId: recurringTask.id,
+      recurrenceInterval: 2,
+      status: "TODO",
+      title: "Recurring integration review",
+    });
+    await expectActivityEvent({
+      entityId: generatedTask!.id,
+      entityType: "task",
+      eventType: "TaskRecurrenceGenerated",
+      payload: {
+        dueDate: "2026-07-24",
+        generatedFromTaskId: recurringTask.id,
+        recurrenceFrequency: "WEEKLY",
+        recurrenceInterval: 2,
+        status: "TODO",
+        title: "Recurring integration review",
+      },
+      projectId,
+      taskId: generatedTask!.id,
+      workspaceId,
+    });
+  }, 60_000);
+
   it("updates task details, assignments, subtasks, and comments", async () => {
     const currentUser = await prisma.user.findUniqueOrThrow({ where: { email } });
 

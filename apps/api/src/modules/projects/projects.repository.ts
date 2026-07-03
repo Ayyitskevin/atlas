@@ -1,7 +1,18 @@
 import type { PrismaClient, ProjectRole } from "@atlas/db";
-import type { AddProjectMemberRequest, CreateProjectRequest, UpdateProjectRequest } from "@atlas/shared";
+import type {
+  AddProjectMemberRequest,
+  CreateProjectFromTemplateRequest,
+  CreateProjectRequest,
+  CreateProjectTemplateFromProjectRequest,
+  UpdateProjectRequest,
+} from "@atlas/shared";
 
 import { paginationArgs } from "../../shared/pagination.js";
+
+const projectTemplateInclude = {
+  _count: { select: { sections: true, tasks: true } },
+  createdBy: { select: { email: true, id: true, name: true } },
+};
 
 export class ProjectsRepository {
   constructor(private readonly prisma: PrismaClient) {}
@@ -49,6 +60,145 @@ export class ProjectsRepository {
 
   softDelete(workspaceId: string, projectId: string) {
     return this.prisma.project.update({ data: { deletedAt: new Date() }, where: { id: projectId, workspaceId } });
+  }
+
+  listTemplates(workspaceId: string) {
+    return this.prisma.projectTemplate.findMany({
+      include: projectTemplateInclude,
+      orderBy: { createdAt: "desc" },
+      where: { deletedAt: null, workspaceId },
+    });
+  }
+
+  findTemplate(workspaceId: string, templateId: string) {
+    return this.prisma.projectTemplate.findFirst({
+      include: projectTemplateInclude,
+      where: { deletedAt: null, id: templateId, workspaceId },
+    });
+  }
+
+  async createTemplateFromProject(
+    input: CreateProjectTemplateFromProjectRequest & { createdById: string; projectId: string; workspaceId: string },
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const project = await tx.project.findFirst({
+        include: {
+          sections: {
+            include: {
+              tasks: {
+                orderBy: { position: "asc" },
+                select: { description: true, position: true, priority: true, title: true },
+                where: { deletedAt: null },
+              },
+            },
+            orderBy: { position: "asc" },
+            where: { deletedAt: null },
+          },
+        },
+        where: { deletedAt: null, id: input.projectId, workspaceId: input.workspaceId },
+      });
+      if (!project) return null;
+
+      const template = await tx.projectTemplate.create({
+        data: {
+          createdById: input.createdById,
+          description: input.description ?? project.description,
+          name: input.name ?? project.name + " template",
+          workspaceId: input.workspaceId,
+        },
+      });
+
+      for (const section of project.sections) {
+        const templateSection = await tx.projectTemplateSection.create({
+          data: {
+            name: section.name,
+            position: section.position,
+            templateId: template.id,
+            workspaceId: input.workspaceId,
+          },
+        });
+        if (!section.tasks.length) continue;
+        await tx.projectTemplateTask.createMany({
+          data: section.tasks.map((task) => ({
+            description: task.description,
+            position: task.position,
+            priority: task.priority,
+            sectionId: templateSection.id,
+            templateId: template.id,
+            title: task.title,
+            workspaceId: input.workspaceId,
+          })),
+        });
+      }
+
+      return tx.projectTemplate.findUniqueOrThrow({ include: projectTemplateInclude, where: { id: template.id } });
+    });
+  }
+
+  async createProjectFromTemplate(
+    input: CreateProjectFromTemplateRequest & { createdById: string; templateId: string; workspaceId: string },
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const template = await tx.projectTemplate.findFirst({
+        include: {
+          sections: {
+            include: {
+              tasks: {
+                orderBy: { position: "asc" },
+                where: { workspaceId: input.workspaceId },
+              },
+            },
+            orderBy: { position: "asc" },
+            where: { workspaceId: input.workspaceId },
+          },
+        },
+        where: { deletedAt: null, id: input.templateId, workspaceId: input.workspaceId },
+      });
+      if (!template) return null;
+
+      const project = await tx.project.create({
+        data: {
+          createdById: input.createdById,
+          description: input.description ?? template.description,
+          members: { create: { role: "PROJECT_ADMIN", userId: input.createdById } },
+          name: input.name,
+          visibility: input.visibility,
+          workspaceId: input.workspaceId,
+        },
+      });
+
+      for (const templateSection of template.sections) {
+        const section = await tx.section.create({
+          data: {
+            name: templateSection.name,
+            position: templateSection.position,
+            projectId: project.id,
+            workspaceId: input.workspaceId,
+          },
+        });
+        if (!templateSection.tasks.length) continue;
+        await tx.task.createMany({
+          data: templateSection.tasks.map((task) => ({
+            description: task.description,
+            position: task.position,
+            priority: task.priority,
+            projectId: project.id,
+            sectionId: section.id,
+            title: task.title,
+            workspaceId: input.workspaceId,
+          })),
+        });
+      }
+
+      return tx.project.findUniqueOrThrow({ where: { id: project.id } });
+    });
+  }
+
+  softDeleteTemplate(workspaceId: string, templateId: string) {
+    return this.prisma.projectTemplate.updateMany({
+      data: { deletedAt: new Date() },
+      where: { deletedAt: null, id: templateId, workspaceId },
+    });
   }
 
   listMembers(workspaceId: string, projectId: string) {

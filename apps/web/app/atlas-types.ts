@@ -50,6 +50,22 @@ export type ProjectMessage = {
   workspaceId: string;
 };
 
+export type ProjectTemplate = {
+  _count?: {
+    sections: number;
+    tasks: number;
+  };
+  createdAt: string;
+  createdBy?: User;
+  createdById: string;
+  deletedAt?: string | null;
+  description?: string | null;
+  id: string;
+  name: string;
+  updatedAt: string;
+  workspaceId: string;
+};
+
 export type Section = {
   id: string;
   name: string;
@@ -58,6 +74,7 @@ export type Section = {
 
 export type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE" | "ARCHIVED";
 export type TaskPriority = "LOW" | "MEDIUM" | "HIGH" | "URGENT";
+export type TaskRecurrenceFrequency = "DAILY" | "MONTHLY" | "WEEKLY";
 
 export type TaskAssignee = {
   assignedById?: string | null;
@@ -106,6 +123,9 @@ export type Task = {
   position?: number | string;
   priority: TaskPriority;
   projectId: string;
+  recurrenceFrequency?: TaskRecurrenceFrequency | null;
+  recurrenceGeneratedFromTaskId?: string | null;
+  recurrenceInterval?: number | null;
   sectionId: string;
   status: TaskStatus;
   title: string;

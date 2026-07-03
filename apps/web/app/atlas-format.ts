@@ -11,6 +11,7 @@ const activityTitles: Record<string, string> = {
   MemberInvited: "Member invited",
   ProjectArchived: "Project archived",
   ProjectCreated: "Project created",
+  ProjectCreatedFromTemplate: "Project created from template",
   ProjectDeleted: "Project deleted",
   ProjectMemberAdded: "Project member added",
   ProjectMemberRemoved: "Project member removed",
@@ -20,6 +21,8 @@ const activityTitles: Record<string, string> = {
   ProjectMessagePinned: "Message pinned",
   ProjectMessageUnpinned: "Message unpinned",
   ProjectMessageUpdated: "Message updated",
+  ProjectTemplateCreated: "Template saved",
+  ProjectTemplateDeleted: "Template deleted",
   ProjectUpdated: "Project updated",
   SectionCreated: "Section created",
   SectionDeleted: "Section removed",
@@ -34,6 +37,7 @@ const activityTitles: Record<string, string> = {
   TaskLabelAdded: "Label added",
   TaskLabelRemoved: "Label removed",
   TaskMoved: "Task moved",
+  TaskRecurrenceGenerated: "Recurring task created",
   TaskUnassigned: "Task unassigned",
   TaskUpdated: "Task updated",
   TaskUnwatched: "Follower removed",
@@ -109,6 +113,14 @@ export function taskStatusLabel(value: string) {
   return value.replace(/_/g, " ").toLowerCase();
 }
 
+export function taskRecurrenceLabel(frequency?: string | null, interval?: number | null) {
+  if (!frequency) return "none";
+  const normalizedInterval = interval && interval > 0 ? interval : 1;
+  const unit = recurrenceUnit(frequency);
+  if (normalizedInterval === 1) return frequency.toLowerCase();
+  return "every " + normalizedInterval + " " + unit + "s";
+}
+
 export function workspaceRoleLabel(value: string) {
   return value.replace(/_/g, " ").toLowerCase();
 }
@@ -157,10 +169,12 @@ function taskActivityDetail(activity: ActivitySummaryInput, payload: Record<stri
   const status = taskStatusChange(payload);
   const priority = stringPayload(payload, "priority");
   const dueDate = stringPayload(payload, "dueDate");
+  const recurrence = stringPayload(payload, "recurrenceFrequency");
   const parts = [
     status,
     priority ? taskStatusLabel(priority) + " priority" : null,
     dueDate ? "due " + dueDate : null,
+    recurrence ? taskRecurrenceLabel(recurrence, numberPayload(payload, "recurrenceInterval")) : null,
   ].filter(isString);
   return parts.length ? detail + " · " + parts.join(" · ") : detail;
 }
@@ -171,9 +185,11 @@ function taskActivityMetadata(payload: Record<string, unknown>) {
   const priority = changedLabel(stringPayload(payload, "previousPriority"), stringPayload(payload, "priority"), taskStatusLabel);
   const dueDate = changedLabel(stringPayload(payload, "previousDueDate"), stringPayload(payload, "dueDate"), identityLabel);
   const label = stringPayload(payload, "name");
+  const recurrence = stringPayload(payload, "recurrenceFrequency");
   if (status) items.push({ label: "Status", value: status });
   if (priority) items.push({ label: "Priority", value: priority });
   if (dueDate) items.push({ label: "Due", value: dueDate });
+  if (recurrence) items.push({ label: "Repeat", value: taskRecurrenceLabel(recurrence, numberPayload(payload, "recurrenceInterval")) });
   if (label) items.push({ label: "Label", value: label });
   return items;
 }
@@ -231,6 +247,13 @@ function identityLabel(value: string) {
 }
 
 function projectVisibilityLabel(value: string) {
+  return value.toLowerCase();
+}
+
+function recurrenceUnit(value: string) {
+  if (value === "DAILY") return "day";
+  if (value === "WEEKLY") return "week";
+  if (value === "MONTHLY") return "month";
   return value.toLowerCase();
 }
 

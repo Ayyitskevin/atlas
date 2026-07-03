@@ -10,6 +10,8 @@ export function taskNotificationCopy(event: MutationEventJob, taskTitle: string)
   switch (event.eventType) {
     case "TaskCompleted":
       return { body: quote(title) + " was marked complete.", title: "Task completed" };
+    case "TaskRecurrenceGenerated":
+      return { body: quote(title) + " was created from a recurring task.", title: "Recurring task created" };
     case "TaskMoved":
       return { body: quote(title) + " moved to another section.", title: "Task moved" };
     case "TaskAssigned":

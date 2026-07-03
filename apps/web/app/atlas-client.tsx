@@ -12,11 +12,13 @@ import { NotificationsPanel } from "./notifications-panel";
 import { OutboxPanel } from "./outbox-panel";
 import { ProjectMembersPanel } from "./project-members-panel";
 import { ProjectPanel } from "./project-panel";
+import { ProjectTemplatesPanel } from "./project-templates-panel";
 import {
   realtimeEventTouchesProject,
   realtimeEventTouchesProjectList,
   realtimeEventTouchesProjectMembers,
   realtimeEventTouchesProjectMessages,
+  realtimeEventTouchesProjectTemplates,
   realtimeEventTouchesTask,
   type RealtimeDomainEvent,
 } from "./realtime-utils";
@@ -43,6 +45,7 @@ import type {
   MyWorkTask,
   Page,
   Project,
+  ProjectTemplate,
   ProjectVisibility,
   User,
   Workspace,
@@ -60,6 +63,8 @@ export function AtlasClient({
   const [user, setUser] = useState<User | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [projects, setProjects] = useState<Project[]>([]);
+  const [projectTemplates, setProjectTemplates] = useState<ProjectTemplate[]>([]);
+  const [projectTemplatesStatus, setProjectTemplatesStatus] = useState("");
   const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("");
   const [selectedProjectId, setSelectedProjectId] = useState("");
   const [selectedTaskId, setSelectedTaskId] = useState("");
@@ -293,6 +298,10 @@ export function AtlasClient({
       refreshes.push(refreshProjectsForRealtime(auth.accessToken, selectedWorkspaceId));
     }
 
+    if (realtimeEventTouchesProjectTemplates(event)) {
+      refreshes.push(loadProjectTemplates(auth.accessToken, selectedWorkspaceId));
+    }
+
     if (realtimeEventTouchesProject(event, selectedProjectId)) {
       refreshes.push(loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId));
     }
@@ -346,6 +355,11 @@ export function AtlasClient({
     clearProjectMessages();
   }
 
+  function clearProjectTemplates() {
+    setProjectTemplates([]);
+    setProjectTemplatesStatus("");
+  }
+
   async function hydrate(currentAuth: AuthPair) {
     try {
       const me = await api<{ user: User }>("/auth/me", {}, currentAuth.accessToken);
@@ -370,6 +384,7 @@ export function AtlasClient({
         clearProjectMessages();
         clearOutboxState();
         clearDashboardWork();
+        clearProjectTemplates();
       }
     } catch (error) {
       clearSession();
@@ -460,6 +475,7 @@ export function AtlasClient({
     clearWorkspaceAdminState();
     clearProjectMemberState();
     clearProjectMessages();
+    clearProjectTemplates();
     clearOutboxState();
     clearDashboardWork();
     clearMyWork();
@@ -469,8 +485,9 @@ export function AtlasClient({
     setActivityScope("project");
     try {
       await loadNotifications(accessToken, workspaceId, notificationFilter);
-      const [projectPage, , , , members] = await Promise.all([
+      const [projectPage, , , , , members] = await Promise.all([
         api<Page<Project>>(`/workspaces/${workspaceId}/projects`, {}, accessToken),
+        loadProjectTemplates(accessToken, workspaceId),
         loadDashboardWork(accessToken, workspaceId),
         loadMyWork(accessToken, workspaceId, myWorkStatusFilter, myWorkDueFilter, myWorkScopeFilter),
         loadNotificationPreferences(accessToken, workspaceId),
@@ -490,7 +507,24 @@ export function AtlasClient({
       setSelectedProjectId("");
       setSelectedTaskId("");
       clearProjectMemberState();
+      clearProjectTemplates();
       setMessage(errorMessage(error));
+    }
+  }
+
+  async function loadProjectTemplates(accessToken: string, workspaceId: string) {
+    const templatePage = await api<{ items: ProjectTemplate[] }>(`/workspaces/${workspaceId}/project-templates`, {}, accessToken);
+    setProjectTemplates(templatePage.items);
+    setProjectTemplatesStatus("");
+  }
+
+  async function refreshProjectTemplates() {
+    if (!auth || !selectedWorkspaceId) return;
+    try {
+      setProjectTemplatesStatus("Refreshing templates...");
+      await loadProjectTemplates(auth.accessToken, selectedWorkspaceId);
+    } catch (error) {
+      setProjectTemplatesStatus(errorMessage(error));
     }
   }
 
@@ -511,6 +545,79 @@ export function AtlasClient({
       formElement.reset();
     } catch (error) {
       setMessage(errorMessage(error));
+    }
+  }
+
+  async function saveProjectTemplate(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!auth || !selectedWorkspaceId || !selectedProjectId) return;
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const name = String(form.get("name") ?? "").trim();
+    const description = String(form.get("description") ?? "").trim();
+    try {
+      setProjectTemplatesStatus("Saving template...");
+      await api<ProjectTemplate>(
+        "/workspaces/" + selectedWorkspaceId + "/projects/" + selectedProjectId + "/template",
+        {
+          body: JSON.stringify({
+            ...(description ? { description } : {}),
+            ...(name ? { name } : {}),
+          }),
+          method: "POST",
+        },
+        auth.accessToken,
+      );
+      await loadProjectTemplates(auth.accessToken, selectedWorkspaceId);
+      formElement.reset();
+      setProjectTemplatesStatus("");
+    } catch (error) {
+      setProjectTemplatesStatus(errorMessage(error));
+    }
+  }
+
+  async function createProjectFromTemplate(templateId: string, event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!auth || !selectedWorkspaceId) return;
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const name = String(form.get("name") ?? "").trim();
+    if (!name) return;
+    try {
+      setProjectTemplatesStatus("Creating project...");
+      const project = await api<Project>(
+        "/workspaces/" + selectedWorkspaceId + "/project-templates/" + templateId + "/projects",
+        {
+          body: JSON.stringify({
+            name,
+            visibility: String(form.get("visibility")) as ProjectVisibility,
+          }),
+          method: "POST",
+        },
+        auth.accessToken,
+      );
+      setProjects((currentProjects) => [project, ...currentProjects.filter((currentProject) => currentProject.id !== project.id)]);
+      await chooseProject(auth.accessToken, selectedWorkspaceId, project.id);
+      setProjectTemplatesStatus("");
+      formElement.reset();
+    } catch (error) {
+      setProjectTemplatesStatus(errorMessage(error));
+    }
+  }
+
+  async function deleteProjectTemplate(templateId: string) {
+    if (!auth || !selectedWorkspaceId) return;
+    try {
+      setProjectTemplatesStatus("Deleting template...");
+      await api<{ ok: boolean }>(
+        "/workspaces/" + selectedWorkspaceId + "/project-templates/" + templateId,
+        { method: "DELETE" },
+        auth.accessToken,
+      );
+      setProjectTemplates((currentTemplates) => currentTemplates.filter((template) => template.id !== templateId));
+      setProjectTemplatesStatus("");
+    } catch (error) {
+      setProjectTemplatesStatus(errorMessage(error));
     }
   }
 
@@ -623,6 +730,7 @@ export function AtlasClient({
     clearOutboxState();
     clearDashboardWork();
     clearProjectMessages();
+    clearProjectTemplates();
     clearSearch();
     clearActivity();
     setActivityScope("project");
@@ -778,6 +886,17 @@ export function AtlasClient({
           onUpdateMessage={updateProjectMessage}
           project={selectedProject}
           statusMessage={projectMessagesStatus}
+        />
+
+        <ProjectTemplatesPanel
+          onCreateProjectFromTemplate={createProjectFromTemplate}
+          onDeleteTemplate={deleteProjectTemplate}
+          onRefresh={refreshProjectTemplates}
+          onSaveTemplate={saveProjectTemplate}
+          project={selectedProject}
+          statusMessage={projectTemplatesStatus}
+          templates={projectTemplates}
+          workspaceSelected={Boolean(selectedWorkspaceId)}
         />
 
         <WorkspaceAdminPanel

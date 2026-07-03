@@ -3,8 +3,10 @@ import { z } from "zod";
 
 import {
   addProjectMemberRequestSchema,
+  createProjectFromTemplateRequestSchema,
   createProjectMessageRequestSchema,
   createProjectRequestSchema,
+  createProjectTemplateFromProjectRequestSchema,
   cursorPaginationQuerySchema,
   updateProjectMessageRequestSchema,
   updateProjectMemberRequestSchema,
@@ -21,6 +23,7 @@ import { ProjectsService } from "./projects.service.js";
 
 const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
 const projectParamsSchema = workspaceParamsSchema.extend({ projectId: z.string().uuid() });
+const projectTemplateParamsSchema = workspaceParamsSchema.extend({ templateId: z.string().uuid() });
 const projectMemberParamsSchema = projectParamsSchema.extend({ userId: z.string().uuid() });
 const projectMessageParamsSchema = projectParamsSchema.extend({ messageId: z.string().uuid() });
 
@@ -58,6 +61,26 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     "/workspaces/:workspaceId/projects/:projectId",
     { schema: openApiSchema({ params: projectParamsSchema, tags: ["Projects"] }) },
     controller.delete,
+  );
+  app.get(
+    "/workspaces/:workspaceId/project-templates",
+    { schema: openApiSchema({ params: workspaceParamsSchema, tags: ["Project Templates"] }) },
+    controller.listTemplates,
+  );
+  app.post(
+    "/workspaces/:workspaceId/projects/:projectId/template",
+    { schema: openApiSchema({ body: createProjectTemplateFromProjectRequestSchema, params: projectParamsSchema, tags: ["Project Templates"] }) },
+    controller.createTemplateFromProject,
+  );
+  app.post(
+    "/workspaces/:workspaceId/project-templates/:templateId/projects",
+    { schema: openApiSchema({ body: createProjectFromTemplateRequestSchema, params: projectTemplateParamsSchema, tags: ["Project Templates"] }) },
+    controller.createProjectFromTemplate,
+  );
+  app.delete(
+    "/workspaces/:workspaceId/project-templates/:templateId",
+    { schema: openApiSchema({ params: projectTemplateParamsSchema, tags: ["Project Templates"] }) },
+    controller.deleteTemplate,
   );
   app.get(
     "/workspaces/:workspaceId/projects/:projectId/members",

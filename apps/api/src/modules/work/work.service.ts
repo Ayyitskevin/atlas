@@ -22,7 +22,7 @@ import {
   type UpdateSubtaskRequest,
   type UpdateTaskRequest,
 } from "@atlas/shared";
-import { Prisma } from "@atlas/db";
+import { Prisma, type TaskPriority, type TaskRecurrenceFrequency } from "@atlas/db";
 
 import type { AuthContext } from "../../shared/auth-context.js";
 import { AtlasHttpError } from "../../shared/errors.js";
@@ -31,6 +31,7 @@ import { createAttachmentObjectKey, createDownloadInstructions, createUploadInst
 import { DomainEventsRepository } from "../events/domain-events.repository.js";
 import { PermissionsService } from "../permissions/permissions.service.js";
 import { defaultListPosition } from "./position.js";
+import { nextRecurringDueDate } from "./task-recurrence.js";
 import { WorkRepository } from "./work.repository.js";
 
 export class WorkService {
@@ -116,10 +117,13 @@ export class WorkService {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
     await this.requireSectionInProject(workspaceId, projectId, input.sectionId);
     await this.requireWorkspaceMembers(workspaceId, input.assigneeIds);
+    const recurrence = this.createRecurrence(input);
     const task = await this.workRepository.createTask({
       ...input,
       position: input.position ?? defaultListPosition(),
       projectId,
+      recurrenceFrequency: recurrence.recurrenceFrequency,
+      recurrenceInterval: recurrence.recurrenceInterval,
       workspaceId,
     });
     await this.events.recordActivity({
@@ -158,11 +162,13 @@ export class WorkService {
   async updateTask(ctx: AuthContext, workspaceId: string, taskId: string, input: UpdateTaskRequest) {
     const task = await this.getTask(ctx, workspaceId, taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
+    const recurrence = this.updateRecurrence(input, task);
     const count = await this.workRepository.updateTask({
       data: {
         description: input.description,
         dueDate: input.dueDate,
         priority: input.priority,
+        ...recurrence,
         status: input.status,
         title: input.title,
       },
@@ -184,6 +190,7 @@ export class WorkService {
       taskId,
       workspaceId,
     });
+    if (eventType === "TaskCompleted") await this.createNextRecurringTask(ctx, workspaceId, updated);
     return updated;
   }
 
@@ -670,15 +677,116 @@ export class WorkService {
       throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "One or more assignees are not active members of this Workspace.");
     }
   }
+
+  private createRecurrence(input: CreateTaskRequest) {
+    if (input.recurrenceInterval !== undefined && !input.recurrenceFrequency) {
+      throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "Recurring tasks require a recurrence frequency.");
+    }
+    return {
+      recurrenceFrequency: input.recurrenceFrequency ?? null,
+      recurrenceInterval: input.recurrenceFrequency ? input.recurrenceInterval ?? 1 : null,
+    };
+  }
+
+  private updateRecurrence(
+    input: UpdateTaskRequest,
+    task: { recurrenceFrequency?: TaskRecurrenceFrequency | null; recurrenceInterval?: number | null },
+  ) {
+    if (input.recurrenceFrequency === null) return { recurrenceFrequency: null, recurrenceInterval: null };
+    if (input.recurrenceFrequency !== undefined) {
+      return {
+        recurrenceFrequency: input.recurrenceFrequency,
+        recurrenceInterval: input.recurrenceInterval ?? task.recurrenceInterval ?? 1,
+      };
+    }
+    if (input.recurrenceInterval === null) return { recurrenceFrequency: null, recurrenceInterval: null };
+    if (input.recurrenceInterval !== undefined) {
+      if (!task.recurrenceFrequency) {
+        throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "Recurring tasks require a recurrence frequency.");
+      }
+      return { recurrenceInterval: input.recurrenceInterval };
+    }
+    return {};
+  }
+
+  private async createNextRecurringTask(
+    ctx: AuthContext,
+    workspaceId: string,
+    task: {
+      assignees: Array<{ userId: string }>;
+      description?: string | null;
+      dueDate?: Date | string | null;
+      id: string;
+      priority: TaskPriority;
+      projectId: string;
+      recurrenceFrequency?: TaskRecurrenceFrequency | null;
+      recurrenceInterval?: number | null;
+      sectionId: string;
+      title: string;
+    },
+  ) {
+    if (!task.recurrenceFrequency || !task.recurrenceInterval) return null;
+    try {
+      const nextTask = await this.workRepository.createRecurringTask({
+        assigneeIds: task.assignees.map((assignee) => assignee.userId),
+        description: task.description,
+        dueDate: nextRecurringDueDate({
+          dueDate: task.dueDate,
+          frequency: task.recurrenceFrequency,
+          interval: task.recurrenceInterval,
+        }),
+        generatedFromTaskId: task.id,
+        position: defaultListPosition(),
+        priority: task.priority,
+        projectId: task.projectId,
+        recurrenceFrequency: task.recurrenceFrequency,
+        recurrenceInterval: task.recurrenceInterval,
+        sectionId: task.sectionId,
+        title: task.title,
+        workspaceId,
+      });
+      await this.events.recordActivity({
+        actorUserId: ctx.userId,
+        entityId: nextTask.id,
+        entityType: "task",
+        eventType: "TaskRecurrenceGenerated",
+        payload: { ...taskAuditPayload(nextTask), generatedFromTaskId: task.id },
+        projectId: task.projectId,
+        taskId: nextTask.id,
+        workspaceId,
+      });
+      return nextTask;
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) return null;
+      throw error;
+    }
+  }
 }
 
 function taskAuditPayload(
-  task: { dueDate?: Date | string | null; priority: string; sectionId: string; status: string; title: string },
-  previous?: { dueDate?: Date | string | null; priority: string; status: string; title: string },
+  task: {
+    dueDate?: Date | string | null;
+    priority: string;
+    recurrenceFrequency?: string | null;
+    recurrenceInterval?: number | null;
+    sectionId: string;
+    status: string;
+    title: string;
+  },
+  previous?: {
+    dueDate?: Date | string | null;
+    priority: string;
+    recurrenceFrequency?: string | null;
+    recurrenceInterval?: number | null;
+    status: string;
+    title: string;
+  },
 ) {
-  const payload: Record<string, string | null> = {
+  const payload: Record<string, number | string | null> = {
     dueDate: datePayloadValue(task.dueDate),
     priority: task.priority,
+    recurrenceFrequency: task.recurrenceFrequency ?? null,
+    recurrenceInterval: task.recurrenceInterval ?? null,
     sectionId: task.sectionId,
     status: task.status,
     title: task.title,
@@ -687,6 +795,12 @@ function taskAuditPayload(
   if (previous.title !== task.title) payload.previousTitle = previous.title;
   if (previous.status !== task.status) payload.previousStatus = previous.status;
   if (previous.priority !== task.priority) payload.previousPriority = previous.priority;
+  if ((previous.recurrenceFrequency ?? null) !== (task.recurrenceFrequency ?? null)) {
+    payload.previousRecurrenceFrequency = previous.recurrenceFrequency ?? null;
+  }
+  if ((previous.recurrenceInterval ?? null) !== (task.recurrenceInterval ?? null)) {
+    payload.previousRecurrenceInterval = previous.recurrenceInterval ?? null;
+  }
   const previousDueDate = datePayloadValue(previous.dueDate);
   if (previousDueDate !== payload.dueDate) payload.previousDueDate = previousDueDate;
   return payload;

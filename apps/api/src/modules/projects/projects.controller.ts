@@ -3,8 +3,10 @@ import { z } from "zod";
 
 import {
   addProjectMemberRequestSchema,
+  createProjectFromTemplateRequestSchema,
   createProjectMessageRequestSchema,
   createProjectRequestSchema,
+  createProjectTemplateFromProjectRequestSchema,
   cursorPaginationQuerySchema,
   updateProjectMessageRequestSchema,
   updateProjectMemberRequestSchema,
@@ -17,6 +19,7 @@ import { ProjectsService } from "./projects.service.js";
 
 const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
 const projectParamsSchema = workspaceParamsSchema.extend({ projectId: z.string().uuid() });
+const projectTemplateParamsSchema = workspaceParamsSchema.extend({ templateId: z.string().uuid() });
 const projectMemberParamsSchema = projectParamsSchema.extend({ userId: z.string().uuid() });
 const projectMessageParamsSchema = projectParamsSchema.extend({ messageId: z.string().uuid() });
 
@@ -52,6 +55,38 @@ export class ProjectsController {
   delete = async (request: FastifyRequest) => {
     const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
     return this.projectsService.delete(await requireAuth(request), workspaceId, projectId);
+  };
+
+  listTemplates = async (request: FastifyRequest) => {
+    const { workspaceId } = parseParams(request, workspaceParamsSchema);
+    return this.projectsService.listTemplates(await requireAuth(request), workspaceId);
+  };
+
+  createTemplateFromProject = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
+    const result = await this.projectsService.createTemplateFromProject(
+      await requireAuth(request),
+      workspaceId,
+      projectId,
+      parseBody(request, createProjectTemplateFromProjectRequestSchema),
+    );
+    return reply.status(201).send(result);
+  };
+
+  createProjectFromTemplate = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { templateId, workspaceId } = parseParams(request, projectTemplateParamsSchema);
+    const result = await this.projectsService.createProjectFromTemplate(
+      await requireAuth(request),
+      workspaceId,
+      templateId,
+      parseBody(request, createProjectFromTemplateRequestSchema),
+    );
+    return reply.status(201).send(result);
+  };
+
+  deleteTemplate = async (request: FastifyRequest) => {
+    const { templateId, workspaceId } = parseParams(request, projectTemplateParamsSchema);
+    return this.projectsService.deleteTemplate(await requireAuth(request), workspaceId, templateId);
   };
 
   listMembers = async (request: FastifyRequest) => {

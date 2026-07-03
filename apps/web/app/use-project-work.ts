@@ -310,6 +310,8 @@ export function useProjectWork({
       }
 
       const dueDate = String(form.get("dueDate") ?? "");
+      const recurrenceFrequency = String(form.get("recurrenceFrequency") ?? "");
+      const recurrenceInterval = Number(form.get("recurrenceInterval") ?? 1);
       const updated = await api<Task>(
         "/workspaces/" + selectedWorkspaceId + "/tasks/" + currentTask.id,
         {
@@ -317,6 +319,8 @@ export function useProjectWork({
             description: String(form.get("description") ?? ""),
             dueDate: dueDate || null,
             priority: String(form.get("priority")) as TaskPriority,
+            recurrenceFrequency: recurrenceFrequency || null,
+            recurrenceInterval: recurrenceFrequency ? recurrenceInterval : null,
             status: String(form.get("status")) as TaskStatus,
             title: String(form.get("title")),
             version: currentTask.version,
@@ -326,6 +330,7 @@ export function useProjectWork({
         auth.accessToken,
       );
       replaceTask(updated);
+      await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
       await loadActivity(auth.accessToken, selectedWorkspaceId, "task", selectedProjectId, updated.id);
     } catch (error) {
       setMessage(errorMessage(error));
@@ -342,6 +347,7 @@ export function useProjectWork({
         auth.accessToken,
       );
       replaceTask(completed);
+      await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
       await loadActivity(auth.accessToken, selectedWorkspaceId, "task", selectedProjectId, completed.id);
     } catch (error) {
       setMessage(errorMessage(error));

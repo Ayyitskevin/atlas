@@ -3,10 +3,11 @@
 import type { FormEvent } from "react";
 
 import { dateInputValue, taskStatusLabel } from "./atlas-format";
-import type { Section, Task, TaskPriority, TaskStatus } from "./atlas-types";
+import type { Section, Task, TaskPriority, TaskRecurrenceFrequency, TaskStatus } from "./atlas-types";
 
 const taskStatuses: TaskStatus[] = ["TODO", "IN_PROGRESS", "DONE", "ARCHIVED"];
 const taskPriorities: TaskPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+const recurrenceFrequencies: TaskRecurrenceFrequency[] = ["DAILY", "WEEKLY", "MONTHLY"];
 
 type TaskDetailFormPanelProps = {
   onCompleteTask: () => Promise<void>;
@@ -63,6 +64,30 @@ export function TaskDetailFormPanel({ onCompleteTask, onDeleteTask, onUpdateTask
               </option>
             ))}
           </select>
+        </label>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="grid gap-1 text-sm font-medium text-slate-700">
+          Repeat
+          <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" defaultValue={task.recurrenceFrequency ?? ""} name="recurrenceFrequency">
+            <option value="">None</option>
+            {recurrenceFrequencies.map((frequency) => (
+              <option key={frequency} value={frequency}>
+                {frequency.toLowerCase()}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-sm font-medium text-slate-700">
+          Interval
+          <input
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            defaultValue={task.recurrenceInterval ?? 1}
+            max={365}
+            min={1}
+            name="recurrenceInterval"
+            type="number"
+          />
         </label>
       </div>
       <div className="flex flex-wrap gap-2">

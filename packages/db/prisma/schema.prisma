@@ -40,6 +40,12 @@ enum TaskPriority {
   URGENT
 }
 
+enum TaskRecurrenceFrequency {
+  DAILY
+  WEEKLY
+  MONTHLY
+}
+
 enum NotificationStatus {
   UNREAD
   READ
@@ -62,6 +68,7 @@ model User {
   sentWorkspaceInvitations WorkspaceInvitation[] @relation("WorkspaceInvitationInviter")
   ownedWorkspaces          Workspace[]           @relation("WorkspaceOwner")
   createdProjects          Project[]             @relation("ProjectCreator")
+  createdProjectTemplates  ProjectTemplate[]     @relation("ProjectTemplateCreator")
   projectMessages          ProjectMessage[]      @relation("ProjectMessageAuthor")
   pinnedProjectMessages    ProjectMessage[]      @relation("ProjectMessagePinnedBy")
   projectLinks             ProjectMember[]
@@ -127,6 +134,7 @@ model Workspace {
   members       WorkspaceMember[]
   invitations   WorkspaceInvitation[]
   projects      Project[]
+  projectTemplates ProjectTemplate[]
   projectMessages ProjectMessage[]
   activity      ActivityEvent[]
   notifications Notification[]
@@ -246,6 +254,58 @@ model ProjectMessage {
   @@map("project_messages")
 }
 
+model ProjectTemplate {
+  id          String                   @id @default(uuid()) @db.Uuid
+  workspaceId String                   @map("workspace_id") @db.Uuid
+  name        String
+  description String?
+  createdById String                   @map("created_by_id") @db.Uuid
+  createdAt   DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt   DateTime?                @map("deleted_at") @db.Timestamptz(6)
+  workspace   Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdBy   User                     @relation("ProjectTemplateCreator", fields: [createdById], references: [id])
+  sections    ProjectTemplateSection[]
+  tasks       ProjectTemplateTask[]
+
+  @@index([workspaceId, deletedAt, createdAt])
+  @@index([createdById])
+  @@map("project_templates")
+}
+
+model ProjectTemplateSection {
+  id          String                @id @default(uuid()) @db.Uuid
+  workspaceId String                @map("workspace_id") @db.Uuid
+  templateId  String                @map("template_id") @db.Uuid
+  name        String
+  position    Decimal               @db.Decimal(20, 10)
+  createdAt   DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  template    ProjectTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  tasks       ProjectTemplateTask[]
+
+  @@unique([templateId, position])
+  @@index([workspaceId, templateId])
+  @@map("project_template_sections")
+}
+
+model ProjectTemplateTask {
+  id          String                 @id @default(uuid()) @db.Uuid
+  workspaceId String                 @map("workspace_id") @db.Uuid
+  templateId  String                 @map("template_id") @db.Uuid
+  sectionId   String                 @map("section_id") @db.Uuid
+  title       String
+  description String?
+  priority    TaskPriority           @default(MEDIUM)
+  position    Decimal                @db.Decimal(20, 10)
+  createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+  template    ProjectTemplate        @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  section     ProjectTemplateSection @relation(fields: [sectionId], references: [id], onDelete: Cascade)
+
+  @@index([workspaceId, templateId])
+  @@index([workspaceId, sectionId, position])
+  @@map("project_template_tasks")
+}
+
 model Section {
   id          String    @id @default(uuid()) @db.Uuid
   workspaceId String    @map("workspace_id") @db.Uuid
@@ -275,12 +335,17 @@ model Task {
   dueDate       DateTime?       @map("due_date") @db.Date
   position      Decimal         @db.Decimal(20, 10)
   completedAt   DateTime?       @map("completed_at") @db.Timestamptz(6)
+  recurrenceFrequency TaskRecurrenceFrequency? @map("recurrence_frequency")
+  recurrenceInterval Int? @map("recurrence_interval")
+  recurrenceGeneratedFromTaskId String? @unique @map("recurrence_generated_from_task_id") @db.Uuid
   version       Int             @default(0)
   createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt     DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt     DateTime?       @map("deleted_at") @db.Timestamptz(6)
   project       Project         @relation(fields: [projectId], references: [id], onDelete: Cascade)
   section       Section         @relation(fields: [sectionId], references: [id])
+  recurrenceGeneratedFromTask Task? @relation("TaskRecurrenceGeneratedFrom", fields: [recurrenceGeneratedFromTaskId], references: [id], onDelete: SetNull)
+  recurrenceGeneratedTasks Task[] @relation("TaskRecurrenceGeneratedFrom")
   assignees     TaskAssignee[]
   watchers      TaskWatcher[]
   subtasks      Subtask[]
@@ -292,6 +357,7 @@ model Task {
 
   @@index([workspaceId, projectId, deletedAt])
   @@index([workspaceId, sectionId, position])
+  @@index([workspaceId, recurrenceFrequency])
   @@index([workspaceId, status])
   @@index([workspaceId, dueDate])
   @@map("tasks")

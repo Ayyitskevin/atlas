@@ -1,8 +1,10 @@
 import {
   ATLAS_ERROR_CODES,
   type AddProjectMemberRequest,
+  type CreateProjectFromTemplateRequest,
   type CreateProjectMessageRequest,
   type CreateProjectRequest,
+  type CreateProjectTemplateFromProjectRequest,
   type CursorPaginationQuery,
   type UpdateProjectMessageRequest,
   type UpdateProjectMemberRequest,
@@ -95,6 +97,76 @@ export class ProjectsService {
       workspaceId,
     });
     return project;
+  }
+
+  async listTemplates(ctx: AuthContext, workspaceId: string) {
+    await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
+    return { items: await this.projectsRepository.listTemplates(workspaceId) };
+  }
+
+  async createTemplateFromProject(
+    ctx: AuthContext,
+    workspaceId: string,
+    projectId: string,
+    input: CreateProjectTemplateFromProjectRequest,
+  ) {
+    await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "PROJECT_ADMIN");
+    const template = await this.projectsRepository.createTemplateFromProject({
+      ...input,
+      createdById: ctx.userId,
+      projectId,
+      workspaceId,
+    });
+    if (!template) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project not found.");
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: template.id,
+      entityType: "project_template",
+      eventType: "ProjectTemplateCreated",
+      payload: projectTemplatePayload(template, { sourceProjectId: projectId }),
+      projectId,
+      workspaceId,
+    });
+    return template;
+  }
+
+  async createProjectFromTemplate(ctx: AuthContext, workspaceId: string, templateId: string, input: CreateProjectFromTemplateRequest) {
+    await this.permissions.requireWorkspaceRole(ctx, workspaceId, "MEMBER");
+    const project = await this.projectsRepository.createProjectFromTemplate({
+      ...input,
+      createdById: ctx.userId,
+      templateId,
+      workspaceId,
+    });
+    if (!project) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project template not found.");
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: project.id,
+      entityType: "project",
+      eventType: "ProjectCreatedFromTemplate",
+      payload: { ...projectPayload(project), templateId },
+      projectId: project.id,
+      workspaceId,
+    });
+    return project;
+  }
+
+  async deleteTemplate(ctx: AuthContext, workspaceId: string, templateId: string) {
+    await this.permissions.requireWorkspaceRole(ctx, workspaceId, "MEMBER");
+    const template = await this.projectsRepository.findTemplate(workspaceId, templateId);
+    if (!template) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project template not found.");
+    if (template.createdById !== ctx.userId) await this.permissions.requireWorkspaceRole(ctx, workspaceId, "ADMIN");
+
+    await this.projectsRepository.softDeleteTemplate(workspaceId, templateId);
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: template.id,
+      entityType: "project_template",
+      eventType: "ProjectTemplateDeleted",
+      payload: projectTemplatePayload(template),
+      workspaceId,
+    });
+    return { ok: true };
   }
 
   async listMembers(ctx: AuthContext, workspaceId: string, projectId: string) {
@@ -286,6 +358,23 @@ function projectPayload(project: { archivedAt?: Date | null; description?: strin
     description: project.description ?? null,
     name: project.name,
     visibility: project.visibility,
+  };
+}
+
+function projectTemplatePayload(
+  template: {
+    _count?: { sections: number; tasks: number };
+    description?: string | null;
+    name: string;
+  },
+  extra?: Record<string, unknown>,
+) {
+  return {
+    description: template.description ?? null,
+    name: template.name,
+    sectionCount: template._count?.sections ?? 0,
+    taskCount: template._count?.tasks ?? 0,
+    ...extra,
   };
 }
 

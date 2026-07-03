@@ -9,6 +9,7 @@ import {
   formatEventType,
   invitationStatus,
   projectRoleLabel,
+  taskRecurrenceLabel,
   taskStatusLabel,
   workspaceRoleLabel,
 } from "./atlas-format";
@@ -26,8 +27,13 @@ describe("atlas format helpers", () => {
     expect(formatActivityTitle("TaskLabelAdded")).toBe("Label added");
     expect(formatActivityTitle("TaskWatched")).toBe("Follower added");
     expect(formatActivityTitle("ProjectMessageCreated")).toBe("Message posted");
+    expect(formatActivityTitle("ProjectTemplateCreated")).toBe("Template saved");
+    expect(formatActivityTitle("ProjectCreatedFromTemplate")).toBe("Project created from template");
+    expect(formatActivityTitle("TaskRecurrenceGenerated")).toBe("Recurring task created");
     expect(formatActivityTitle("CustomEvent")).toBe("Custom Event");
     expect(taskStatusLabel("IN_PROGRESS")).toBe("in progress");
+    expect(taskRecurrenceLabel("WEEKLY", 2)).toBe("every 2 weeks");
+    expect(taskRecurrenceLabel("DAILY", 1)).toBe("daily");
     expect(workspaceRoleLabel("OWNER")).toBe("owner");
     expect(projectRoleLabel("PROJECT_ADMIN")).toBe("project admin");
   });
@@ -65,6 +71,14 @@ describe("atlas format helpers", () => {
     ).toBe("project message: Weekly update");
     expect(
       formatActivityDetail({
+        entityType: "project_template",
+        eventType: "ProjectTemplateCreated",
+        payload: { name: "Launch template" },
+        projectId: "project-1",
+      }),
+    ).toBe("project template: Launch template");
+    expect(
+      formatActivityDetail({
         entityType: "task",
         eventType: "TaskWatched",
         payload: { title: "Prep launch QA", user: { email: "watcher@example.com", name: "Watcher" } },
@@ -82,17 +96,20 @@ describe("atlas format helpers", () => {
         previousDueDate: null,
         previousStatus: "IN_PROGRESS",
         priority: "HIGH",
+        recurrenceFrequency: "WEEKLY",
+        recurrenceInterval: 2,
         status: "DONE",
         title: "Prep launch QA",
       },
       taskId: "task-1",
     };
 
-    expect(formatActivityDetail(activity)).toBe("Task: Prep launch QA · in progress -> done · high priority · due 2026-07-05");
+    expect(formatActivityDetail(activity)).toBe("Task: Prep launch QA · in progress -> done · high priority · due 2026-07-05 · every 2 weeks");
     expect(formatActivityMetadata(activity)).toEqual([
       { label: "Status", value: "in progress -> done" },
       { label: "Priority", value: "high" },
       { label: "Due", value: "2026-07-05" },
+      { label: "Repeat", value: "every 2 weeks" },
     ]);
   });
 

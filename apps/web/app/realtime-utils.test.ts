@@ -6,6 +6,7 @@ import {
   realtimeEventTouchesProjectList,
   realtimeEventTouchesProjectMembers,
   realtimeEventTouchesProjectMessages,
+  realtimeEventTouchesProjectTemplates,
   realtimeEventTouchesTask,
   realtimeReconnectDelay,
   realtimeSubscriptions,
@@ -83,18 +84,24 @@ describe("realtime utilities", () => {
 
   it("classifies which selected data a domain event touches", () => {
     const taskEvent = { eventType: "TaskMoved", projectId: "project-1", taskId: "task-1" } as RealtimeDomainEvent;
+    const recurringTaskEvent = { eventType: "TaskRecurrenceGenerated", projectId: "project-1", taskId: "task-2" } as RealtimeDomainEvent;
     const labelEvent = { eventType: "TaskLabelAdded", projectId: "project-1", taskId: "task-1" } as RealtimeDomainEvent;
     const commentEvent = { eventType: "CommentCreated", projectId: "project-1", taskId: "task-1" } as RealtimeDomainEvent;
     const messageEvent = { eventType: "ProjectMessageCreated", projectId: "project-1", taskId: null } as RealtimeDomainEvent;
     const pinnedMessageEvent = { eventType: "ProjectMessagePinned", projectId: "project-1", taskId: null } as RealtimeDomainEvent;
+    const templateEvent = { eventType: "ProjectTemplateCreated", projectId: "project-1", taskId: null } as RealtimeDomainEvent;
 
     expect(realtimeEventTouchesProject(taskEvent, "project-1")).toBe(true);
+    expect(realtimeEventTouchesProject(recurringTaskEvent, "project-1")).toBe(true);
     expect(realtimeEventTouchesProject(labelEvent, "project-1")).toBe(true);
     expect(realtimeEventTouchesProject(commentEvent, "project-1")).toBe(false);
     expect(realtimeEventTouchesProject({ eventType: "SectionUpdated", projectId: "project-1", taskId: null } as RealtimeDomainEvent, "project-1")).toBe(true);
     expect(realtimeEventTouchesProjectList({ eventType: "ProjectUpdated", projectId: "project-1", taskId: null } as RealtimeDomainEvent)).toBe(true);
+    expect(realtimeEventTouchesProjectList({ eventType: "ProjectCreatedFromTemplate", projectId: "project-1", taskId: null } as RealtimeDomainEvent)).toBe(true);
     expect(realtimeEventTouchesProjectList({ eventType: "ProjectMemberAdded", projectId: "project-1", taskId: null } as RealtimeDomainEvent)).toBe(true);
     expect(realtimeEventTouchesProjectList(taskEvent)).toBe(false);
+    expect(realtimeEventTouchesProjectTemplates(templateEvent)).toBe(true);
+    expect(realtimeEventTouchesProjectTemplates(taskEvent)).toBe(false);
     expect(realtimeEventTouchesProjectMembers({ eventType: "ProjectMemberUpdated", projectId: "project-1", taskId: null } as RealtimeDomainEvent, "project-1")).toBe(true);
     expect(realtimeEventTouchesProjectMembers({ eventType: "ProjectMemberUpdated", projectId: "project-2", taskId: null } as RealtimeDomainEvent, "project-1")).toBe(false);
     expect(realtimeEventTouchesProjectMessages(messageEvent, "project-1")).toBe(true);
