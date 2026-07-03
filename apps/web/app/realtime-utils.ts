@@ -41,7 +41,13 @@ const projectRefreshEvents = new Set([
 
 const projectMemberRefreshEvents = new Set(["ProjectMemberAdded", "ProjectMemberRemoved", "ProjectMemberUpdated"]);
 
-const projectMessageRefreshEvents = new Set(["ProjectMessageCreated", "ProjectMessageDeleted", "ProjectMessageUpdated"]);
+const projectMessageRefreshEvents = new Set([
+  "ProjectMessageCreated",
+  "ProjectMessageDeleted",
+  "ProjectMessagePinned",
+  "ProjectMessageUnpinned",
+  "ProjectMessageUpdated",
+]);
 
 const projectListRefreshEvents = new Set([
   "ProjectArchived",

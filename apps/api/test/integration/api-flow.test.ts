@@ -328,6 +328,58 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       workspaceId,
     });
 
+    const pinMessage = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/messages/" + messageBody.id + "/pin",
+    });
+    expect(pinMessage.statusCode).toBe(200);
+    const pinnedMessageBody = pinMessage.json<{ id: string; pinnedAt: string; pinnedById: string; title: string }>();
+    expect(pinnedMessageBody).toMatchObject({
+      id: messageBody.id,
+      pinnedAt: expect.any(String),
+      pinnedById: expect.any(String),
+      title: "Weekly update edited",
+    });
+    await expectActivityEvent({
+      entityId: messageBody.id,
+      entityType: "project_message",
+      eventType: "ProjectMessagePinned",
+      payload: { bodyPreview: "Updated weekly project notes.", pinnedAt: expect.any(String), title: "Weekly update edited" },
+      projectId,
+      workspaceId,
+    });
+
+    const pinnedMessages = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/messages",
+    });
+    expect(pinnedMessages.statusCode).toBe(200);
+    expect(pinnedMessages.json<{ items: Array<{ id: string; pinnedAt: string | null }> }>().items[0]).toMatchObject({
+      id: messageBody.id,
+      pinnedAt: expect.any(String),
+    });
+
+    const unpinMessage = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/messages/" + messageBody.id + "/pin",
+    });
+    expect(unpinMessage.statusCode).toBe(200);
+    expect(unpinMessage.json<{ pinnedAt: string | null; pinnedById: string | null }>()).toMatchObject({
+      pinnedAt: null,
+      pinnedById: null,
+    });
+    await expectActivityEvent({
+      entityId: messageBody.id,
+      entityType: "project_message",
+      eventType: "ProjectMessageUnpinned",
+      payload: { bodyPreview: "Updated weekly project notes.", pinnedAt: expect.any(String), title: "Weekly update edited" },
+      projectId,
+      workspaceId,
+    });
+
     const deleteMessage = await app!.inject({
       headers: authHeaders(accessToken),
       method: "DELETE",

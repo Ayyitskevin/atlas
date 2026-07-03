@@ -122,4 +122,14 @@ export class ProjectsController {
     const { messageId, projectId, workspaceId } = parseParams(request, projectMessageParamsSchema);
     return this.projectsService.deleteMessage(await requireAuth(request), workspaceId, projectId, messageId);
   };
+
+  pinMessage = async (request: FastifyRequest) => {
+    const { messageId, projectId, workspaceId } = parseParams(request, projectMessageParamsSchema);
+    return this.projectsService.pinMessage(await requireAuth(request), workspaceId, projectId, messageId);
+  };
+
+  unpinMessage = async (request: FastifyRequest) => {
+    const { messageId, projectId, workspaceId } = parseParams(request, projectMessageParamsSchema);
+    return this.projectsService.unpinMessage(await requireAuth(request), workspaceId, projectId, messageId);
+  };
 }

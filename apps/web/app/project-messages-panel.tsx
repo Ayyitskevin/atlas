@@ -9,7 +9,9 @@ type ProjectMessagesPanelProps = {
   messages: ProjectMessage[];
   onCreateMessage: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onDeleteMessage: (messageId: string) => Promise<void>;
+  onPinMessage: (messageId: string) => Promise<void>;
   onRefresh: () => Promise<void>;
+  onUnpinMessage: (messageId: string) => Promise<void>;
   onUpdateMessage: (messageId: string, event: FormEvent<HTMLFormElement>) => Promise<void>;
   project?: Project;
   statusMessage: string;
@@ -19,7 +21,9 @@ export function ProjectMessagesPanel({
   messages,
   onCreateMessage,
   onDeleteMessage,
+  onPinMessage,
   onRefresh,
+  onUnpinMessage,
   onUpdateMessage,
   project,
   statusMessage,
@@ -71,12 +75,35 @@ export function ProjectMessagesPanel({
                   <div className="grid gap-2">
                     <div className="flex flex-wrap items-start justify-between gap-3">
                       <div className="min-w-0">
-                        <h3 className="break-words text-base font-semibold text-slate-950">{message.title}</h3>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <h3 className="break-words text-base font-semibold text-slate-950">{message.title}</h3>
+                          {message.pinnedAt ? (
+                            <span className="rounded-md bg-amber-100 px-2 py-1 text-xs font-semibold text-amber-800">Pinned</span>
+                          ) : null}
+                        </div>
                         <p className="text-xs text-slate-500">
                           {message.author.name} - {formatTimestamp(message.createdAt)}
+                          {message.pinnedAt ? " - pinned " + formatTimestamp(message.pinnedAt) : ""}
                         </p>
                       </div>
                       <div className="flex shrink-0 gap-2">
+                        {message.pinnedAt ? (
+                          <button
+                            className="rounded-md border border-amber-200 px-2 py-1 text-xs font-medium text-amber-800"
+                            onClick={() => void onUnpinMessage(message.id)}
+                            type="button"
+                          >
+                            Unpin
+                          </button>
+                        ) : (
+                          <button
+                            className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700"
+                            onClick={() => void onPinMessage(message.id)}
+                            type="button"
+                          >
+                            Pin
+                          </button>
+                        )}
                         <button
                           className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700"
                           onClick={() => setEditingMessageId(message.id)}

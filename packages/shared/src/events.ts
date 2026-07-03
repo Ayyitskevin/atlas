@@ -13,6 +13,8 @@ export const domainEventTypeSchema = z.enum([
   "ProjectMessageCreated",
   "ProjectMessageUpdated",
   "ProjectMessageDeleted",
+  "ProjectMessagePinned",
+  "ProjectMessageUnpinned",
   "SectionCreated",
   "SectionUpdated",
   "SectionDeleted",

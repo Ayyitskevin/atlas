@@ -109,14 +109,50 @@ export function useProjectMessages({
     }
   }
 
+  async function pinProjectMessage(messageId: string) {
+    if (!auth || !selectedWorkspaceId || !selectedProjectId) return;
+    try {
+      setProjectMessagesStatus("Pinning message...");
+      await api<ProjectMessage>(
+        "/workspaces/" + selectedWorkspaceId + "/projects/" + selectedProjectId + "/messages/" + messageId + "/pin",
+        { method: "POST" },
+        auth.accessToken,
+      );
+      await loadProjectMessages(auth.accessToken, selectedWorkspaceId, selectedProjectId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId);
+      setProjectMessagesStatus("");
+    } catch (error) {
+      setProjectMessagesStatus(errorMessage(error));
+    }
+  }
+
+  async function unpinProjectMessage(messageId: string) {
+    if (!auth || !selectedWorkspaceId || !selectedProjectId) return;
+    try {
+      setProjectMessagesStatus("Unpinning message...");
+      await api<ProjectMessage>(
+        "/workspaces/" + selectedWorkspaceId + "/projects/" + selectedProjectId + "/messages/" + messageId + "/pin",
+        { method: "DELETE" },
+        auth.accessToken,
+      );
+      await loadProjectMessages(auth.accessToken, selectedWorkspaceId, selectedProjectId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId);
+      setProjectMessagesStatus("");
+    } catch (error) {
+      setProjectMessagesStatus(errorMessage(error));
+    }
+  }
+
   return {
     clearProjectMessages,
     createProjectMessage,
     deleteProjectMessage,
     loadProjectMessages,
+    pinProjectMessage,
     projectMessages,
     projectMessagesStatus,
     refreshProjectMessages,
+    unpinProjectMessage,
     updateProjectMessage,
   };
 }

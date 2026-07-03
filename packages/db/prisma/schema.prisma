@@ -63,6 +63,7 @@ model User {
   ownedWorkspaces          Workspace[]           @relation("WorkspaceOwner")
   createdProjects          Project[]             @relation("ProjectCreator")
   projectMessages          ProjectMessage[]      @relation("ProjectMessageAuthor")
+  pinnedProjectMessages    ProjectMessage[]      @relation("ProjectMessagePinnedBy")
   projectLinks             ProjectMember[]
   assignedTasks            TaskAssignee[]
   taskWatches              TaskWatcher[]         @relation("TaskWatcherUser")
@@ -229,14 +230,18 @@ model ProjectMessage {
   authorId    String    @map("author_id") @db.Uuid
   title       String
   body        String
+  pinnedAt    DateTime? @map("pinned_at") @db.Timestamptz(6)
+  pinnedById  String?   @map("pinned_by_id") @db.Uuid
   createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt   DateTime? @map("deleted_at") @db.Timestamptz(6)
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   project     Project   @relation(fields: [projectId], references: [id], onDelete: Cascade)
   author      User      @relation("ProjectMessageAuthor", fields: [authorId], references: [id])
+  pinnedBy    User?     @relation("ProjectMessagePinnedBy", fields: [pinnedById], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, projectId, createdAt])
+  @@index([workspaceId, projectId, pinnedAt])
   @@index([workspaceId, authorId])
   @@map("project_messages")
 }

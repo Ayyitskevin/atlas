@@ -231,6 +231,42 @@ export class ProjectsService {
     return { ok: true };
   }
 
+  async pinMessage(ctx: AuthContext, workspaceId: string, projectId: string, messageId: string) {
+    const message = await this.projectsRepository.findMessage({ messageId, projectId, workspaceId });
+    if (!message) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project message not found.");
+    await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
+    const pinned = await this.projectsRepository.pinMessage({ messageId, pinnedById: ctx.userId, projectId, workspaceId });
+    if (!pinned) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project message not found.");
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: pinned.id,
+      entityType: "project_message",
+      eventType: "ProjectMessagePinned",
+      payload: projectMessagePayload(pinned),
+      projectId,
+      workspaceId,
+    });
+    return pinned;
+  }
+
+  async unpinMessage(ctx: AuthContext, workspaceId: string, projectId: string, messageId: string) {
+    const message = await this.projectsRepository.findMessage({ messageId, projectId, workspaceId });
+    if (!message) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project message not found.");
+    await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
+    const unpinned = await this.projectsRepository.unpinMessage({ messageId, projectId, workspaceId });
+    if (!unpinned) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Project message not found.");
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: unpinned.id,
+      entityType: "project_message",
+      eventType: "ProjectMessageUnpinned",
+      payload: projectMessagePayload(message),
+      projectId,
+      workspaceId,
+    });
+    return unpinned;
+  }
+
   private async requireMessageMutationRole(ctx: AuthContext, workspaceId: string, projectId: string, authorId: string) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, authorId === ctx.userId ? "COMMENTER" : "EDITOR");
   }
@@ -270,11 +306,12 @@ function projectMemberPayload(
 }
 
 function projectMessagePayload(
-  message: { body: string; title: string },
+  message: { body: string; pinnedAt?: Date | null; title: string },
   previous?: { body: string; title: string },
 ) {
   const payload: Record<string, string | null> = {
     bodyPreview: message.body.slice(0, 160),
+    pinnedAt: message.pinnedAt?.toISOString() ?? null,
     title: message.title,
   };
   if (!previous) return payload;

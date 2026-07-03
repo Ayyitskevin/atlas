@@ -162,9 +162,11 @@ export function AtlasClient({
     createProjectMessage,
     deleteProjectMessage,
     loadProjectMessages,
+    pinProjectMessage,
     projectMessages,
     projectMessagesStatus,
     refreshProjectMessages,
+    unpinProjectMessage,
     updateProjectMessage,
   } = useProjectMessages({
     activityScope,
@@ -770,7 +772,9 @@ export function AtlasClient({
           messages={projectMessages}
           onCreateMessage={createProjectMessage}
           onDeleteMessage={deleteProjectMessage}
+          onPinMessage={pinProjectMessage}
           onRefresh={refreshProjectMessages}
+          onUnpinMessage={unpinProjectMessage}
           onUpdateMessage={updateProjectMessage}
           project={selectedProject}
           statusMessage={projectMessagesStatus}

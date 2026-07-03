@@ -17,6 +17,8 @@ const activityTitles: Record<string, string> = {
   ProjectMemberUpdated: "Project member updated",
   ProjectMessageCreated: "Message posted",
   ProjectMessageDeleted: "Message deleted",
+  ProjectMessagePinned: "Message pinned",
+  ProjectMessageUnpinned: "Message unpinned",
   ProjectMessageUpdated: "Message updated",
   ProjectUpdated: "Project updated",
   SectionCreated: "Section created",

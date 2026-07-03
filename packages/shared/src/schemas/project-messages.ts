@@ -19,6 +19,8 @@ export const projectMessageResponseSchema = z.object({
   body: z.string(),
   createdAt: z.string().datetime(),
   id: z.string().uuid(),
+  pinnedAt: z.string().datetime().nullable(),
+  pinnedById: z.string().uuid().nullable(),
   projectId: z.string().uuid(),
   title: z.string(),
   updatedAt: z.string().datetime(),

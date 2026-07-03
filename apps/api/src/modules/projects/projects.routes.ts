@@ -99,4 +99,14 @@ export async function registerProjectRoutes(app: FastifyInstance): Promise<void>
     { schema: openApiSchema({ params: projectMessageParamsSchema, tags: ["Project Messages"] }) },
     controller.deleteMessage,
   );
+  app.post(
+    "/workspaces/:workspaceId/projects/:projectId/messages/:messageId/pin",
+    { schema: openApiSchema({ params: projectMessageParamsSchema, tags: ["Project Messages"] }) },
+    controller.pinMessage,
+  );
+  app.delete(
+    "/workspaces/:workspaceId/projects/:projectId/messages/:messageId/pin",
+    { schema: openApiSchema({ params: projectMessageParamsSchema, tags: ["Project Messages"] }) },
+    controller.unpinMessage,
+  );
 }

@@ -42,6 +42,8 @@ export type ProjectMessage = {
   body: string;
   createdAt: string;
   id: string;
+  pinnedAt: string | null;
+  pinnedById: string | null;
   projectId: string;
   title: string;
   updatedAt: string;

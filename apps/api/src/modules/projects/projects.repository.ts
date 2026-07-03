@@ -127,7 +127,7 @@ export class ProjectsRepository {
     return this.prisma.projectMessage.findMany({
       ...paginationArgs(input),
       include: { author: { select: { email: true, id: true, name: true } } },
-      orderBy: [{ createdAt: "desc" }, { id: "asc" }],
+      orderBy: [{ pinnedAt: { nulls: "last", sort: "desc" } }, { createdAt: "desc" }, { id: "asc" }],
       where: { deletedAt: null, projectId: input.projectId, workspaceId: input.workspaceId },
     });
   }
@@ -153,5 +153,23 @@ export class ProjectsRepository {
       data: { deletedAt: new Date() },
       where: { deletedAt: null, id: input.messageId, projectId: input.projectId, workspaceId: input.workspaceId },
     });
+  }
+
+  async pinMessage(input: { messageId: string; pinnedById: string; projectId: string; workspaceId: string }) {
+    const result = await this.prisma.projectMessage.updateMany({
+      data: { pinnedAt: new Date(), pinnedById: input.pinnedById },
+      where: { deletedAt: null, id: input.messageId, projectId: input.projectId, workspaceId: input.workspaceId },
+    });
+    if (!result.count) return null;
+    return this.findMessage(input);
+  }
+
+  async unpinMessage(input: { messageId: string; projectId: string; workspaceId: string }) {
+    const result = await this.prisma.projectMessage.updateMany({
+      data: { pinnedAt: null, pinnedById: null },
+      where: { deletedAt: null, id: input.messageId, projectId: input.projectId, workspaceId: input.workspaceId },
+    });
+    if (!result.count) return null;
+    return this.findMessage(input);
   }
 }
