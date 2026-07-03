@@ -21,6 +21,10 @@ export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void
     const query = request.query as { accessToken?: string };
     const ctx = await requireAuthToken(request, query.accessToken);
     const cleanup = new Set<() => void>();
+    const dispose = () => {
+      for (const leave of cleanup) leave();
+      cleanup.clear();
+    };
 
     socket.on("message", async (raw: Buffer) => {
       try {
@@ -60,9 +64,7 @@ export async function registerRealtimeRoutes(app: FastifyInstance): Promise<void
       }
     });
 
-    socket.on("close", () => {
-      for (const leave of cleanup) leave();
-      cleanup.clear();
-    });
+    socket.on("close", dispose);
+    socket.on("error", dispose);
   });
 }

@@ -299,6 +299,8 @@ Rooms:
 
 Clients authenticate the socket with an access token and must subscribe with explicit workspace/project/task identifiers. Subscription checks reuse service-layer permission guards. Broadcast payloads are versioned domain-event projections, not raw database rows.
 
+The API treats websocket delivery as best-effort after durable mutation state is written: closed sockets are pruned from rooms during broadcast, send failures remove only the failing socket, and remaining subscribers still receive the event.
+
 ## Event Flow
 
 ```mermaid

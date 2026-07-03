@@ -1,6 +1,12 @@
-type RealtimeSocket = {
+export type RealtimeSocket = {
   readyState: number;
   send(data: string): void;
+};
+
+export type RealtimeBroadcastResult = {
+  delivered: number;
+  pruned: number;
+  roomSize: number;
 };
 
 const openState = 1;
@@ -22,25 +28,44 @@ export class RealtimeHub {
     if (!sockets.size) this.rooms.delete(room);
   }
 
-  broadcastWorkspace(workspaceId: string, payload: unknown): void {
-    this.broadcast(`workspace:${workspaceId}`, payload);
+  roomSize(room: string): number {
+    return this.rooms.get(room)?.size ?? 0;
   }
 
-  broadcastProject(projectId: string, payload: unknown): void {
-    this.broadcast(`project:${projectId}`, payload);
+  broadcastWorkspace(workspaceId: string, payload: unknown): RealtimeBroadcastResult {
+    return this.broadcast(`workspace:${workspaceId}`, payload);
   }
 
-  broadcastTask(taskId: string, payload: unknown): void {
-    this.broadcast(`task:${taskId}`, payload);
+  broadcastProject(projectId: string, payload: unknown): RealtimeBroadcastResult {
+    return this.broadcast(`project:${projectId}`, payload);
   }
 
-  private broadcast(room: string, payload: unknown): void {
+  broadcastTask(taskId: string, payload: unknown): RealtimeBroadcastResult {
+    return this.broadcast(`task:${taskId}`, payload);
+  }
+
+  private broadcast(room: string, payload: unknown): RealtimeBroadcastResult {
     const sockets = this.rooms.get(room);
-    if (!sockets) return;
+    if (!sockets) return { delivered: 0, pruned: 0, roomSize: 0 };
     const message = JSON.stringify(payload);
+    let delivered = 0;
+    let pruned = 0;
     for (const socket of sockets) {
-      if (socket.readyState === openState) socket.send(message);
+      if (socket.readyState !== openState) {
+        sockets.delete(socket);
+        pruned += 1;
+        continue;
+      }
+      try {
+        socket.send(message);
+        delivered += 1;
+      } catch {
+        sockets.delete(socket);
+        pruned += 1;
+      }
     }
+    if (!sockets.size) this.rooms.delete(room);
+    return { delivered, pruned, roomSize: sockets.size };
   }
 }
 
