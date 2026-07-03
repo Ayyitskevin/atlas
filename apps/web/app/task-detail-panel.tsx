@@ -7,6 +7,7 @@ import { TaskAssigneesPanel } from "./task-assignees-panel";
 import { TaskAttachmentsPanel } from "./task-attachments-panel";
 import { TaskCommentsPanel } from "./task-comments-panel";
 import { TaskDependenciesPanel } from "./task-dependencies-panel";
+import { openDependencyBlockers } from "./task-dependency-utils";
 import { TaskDetailFormPanel } from "./task-detail-form-panel";
 import { TaskLabelsPanel } from "./task-labels-panel";
 import { TaskSubtasksPanel } from "./task-subtasks-panel";
@@ -25,6 +26,7 @@ type TaskDetailPanelProps = {
   onAssignTask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onAssignTaskLabel: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onCompleteTask: () => Promise<void>;
+  onCompleteReadyBlockers: () => Promise<void>;
   onCreateComment: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onCreateTaskLabel: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onCreateSubtask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
@@ -65,6 +67,7 @@ export function TaskDetailPanel({
   onAssignTask,
   onAssignTaskLabel,
   onCompleteTask,
+  onCompleteReadyBlockers,
   onCreateComment,
   onCreateTaskLabel,
   onCreateSubtask,
@@ -100,7 +103,7 @@ export function TaskDetailPanel({
     );
   }
 
-  const openBlockerCount = dependencies.blockedBy.filter((edge) => edge.task.status !== "DONE").length;
+  const openBlockerCount = openDependencyBlockers(dependencies).length;
 
   return (
     <aside className="grid content-start gap-4 rounded-lg border border-slate-200 bg-white p-4">
@@ -147,6 +150,7 @@ export function TaskDetailPanel({
         dependencies={dependencies}
         dependencyStatus={dependencyStatus}
         onAddDependency={onAddDependency}
+        onCompleteReadyBlockers={onCompleteReadyBlockers}
         onRemoveDependency={onRemoveDependency}
         task={task}
         tasks={tasks}

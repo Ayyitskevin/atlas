@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { attachmentMimeTypeForUpload, attachmentUploadValidationMessage } from "./attachment-upload-utils";
 import { api, errorMessage } from "./atlas-api";
 import { moveItemById, nextTaskPosition, sectionPositionPayload } from "./board-utils";
+import { dependencyTaskIds, readyDependencyBlockers } from "./task-dependency-utils";
 import type {
   ActivityScope,
   Attachment,
@@ -415,6 +416,34 @@ export function useProjectWork({
     }
   }
 
+  async function completeReadyBlockers() {
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
+    const blockerIds = dependencyTaskIds(readyDependencyBlockers(taskDependencies));
+    if (!blockerIds.length) {
+      setDependencyStatus("No ready blockers to complete.");
+      return;
+    }
+
+    try {
+      setDependencyStatus("Completing " + blockerIds.length + " ready " + (blockerIds.length === 1 ? "blocker" : "blockers") + "...");
+      for (const blockerId of blockerIds) {
+        await api<Task>(
+          "/workspaces/" + selectedWorkspaceId + "/tasks/" + blockerId + "/complete",
+          { method: "POST" },
+          auth.accessToken,
+        );
+      }
+      await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
+      await loadTaskDependencies(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, "task", selectedProjectId, selectedTaskId);
+      setDependencyStatus("Completed " + blockerIds.length + " ready " + (blockerIds.length === 1 ? "blocker." : "blockers."));
+    } catch (error) {
+      setDependencyStatus(errorMessage(error));
+      await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
+      await loadTaskDependencies(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+    }
+  }
+
   async function deleteTask() {
     if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTask) return;
     try {
@@ -806,6 +835,7 @@ export function useProjectWork({
     clearTaskDetailState,
     comments,
     completeTask,
+    completeReadyBlockers,
     changeTaskDependencyFilter,
     createComment,
     createSection,

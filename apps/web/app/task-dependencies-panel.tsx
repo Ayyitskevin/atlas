@@ -4,11 +4,13 @@ import type { FormEvent } from "react";
 
 import { dateInputValue, taskStatusLabel } from "./atlas-format";
 import type { Task, TaskDependencies, TaskDependencyEdge } from "./atlas-types";
+import { readyDependencyBlockers } from "./task-dependency-utils";
 
 type TaskDependenciesPanelProps = {
   dependencies: TaskDependencies;
   dependencyStatus: string;
   onAddDependency: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  onCompleteReadyBlockers: () => Promise<void>;
   onRemoveDependency: (dependencyId: string) => Promise<void>;
   task: Task;
   tasks: Task[];
@@ -18,6 +20,7 @@ export function TaskDependenciesPanel({
   dependencies,
   dependencyStatus,
   onAddDependency,
+  onCompleteReadyBlockers,
   onRemoveDependency,
   task,
   tasks,
@@ -28,6 +31,7 @@ export function TaskDependenciesPanel({
     ...dependencies.blocks.map((edge) => edge.task.id),
   ]);
   const availableTasks = tasks.filter((candidate) => !relatedTaskIds.has(candidate.id));
+  const readyBlockerCount = readyDependencyBlockers(dependencies).length;
 
   return (
     <section className="grid gap-2 border-t border-slate-200 pt-4">
@@ -38,7 +42,18 @@ export function TaskDependenciesPanel({
         ) : null}
       </div>
 
-      <p className="text-xs font-medium uppercase text-slate-400">Blocked by</p>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-xs font-medium uppercase text-slate-400">Blocked by</p>
+        {readyBlockerCount ? (
+          <button
+            className="rounded-md border border-amber-300 px-2 py-1 text-xs font-medium text-amber-800"
+            onClick={() => void onCompleteReadyBlockers()}
+            type="button"
+          >
+            Complete {readyBlockerCount === 1 ? "blocker" : readyBlockerCount + " blockers"}
+          </button>
+        ) : null}
+      </div>
       <DependencyList edges={dependencies.blockedBy} emptyLabel="Not blocked by any task" onRemove={onRemoveDependency} />
 
       <p className="text-xs font-medium uppercase text-slate-400">Blocks</p>

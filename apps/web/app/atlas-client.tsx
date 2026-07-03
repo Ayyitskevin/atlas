@@ -199,6 +199,7 @@ export function AtlasClient({
     clearTaskDetailState,
     comments,
     completeTask,
+    completeReadyBlockers,
     changeTaskDependencyFilter,
     createComment,
     createSection,
@@ -1078,6 +1079,7 @@ export function AtlasClient({
             onAssignTask={assignTask}
             onAssignTaskLabel={assignTaskLabel}
             onCompleteTask={completeTask}
+            onCompleteReadyBlockers={completeReadyBlockers}
             onCreateComment={createComment}
             onCreateTaskLabel={createTaskLabel}
             onCreateSubtask={createSubtask}
