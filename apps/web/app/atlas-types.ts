@@ -148,7 +148,11 @@ export type TaskWatcher = {
 };
 
 export type TaskDependencyTask = {
+  assigneeCount?: number;
+  dependencySummary?: TaskDependencySummary;
+  dueDate?: string | null;
   id: string;
+  priority?: TaskPriority;
   status: TaskStatus;
   title: string;
 };

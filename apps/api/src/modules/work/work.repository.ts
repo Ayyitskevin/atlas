@@ -316,8 +316,26 @@ export class WorkRepository {
   listTaskDependencies(input: { taskId: string; workspaceId: string }) {
     return this.prisma.taskDependency.findMany({
       include: {
-        blockedTask: { select: { id: true, status: true, title: true } },
-        blockingTask: { select: { id: true, status: true, title: true } },
+        blockedTask: {
+          select: {
+            _count: { select: { assignees: true } },
+            dueDate: true,
+            id: true,
+            priority: true,
+            status: true,
+            title: true,
+          },
+        },
+        blockingTask: {
+          select: {
+            _count: { select: { assignees: true } },
+            dueDate: true,
+            id: true,
+            priority: true,
+            status: true,
+            title: true,
+          },
+        },
       },
       orderBy: { createdAt: "asc" },
       where: {

@@ -1306,11 +1306,19 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
 
   it("manages task dependencies with cycle protection", async () => {
     const currentUser = await prisma.user.findUniqueOrThrow({ where: { email } });
+    type DependencyTaskContext = {
+      assigneeCount: number;
+      dependencySummary: { blockedByOpenCount: number; blocksCount: number; isBlocked: boolean };
+      dueDate: string | null;
+      id: string;
+      priority: string;
+      status: string;
+    };
 
     const blockedTask = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
-      payload: { sectionId, title: "Dependency blocked task" },
+      payload: { dueDate: "2026-07-20", priority: "HIGH", sectionId, title: "Dependency blocked task" },
       url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks",
     });
     expect(blockedTask.statusCode).toBe(201);
@@ -1353,13 +1361,23 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     });
     expect(dependencies.statusCode).toBe(200);
     const dependenciesBody = dependencies.json<{
-      blockedBy: Array<{ id: string; task: { id: string } }>;
+      blockedBy: Array<{ id: string; task: DependencyTaskContext }>;
       blocks: Array<{ id: string }>;
       isBlocked: boolean;
     }>();
     expect(dependenciesBody.isBlocked).toBe(true);
     expect(dependenciesBody.blockedBy).toContainEqual(
-      expect.objectContaining({ id: dependencyId, task: expect.objectContaining({ id: blockingTaskId }) }),
+      expect.objectContaining({
+        id: dependencyId,
+        task: expect.objectContaining({
+          assigneeCount: 0,
+          dependencySummary: { blockedByOpenCount: 0, blocksCount: 1, isBlocked: false },
+          dueDate: null,
+          id: blockingTaskId,
+          priority: "MEDIUM",
+          status: "TODO",
+        }),
+      }),
     );
 
     const blockingSide = await app!.inject({
@@ -1368,9 +1386,15 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockingTaskId + "/dependencies",
     });
     expect(blockingSide.statusCode).toBe(200);
-    expect(blockingSide.json<{ blocks: Array<{ task: { id: string } }> }>().blocks).toContainEqual(
-      expect.objectContaining({ task: expect.objectContaining({ id: blockedTaskId }) }),
-    );
+    const blockingSideBody = blockingSide.json<{ blocks: Array<{ task: DependencyTaskContext }> }>();
+    expect(blockingSideBody.blocks).toContainEqual(expect.objectContaining({ task: expect.objectContaining({ id: blockedTaskId }) }));
+    expect(blockingSideBody.blocks.find((edge) => edge.task.id === blockedTaskId)?.task).toMatchObject({
+      assigneeCount: 0,
+      dependencySummary: { blockedByOpenCount: 1, blocksCount: 0, isBlocked: true },
+      dueDate: "2026-07-20",
+      priority: "HIGH",
+      status: "TODO",
+    });
 
     const projectTasksWithDependency = await app!.inject({
       headers: authHeaders(accessToken),
@@ -1410,6 +1434,18 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockingTaskId + "/assign",
     });
     expect(assignBlockingTask.statusCode).toBe(200);
+
+    const blockingSideAfterAssignment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockingTaskId + "/dependencies",
+    });
+    expect(blockingSideAfterAssignment.statusCode).toBe(200);
+    expect(
+      blockingSideAfterAssignment
+        .json<{ blocks: Array<{ task: DependencyTaskContext }> }>()
+        .blocks.find((edge) => edge.task.id === blockedTaskId)?.task.assigneeCount,
+    ).toBe(1);
 
     const myBlockedWork = await app!.inject({
       headers: authHeaders(accessToken),

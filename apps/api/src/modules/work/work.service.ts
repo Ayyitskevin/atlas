@@ -406,8 +406,16 @@ export class WorkService {
   async listTaskDependencies(ctx: AuthContext, workspaceId: string, taskId: string) {
     await this.permissions.requireTaskRole(ctx, workspaceId, taskId, "VIEWER");
     const rows = await this.workRepository.listTaskDependencies({ taskId, workspaceId });
-    const blockedBy = rows.filter((row) => row.blockedTaskId === taskId).map((row) => dependencyEdgeView(row, row.blockingTask));
-    const blocks = rows.filter((row) => row.blockingTaskId === taskId).map((row) => dependencyEdgeView(row, row.blockedTask));
+    const summaries = await this.dependencySummaryMap(
+      workspaceId,
+      rows.flatMap((row) => [row.blockedTaskId, row.blockingTaskId]),
+    );
+    const blockedBy = rows
+      .filter((row) => row.blockedTaskId === taskId)
+      .map((row) => dependencyEdgeView(row, row.blockingTask, summaries.get(row.blockingTaskId)));
+    const blocks = rows
+      .filter((row) => row.blockingTaskId === taskId)
+      .map((row) => dependencyEdgeView(row, row.blockedTask, summaries.get(row.blockedTaskId)));
     const isBlocked = blockedBy.some((edge) => edge.task.status !== "DONE");
     return { blockedBy, blocks, isBlocked };
   }
@@ -826,11 +834,24 @@ export class WorkService {
   }
 
   private async withDependencySummaries<TTask extends { id: string }>(workspaceId: string, tasks: TTask[]) {
+    const summaries = await this.dependencySummaryMap(
+      workspaceId,
+      tasks.map((task) => task.id),
+    );
+
+    return tasks.map((task) => ({
+      ...task,
+      dependencySummary: summaries.get(task.id) ?? emptyDependencySummary(),
+    }));
+  }
+
+  private async dependencySummaryMap(workspaceId: string, taskIds: string[]) {
     const summaries = new Map<string, TaskDependencySummary>();
-    for (const task of tasks) summaries.set(task.id, emptyDependencySummary());
+    const ids = [...new Set(taskIds)];
+    for (const taskId of ids) summaries.set(taskId, emptyDependencySummary());
 
     const rows = await this.workRepository.listTaskDependencySummaryRows({
-      taskIds: tasks.map((task) => task.id),
+      taskIds: ids,
       workspaceId,
     });
 
@@ -845,10 +866,7 @@ export class WorkService {
       if (blocking) blocking.blocksCount += 1;
     }
 
-    return tasks.map((task) => ({
-      ...task,
-      dependencySummary: summaries.get(task.id) ?? emptyDependencySummary(),
-    }));
+    return summaries;
   }
 
   private async requireTaskNotBlocked(workspaceId: string, taskId: string) {
@@ -1099,14 +1117,30 @@ function dateTimeOrNull(value?: Date | string | null) {
 
 function dependencyEdgeView(
   row: { blockedTaskId: string; blockingTaskId: string; createdAt: Date; id: string },
-  task: { id: string; status: string; title: string },
+  task: {
+    _count?: { assignees: number };
+    dueDate?: Date | string | null;
+    id: string;
+    priority?: string;
+    status: string;
+    title: string;
+  },
+  dependencySummary?: TaskDependencySummary,
 ) {
   return {
     blockedTaskId: row.blockedTaskId,
     blockingTaskId: row.blockingTaskId,
     createdAt: row.createdAt,
     id: row.id,
-    task: { id: task.id, status: task.status, title: task.title },
+    task: {
+      assigneeCount: task._count?.assignees ?? 0,
+      dependencySummary: dependencySummary ?? emptyDependencySummary(),
+      dueDate: datePayloadValue(task.dueDate),
+      id: task.id,
+      priority: task.priority,
+      status: task.status,
+      title: task.title,
+    },
   };
 }
 
