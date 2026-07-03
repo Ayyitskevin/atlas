@@ -307,7 +307,16 @@ export function useProjectWork({
 
   function replaceTask(nextTask: Task | null | undefined) {
     if (!nextTask) return;
-    setTasks((currentTasks) => currentTasks.map((task) => (task.id === nextTask.id ? nextTask : task)));
+    setTasks((currentTasks) =>
+      currentTasks.map((task) =>
+        task.id === nextTask.id
+          ? {
+              ...nextTask,
+              dependencySummary: nextTask.dependencySummary ?? task.dependencySummary,
+            }
+          : task,
+      ),
+    );
   }
 
   async function updateTaskDetails(event: FormEvent<HTMLFormElement>) {
@@ -625,6 +634,7 @@ export function useProjectWork({
         { body: JSON.stringify({ blockingTaskId }), method: "POST" },
         auth.accessToken,
       );
+      await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
       await loadTaskDependencies(auth.accessToken, selectedWorkspaceId, selectedTaskId);
       await loadActivity(auth.accessToken, selectedWorkspaceId, "task", selectedProjectId, selectedTaskId);
       formElement.reset();
@@ -642,6 +652,7 @@ export function useProjectWork({
         { method: "DELETE" },
         auth.accessToken,
       );
+      await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
       await loadTaskDependencies(auth.accessToken, selectedWorkspaceId, selectedTaskId);
       await loadActivity(auth.accessToken, selectedWorkspaceId, "task", selectedProjectId, selectedTaskId);
     } catch (error) {

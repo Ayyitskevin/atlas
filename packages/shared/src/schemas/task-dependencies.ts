@@ -26,6 +26,13 @@ export const taskDependenciesResponseSchema = z.object({
   isBlocked: z.boolean(),
 });
 
+export const taskDependencySummarySchema = z.object({
+  blockedByOpenCount: z.number().int().nonnegative(),
+  blocksCount: z.number().int().nonnegative(),
+  isBlocked: z.boolean(),
+});
+
 export type AddTaskDependencyRequest = z.infer<typeof addTaskDependencyRequestSchema>;
 export type TaskDependencyEdge = z.infer<typeof taskDependencyEdgeSchema>;
 export type TaskDependenciesResponse = z.infer<typeof taskDependenciesResponseSchema>;
+export type TaskDependencySummary = z.infer<typeof taskDependencySummarySchema>;

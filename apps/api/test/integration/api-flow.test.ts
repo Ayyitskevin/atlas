@@ -1305,6 +1305,17 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
   }, 60_000);
 
   it("manages task dependencies with cycle protection", async () => {
+    const currentUser = await prisma.user.findUniqueOrThrow({ where: { email } });
+
+    const blockedTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { sectionId, title: "Dependency blocked task" },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks",
+    });
+    expect(blockedTask.statusCode).toBe(201);
+    const blockedTaskId = blockedTask.json<{ id: string }>().id;
+
     const blockingTask = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
@@ -1318,27 +1329,27 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       headers: authHeaders(accessToken),
       method: "POST",
       payload: { blockingTaskId },
-      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/dependencies",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockedTaskId + "/dependencies",
     });
     expect(addDependency.statusCode).toBe(201);
     const dependencyBody = addDependency.json<{ blockedTaskId: string; blockingTaskId: string; id: string }>();
-    expect(dependencyBody).toMatchObject({ blockedTaskId: taskId, blockingTaskId });
+    expect(dependencyBody).toMatchObject({ blockedTaskId, blockingTaskId });
     const dependencyId = dependencyBody.id;
 
     await expectActivityEvent({
       entityId: dependencyId,
       entityType: "task_dependency",
       eventType: "TaskDependencyAdded",
-      payload: { blockedTaskId: taskId, blockingTaskId },
+      payload: { blockedTaskId, blockingTaskId },
       projectId,
-      taskId,
+      taskId: blockedTaskId,
       workspaceId,
     });
 
     const dependencies = await app!.inject({
       headers: authHeaders(accessToken),
       method: "GET",
-      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/dependencies",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockedTaskId + "/dependencies",
     });
     expect(dependencies.statusCode).toBe(200);
     const dependenciesBody = dependencies.json<{
@@ -1358,15 +1369,58 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     });
     expect(blockingSide.statusCode).toBe(200);
     expect(blockingSide.json<{ blocks: Array<{ task: { id: string } }> }>().blocks).toContainEqual(
-      expect.objectContaining({ task: expect.objectContaining({ id: taskId }) }),
+      expect.objectContaining({ task: expect.objectContaining({ id: blockedTaskId }) }),
     );
+
+    const projectTasksWithDependency = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks?limit=100",
+    });
+    expect(projectTasksWithDependency.statusCode).toBe(200);
+    const dependencyTasks = projectTasksWithDependency.json<{
+      items: Array<{
+        dependencySummary: { blockedByOpenCount: number; blocksCount: number; isBlocked: boolean };
+        id: string;
+      }>;
+    }>().items;
+    expect(dependencyTasks.find((item) => item.id === blockedTaskId)?.dependencySummary).toEqual({
+      blockedByOpenCount: 1,
+      blocksCount: 0,
+      isBlocked: true,
+    });
+    expect(dependencyTasks.find((item) => item.id === blockingTaskId)?.dependencySummary).toEqual({
+      blockedByOpenCount: 0,
+      blocksCount: 1,
+      isBlocked: false,
+    });
+
+    const assignBlockedTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { userId: currentUser.id },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockedTaskId + "/assign",
+    });
+    expect(assignBlockedTask.statusCode).toBe(200);
+
+    const myBlockedWork = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/my-work?due=any&limit=20&status=open",
+    });
+    expect(myBlockedWork.statusCode).toBe(200);
+    expect(
+      myBlockedWork
+        .json<{ items: Array<{ dependencySummary: { blockedByOpenCount: number; isBlocked: boolean }; id: string }> }>()
+        .items.find((item) => item.id === blockedTaskId)?.dependencySummary,
+    ).toMatchObject({ blockedByOpenCount: 1, isBlocked: true });
 
     // Re-adding the same edge is idempotent and returns the existing dependency.
     const duplicate = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
       payload: { blockingTaskId },
-      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/dependencies",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockedTaskId + "/dependencies",
     });
     expect(duplicate.statusCode).toBe(201);
     expect(duplicate.json<{ id: string }>().id).toBe(dependencyId);
@@ -1375,8 +1429,8 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     const selfDependency = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
-      payload: { blockingTaskId: taskId },
-      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/dependencies",
+      payload: { blockingTaskId: blockedTaskId },
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockedTaskId + "/dependencies",
     });
     expect(selfDependency.statusCode).toBe(400);
 
@@ -1384,7 +1438,7 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     const cyclicDependency = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
-      payload: { blockingTaskId: taskId },
+      payload: { blockingTaskId: blockedTaskId },
       url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockingTaskId + "/dependencies",
     });
     expect(cyclicDependency.statusCode).toBe(409);
@@ -1399,22 +1453,34 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       entityId: dependencyId,
       entityType: "task_dependency",
       eventType: "TaskDependencyRemoved",
-      payload: { blockedTaskId: taskId, blockingTaskId },
+      payload: { blockedTaskId, blockingTaskId },
       projectId,
-      taskId,
+      taskId: blockedTaskId,
       workspaceId,
     });
 
     const dependenciesAfterRemove = await app!.inject({
       headers: authHeaders(accessToken),
       method: "GET",
-      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/dependencies",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + blockedTaskId + "/dependencies",
     });
     expect(dependenciesAfterRemove.statusCode).toBe(200);
     expect(dependenciesAfterRemove.json<{ blockedBy: Array<{ id: string }>; isBlocked: boolean }>()).toMatchObject({
       blockedBy: [],
       isBlocked: false,
     });
+
+    const projectTasksAfterDependencyRemove = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks?limit=100",
+    });
+    expect(projectTasksAfterDependencyRemove.statusCode).toBe(200);
+    expect(
+      projectTasksAfterDependencyRemove
+        .json<{ items: Array<{ dependencySummary: { blockedByOpenCount: number; blocksCount: number; isBlocked: boolean }; id: string }> }>()
+        .items.find((item) => item.id === blockedTaskId)?.dependencySummary,
+    ).toEqual({ blockedByOpenCount: 0, blocksCount: 0, isBlocked: false });
   }, 60_000);
 
   it("invalidates access tokens after logout", async () => {

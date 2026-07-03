@@ -32,6 +32,8 @@ const projectRefreshEvents = new Set([
   "TaskAssigned",
   "TaskCompleted",
   "TaskCreated",
+  "TaskDependencyAdded",
+  "TaskDependencyRemoved",
   "TaskLabelAdded",
   "TaskLabelRemoved",
   "TaskMoved",

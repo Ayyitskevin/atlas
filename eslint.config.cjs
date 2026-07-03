@@ -5,7 +5,7 @@ module.exports = [
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
-    ignores: ["**/dist/**", "**/.next/**", "**/coverage/**", "**/node_modules/**"],
+    ignores: ["**/dist/**", "**/.next/**", "**/coverage/**", "**/node_modules/**", "apps/web/next-env.d.ts"],
   },
   {
     files: ["**/*.{ts,tsx}"],

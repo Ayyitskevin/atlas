@@ -4,6 +4,7 @@ import type { FormEvent } from "react";
 
 import { taskStatusLabel } from "./atlas-format";
 import type { Section, Task } from "./atlas-types";
+import { TaskDependencyBadges } from "./task-dependency-badges";
 
 type BoardPanelProps = {
   onChooseTask: (taskId: string) => Promise<void>;
@@ -113,6 +114,7 @@ export function BoardPanel({
                     <button className="block w-full text-left" onClick={() => void onChooseTask(task.id)} type="button">
                       <span className="block font-medium text-slate-900">{task.title}</span>
                       <span className="text-xs text-slate-500">{taskStatusLabel(task.status)}</span>
+                      <TaskDependencyBadges summary={task.dependencySummary} />
                     </button>
                     {sections.length > 1 ? (
                       <select

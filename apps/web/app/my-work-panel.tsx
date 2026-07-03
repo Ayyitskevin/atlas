@@ -2,6 +2,7 @@
 
 import { dateInputValue, taskStatusLabel } from "./atlas-format";
 import type { MyWorkDueFilter, MyWorkScopeFilter, MyWorkStatusFilter, MyWorkTask } from "./atlas-types";
+import { TaskDependencyBadges } from "./task-dependency-badges";
 
 const dueFilters: Array<{ label: string; value: MyWorkDueFilter }> = [
   { label: "Any due date", value: "any" },
@@ -130,6 +131,7 @@ export function MyWorkPanel({
               {task.project.name} - {taskStatusLabel(task.status)}
               {task.dueDate ? " - due " + dateInputValue(task.dueDate) : ""}
             </span>
+            <TaskDependencyBadges summary={task.dependencySummary} />
           </button>
         ))}
       </div>

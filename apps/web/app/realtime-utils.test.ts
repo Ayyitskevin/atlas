@@ -136,5 +136,6 @@ describe("realtime utilities", () => {
     expect(realtimeEventTouchesTask(dependencyEvent, "task-1")).toBe(true);
     expect(realtimeEventTouchesTask(dependencyEvent, "task-2")).toBe(true);
     expect(realtimeEventTouchesTask(dependencyEvent, "task-3")).toBe(false);
+    expect(realtimeEventTouchesProject(dependencyEvent, "project-1")).toBe(true);
   });
 });

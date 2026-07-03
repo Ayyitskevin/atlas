@@ -5,6 +5,7 @@ import type { FormEvent } from "react";
 import { dateInputValue, formatActivityDetail, formatActivityTitle, taskStatusLabel } from "./atlas-format";
 import type { ActivityEvent, MyWorkTask, Notification, Project, Section, Task, Workspace, WorkspaceMember } from "./atlas-types";
 import { recentActiveProjects, workspaceDashboardStats } from "./dashboard-utils";
+import { TaskDependencyBadges } from "./task-dependency-badges";
 
 type WorkspaceDashboardPanelProps = {
   activities: ActivityEvent[];
@@ -143,6 +144,7 @@ export function WorkspaceDashboardPanel({
                     {task.project.name} - {taskStatusLabel(task.status)}
                     {task.dueDate ? " - due " + dateInputValue(task.dueDate) : ""}
                   </span>
+                  <TaskDependencyBadges summary={task.dependencySummary} />
                 </button>
               ))
             ) : (

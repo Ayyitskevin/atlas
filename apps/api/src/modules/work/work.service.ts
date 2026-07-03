@@ -36,6 +36,12 @@ import { wouldCreateDependencyCycle } from "./task-dependencies.js";
 import { nextRecurringDueDate } from "./task-recurrence.js";
 import { WorkRepository } from "./work.repository.js";
 
+type TaskDependencySummary = {
+  blockedByOpenCount: number;
+  blocksCount: number;
+  isBlocked: boolean;
+};
+
 export class WorkService {
   constructor(
     private readonly workRepository: WorkRepository,
@@ -143,13 +149,17 @@ export class WorkService {
 
   async listTasks(ctx: AuthContext, workspaceId: string, projectId: string, query: CursorPaginationQuery) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "VIEWER");
-    return pageFromLimit(await this.workRepository.listTasks({ ...query, projectId, workspaceId }), query.limit);
+    const tasks = await this.workRepository.listTasks({ ...query, projectId, workspaceId });
+    return pageFromLimit(await this.withDependencySummaries(workspaceId, tasks), query.limit);
   }
 
   async listMyWork(ctx: AuthContext, workspaceId: string, query: MyWorkQuery) {
     await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
     return pageFromLimit(
-      await this.workRepository.listMyWork({ ...query, userId: ctx.userId, workspaceId }),
+      await this.withDependencySummaries(
+        workspaceId,
+        await this.workRepository.listMyWork({ ...query, userId: ctx.userId, workspaceId }),
+      ),
       query.limit,
     );
   }
@@ -811,6 +821,32 @@ export class WorkService {
     }
   }
 
+  private async withDependencySummaries<TTask extends { id: string }>(workspaceId: string, tasks: TTask[]) {
+    const summaries = new Map<string, TaskDependencySummary>();
+    for (const task of tasks) summaries.set(task.id, emptyDependencySummary());
+
+    const rows = await this.workRepository.listTaskDependencySummaryRows({
+      taskIds: tasks.map((task) => task.id),
+      workspaceId,
+    });
+
+    for (const row of rows) {
+      const blocked = summaries.get(row.blockedTaskId);
+      if (blocked && row.blockingTask.status !== "DONE") {
+        blocked.blockedByOpenCount += 1;
+        blocked.isBlocked = true;
+      }
+
+      const blocking = summaries.get(row.blockingTaskId);
+      if (blocking) blocking.blocksCount += 1;
+    }
+
+    return tasks.map((task) => ({
+      ...task,
+      dependencySummary: summaries.get(task.id) ?? emptyDependencySummary(),
+    }));
+  }
+
   private createRecurrence(input: CreateTaskRequest) {
     if (input.recurrenceInterval !== undefined && !input.recurrenceFrequency) {
       throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "Recurring tasks require a recurrence frequency.");
@@ -1023,6 +1059,10 @@ function dependencyEdgeView(
     id: row.id,
     task: { id: task.id, status: task.status, title: task.title },
   };
+}
+
+function emptyDependencySummary(): TaskDependencySummary {
+  return { blockedByOpenCount: 0, blocksCount: 0, isBlocked: false };
 }
 
 function isPrismaUniqueConstraintError(error: unknown) {

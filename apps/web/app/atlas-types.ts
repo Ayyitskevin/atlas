@@ -167,10 +167,17 @@ export type TaskDependencies = {
   isBlocked: boolean;
 };
 
+export type TaskDependencySummary = {
+  blockedByOpenCount: number;
+  blocksCount: number;
+  isBlocked: boolean;
+};
+
 export type Task = {
   assignees?: TaskAssignee[];
   completedAt?: string | null;
   createdAt?: string;
+  dependencySummary?: TaskDependencySummary;
   description?: string | null;
   dueDate?: string | null;
   id: string;

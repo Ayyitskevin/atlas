@@ -336,6 +336,24 @@ export class WorkRepository {
     });
   }
 
+  listTaskDependencySummaryRows(input: { taskIds: string[]; workspaceId: string }) {
+    const taskIds = [...new Set(input.taskIds)];
+    if (!taskIds.length) return Promise.resolve([]);
+    return this.prisma.taskDependency.findMany({
+      select: {
+        blockedTaskId: true,
+        blockingTask: { select: { status: true } },
+        blockingTaskId: true,
+      },
+      where: {
+        blockedTask: { deletedAt: null },
+        blockingTask: { deletedAt: null },
+        OR: [{ blockedTaskId: { in: taskIds } }, { blockingTaskId: { in: taskIds } }],
+        workspaceId: input.workspaceId,
+      },
+    });
+  }
+
   findTaskDependencyByPair(input: { blockedTaskId: string; blockingTaskId: string; workspaceId: string }) {
     return this.prisma.taskDependency.findFirst({
       include: {
