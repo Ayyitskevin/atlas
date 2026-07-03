@@ -1,8 +1,8 @@
 import type { Prisma, PrismaClient, TaskPriority, TaskRecurrenceFrequency, TaskStatus } from "@atlas/db";
-import type { MyWorkDependencyFilter, MyWorkDueFilter, MyWorkScopeFilter, MyWorkStatusFilter, SearchResultType } from "@atlas/shared";
+import type { MyWorkDependencyFilter, MyWorkDueFilter, MyWorkScopeFilter, MyWorkStatusFilter, ProjectTaskQuery, SearchResultType } from "@atlas/shared";
 
 import { paginationArgs } from "../../shared/pagination.js";
-import { myWorkDependencyWhere, myWorkDueDateWhere, myWorkScopeWhere, myWorkStatusWhere } from "./my-work-filters.js";
+import { myWorkDependencyWhere, myWorkDueDateWhere, myWorkScopeWhere, myWorkStatusWhere, taskDependencyWhere } from "./my-work-filters.js";
 import { completedAtForStatusTransition } from "./task-state.js";
 
 export class WorkRepository {
@@ -95,12 +95,17 @@ export class WorkRepository {
     });
   }
 
-  listTasks(input: { cursor?: string; limit: number; projectId: string; workspaceId: string }) {
+  listTasks(input: ProjectTaskQuery & { projectId: string; workspaceId: string }) {
     return this.prisma.task.findMany({
       ...paginationArgs(input),
       include: { assignees: true },
       orderBy: [{ sectionId: "asc" }, { position: "asc" }],
-      where: { deletedAt: null, projectId: input.projectId, workspaceId: input.workspaceId },
+      where: {
+        AND: [taskDependencyWhere(input.dependency, input.workspaceId)],
+        deletedAt: null,
+        projectId: input.projectId,
+        workspaceId: input.workspaceId,
+      },
     });
   }
 

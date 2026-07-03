@@ -22,6 +22,7 @@ import type {
   TaskLabel,
   TaskLabelAssignment,
   TaskPriority,
+  TaskDependencyFilter,
   TaskStatus,
   TaskWatcher,
 } from "./atlas-types";
@@ -62,6 +63,7 @@ export function useProjectWork({
   const [taskLabels, setTaskLabels] = useState<TaskLabelAssignment[]>([]);
   const [taskWatchers, setTaskWatchers] = useState<TaskWatcher[]>([]);
   const [taskDependencies, setTaskDependencies] = useState<TaskDependencies>(emptyTaskDependencies);
+  const [taskDependencyFilter, setTaskDependencyFilter] = useState<TaskDependencyFilter>("any");
   const [attachmentStatus, setAttachmentStatus] = useState("");
   const [labelStatus, setLabelStatus] = useState("");
   const [watcherStatus, setWatcherStatus] = useState("");
@@ -87,16 +89,24 @@ export function useProjectWork({
     setDependencyStatus("");
   }
 
-  async function loadProjectData(accessToken: string, workspaceId: string, projectId: string) {
+  async function loadProjectData(accessToken: string, workspaceId: string, projectId: string, dependency: TaskDependencyFilter = taskDependencyFilter) {
+    const taskQuery = new URLSearchParams({ dependency, limit: "100" });
     const [sectionPage, taskPage, labelPage] = await Promise.all([
       api<Page<Section>>(`/workspaces/${workspaceId}/projects/${projectId}/sections`, {}, accessToken),
-      api<Page<Task>>(`/workspaces/${workspaceId}/projects/${projectId}/tasks`, {}, accessToken),
+      api<Page<Task>>(`/workspaces/${workspaceId}/projects/${projectId}/tasks?${taskQuery.toString()}`, {}, accessToken),
       api<Page<TaskLabel>>(`/workspaces/${workspaceId}/labels`, {}, accessToken),
       loadProjectMembers(accessToken, workspaceId, projectId),
     ]);
     setSections(sectionPage.items);
     setTasks(taskPage.items);
     setWorkspaceLabels(labelPage.items);
+  }
+
+  function changeTaskDependencyFilter(dependency: TaskDependencyFilter) {
+    setTaskDependencyFilter(dependency);
+    if (auth && selectedWorkspaceId && selectedProjectId) {
+      void loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId, dependency);
+    }
   }
 
   async function createSection(event: FormEvent<HTMLFormElement>) {
@@ -796,6 +806,7 @@ export function useProjectWork({
     clearTaskDetailState,
     comments,
     completeTask,
+    changeTaskDependencyFilter,
     createComment,
     createSection,
     createSubtask,
@@ -821,6 +832,7 @@ export function useProjectWork({
     skipRecurringTask,
     subtasks,
     taskLabels,
+    taskDependencyFilter,
     taskWatchers,
     tasks,
     toggleSubtask,

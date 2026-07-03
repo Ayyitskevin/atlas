@@ -11,6 +11,7 @@ import {
   type CursorPaginationQuery,
   type MoveTaskRequest,
   type MyWorkQuery,
+  type ProjectTaskQuery,
   type NotificationQuery,
   type UpdateNotificationPreferenceRequest,
   type ReorderSectionsRequest,
@@ -147,7 +148,7 @@ export class WorkService {
     return task;
   }
 
-  async listTasks(ctx: AuthContext, workspaceId: string, projectId: string, query: CursorPaginationQuery) {
+  async listTasks(ctx: AuthContext, workspaceId: string, projectId: string, query: ProjectTaskQuery) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "VIEWER");
     const tasks = await this.workRepository.listTasks({ ...query, projectId, workspaceId });
     return pageFromLimit(await this.withDependencySummaries(workspaceId, tasks), query.limit);

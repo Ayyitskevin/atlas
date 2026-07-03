@@ -19,6 +19,10 @@ export function myWorkDueDateWhere(due: MyWorkDueFilter, now = new Date()): Pris
 }
 
 export function myWorkDependencyWhere(dependency: MyWorkDependencyFilter, workspaceId: string): Prisma.TaskWhereInput {
+  return taskDependencyWhere(dependency, workspaceId);
+}
+
+export function taskDependencyWhere(dependency: MyWorkDependencyFilter, workspaceId: string): Prisma.TaskWhereInput {
   if (dependency === "blocked") {
     return {
       dependenciesAsBlocked: {

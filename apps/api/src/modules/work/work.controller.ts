@@ -14,6 +14,7 @@ import {
   moveTaskRequestSchema,
   myWorkQuerySchema,
   notificationQuerySchema,
+  projectTaskQuerySchema,
   reorderSectionsRequestSchema,
   searchQuerySchema,
   taskWatcherUserRequestSchema,
@@ -80,7 +81,7 @@ export class WorkController {
 
   listTasks = async (request: FastifyRequest) => {
     const { projectId, workspaceId } = parseParams(request, projectParamsSchema);
-    return this.workService.listTasks(await requireAuth(request), workspaceId, projectId, parseQuery(request, cursorPaginationQuerySchema));
+    return this.workService.listTasks(await requireAuth(request), workspaceId, projectId, parseQuery(request, projectTaskQuerySchema));
   };
 
   listMyWork = async (request: FastifyRequest) => {

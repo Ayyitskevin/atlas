@@ -1419,6 +1419,29 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       isBlocked: false,
     });
 
+    const blockedProjectTasks = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks?dependency=blocked&limit=100",
+    });
+    expect(blockedProjectTasks.statusCode).toBe(200);
+    expect(blockedProjectTasks.json<{ items: Array<{ id: string }> }>().items.map((item) => item.id)).toEqual([blockedTaskId]);
+
+    const blockingProjectTasks = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks?dependency=blocking&limit=100",
+    });
+    expect(blockingProjectTasks.statusCode).toBe(200);
+    expect(blockingProjectTasks.json<{ items: Array<{ id: string }> }>().items.map((item) => item.id)).toEqual([blockingTaskId]);
+
+    const invalidProjectTaskDependencyFilter = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks?dependency=waiting",
+    });
+    expect(invalidProjectTaskDependencyFilter.statusCode).toBe(400);
+
     const assignBlockedTask = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",

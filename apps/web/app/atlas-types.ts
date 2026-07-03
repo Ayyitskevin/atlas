@@ -201,7 +201,8 @@ export type Task = {
 };
 
 export type MyWorkDueFilter = "any" | "overdue" | "today" | "next7" | "unscheduled";
-export type MyWorkDependencyFilter = "any" | "blocked" | "blocking";
+export type TaskDependencyFilter = "any" | "blocked" | "blocking";
+export type MyWorkDependencyFilter = TaskDependencyFilter;
 export type MyWorkScopeFilter = "all" | "assigned" | "watching";
 export type MyWorkStatusFilter = "all" | "done" | "open";
 

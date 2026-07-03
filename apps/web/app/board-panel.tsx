@@ -3,20 +3,28 @@
 import type { FormEvent } from "react";
 
 import { taskStatusLabel } from "./atlas-format";
-import type { Section, Task } from "./atlas-types";
+import type { Section, Task, TaskDependencyFilter } from "./atlas-types";
 import { TaskDependencyBadges } from "./task-dependency-badges";
+
+const dependencyFilters: Array<{ label: string; value: TaskDependencyFilter }> = [
+  { label: "All dependency states", value: "any" },
+  { label: "Blocked", value: "blocked" },
+  { label: "Blocking open work", value: "blocking" },
+];
 
 type BoardPanelProps = {
   onChooseTask: (taskId: string) => Promise<void>;
   onCreateSection: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onCreateTask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onDeleteSection: (sectionId: string) => Promise<void>;
+  onDependencyFilterChange: (dependency: TaskDependencyFilter) => void;
   onMoveSection: (sectionId: string, direction: -1 | 1) => Promise<void>;
   onMoveTask: (task: Task, sectionId: string) => Promise<void>;
   onRenameSection: (sectionId: string, name: string) => Promise<void>;
   projectName?: string;
   sections: Section[];
   selectedTaskId: string;
+  taskDependencyFilter: TaskDependencyFilter;
   tasks: Task[];
 };
 
@@ -25,24 +33,40 @@ export function BoardPanel({
   onCreateSection,
   onCreateTask,
   onDeleteSection,
+  onDependencyFilterChange,
   onMoveSection,
   onMoveTask,
   onRenameSection,
   projectName,
   sections,
   selectedTaskId,
+  taskDependencyFilter,
   tasks,
 }: BoardPanelProps) {
   return (
     <section className="grid content-start gap-4 rounded-lg border border-slate-200 bg-white p-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-sm font-semibold uppercase text-slate-500">{projectName ?? "Tasks"}</h2>
-        <form className="flex gap-2" onSubmit={onCreateSection}>
-          <input className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm" name="name" placeholder="Section" required />
-          <button className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium" type="submit">
-            Add
-          </button>
-        </form>
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            aria-label="Task dependency filter"
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            onChange={(event) => onDependencyFilterChange(event.target.value as TaskDependencyFilter)}
+            value={taskDependencyFilter}
+          >
+            {dependencyFilters.map((filter) => (
+              <option key={filter.value} value={filter.value}>
+                {filter.label}
+              </option>
+            ))}
+          </select>
+          <form className="flex gap-2" onSubmit={onCreateSection}>
+            <input className="w-36 rounded-md border border-slate-300 px-3 py-2 text-sm" name="name" placeholder="Section" required />
+            <button className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium" type="submit">
+              Add
+            </button>
+          </form>
+        </div>
       </div>
 
       <form className="grid gap-2 md:grid-cols-[1fr_180px_auto]" onSubmit={onCreateTask}>
@@ -132,7 +156,11 @@ export function BoardPanel({
                     ) : null}
                   </article>
                 ))}
-                {!sectionTasks.length ? <p className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">No tasks.</p> : null}
+                {!sectionTasks.length ? (
+                  <p className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs text-slate-500">
+                    {taskDependencyFilter === "any" ? "No tasks." : "No matching tasks."}
+                  </p>
+                ) : null}
               </div>
             </div>
           );

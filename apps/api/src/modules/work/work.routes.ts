@@ -17,6 +17,7 @@ import {
   myWorkQuerySchema,
   notificationQuerySchema,
   notificationPreferenceResponseSchema,
+  projectTaskQuerySchema,
   reorderSectionsRequestSchema,
   searchResponseSchema,
   searchQuerySchema,
@@ -63,7 +64,7 @@ export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
   app.post("/workspaces/:workspaceId/projects/:projectId/sections/reorder", { schema: openApiSchema({ body: reorderSectionsRequestSchema, params: projectParamsSchema, tags: ["Sections"] }) }, controller.reorderSections);
 
   app.post("/workspaces/:workspaceId/projects/:projectId/tasks", { schema: openApiSchema({ body: createTaskRequestSchema, params: projectParamsSchema, tags: ["Tasks"] }) }, controller.createTask);
-  app.get("/workspaces/:workspaceId/projects/:projectId/tasks", { schema: openApiSchema({ params: projectParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Tasks"] }) }, controller.listTasks);
+  app.get("/workspaces/:workspaceId/projects/:projectId/tasks", { schema: openApiSchema({ params: projectParamsSchema, querystring: projectTaskQuerySchema, tags: ["Tasks"] }) }, controller.listTasks);
   app.get("/workspaces/:workspaceId/my-work", { schema: openApiSchema({ params: workspaceParamsSchema, querystring: myWorkQuerySchema, tags: ["Tasks"] }) }, controller.listMyWork);
   app.get("/workspaces/:workspaceId/tasks/:taskId", { schema: openApiSchema({ params: taskParamsSchema, tags: ["Tasks"] }) }, controller.getTask);
   app.patch("/workspaces/:workspaceId/tasks/:taskId", { schema: openApiSchema({ body: updateTaskRequestSchema, params: taskParamsSchema, tags: ["Tasks"] }) }, controller.updateTask);

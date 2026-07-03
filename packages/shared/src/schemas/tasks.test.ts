@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { createTaskRequestSchema, myWorkQuerySchema, updateTaskRequestSchema } from "./tasks.js";
+import { createTaskRequestSchema, myWorkQuerySchema, projectTaskQuerySchema, updateTaskRequestSchema } from "./tasks.js";
 
 describe("task schemas", () => {
   it("validates recurring task creation fields", () => {
@@ -49,5 +49,17 @@ describe("task schemas", () => {
     });
     expect(myWorkQuerySchema.parse({ dependency: "blocking" })).toMatchObject({ dependency: "blocking" });
     expect(myWorkQuerySchema.safeParse({ dependency: "waiting" }).success).toBe(false);
+  });
+
+  it("validates project task dependency filters", () => {
+    expect(projectTaskQuerySchema.parse({ dependency: "blocked" })).toMatchObject({
+      dependency: "blocked",
+      limit: 25,
+    });
+    expect(projectTaskQuerySchema.parse({ dependency: "blocking", limit: "100" })).toMatchObject({
+      dependency: "blocking",
+      limit: 100,
+    });
+    expect(projectTaskQuerySchema.safeParse({ dependency: "waiting" }).success).toBe(false);
   });
 });

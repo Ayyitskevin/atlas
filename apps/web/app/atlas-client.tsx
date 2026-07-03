@@ -199,6 +199,7 @@ export function AtlasClient({
     clearTaskDetailState,
     comments,
     completeTask,
+    changeTaskDependencyFilter,
     createComment,
     createSection,
     createSubtask,
@@ -225,6 +226,7 @@ export function AtlasClient({
     skipRecurringTask,
     subtasks,
     taskLabels,
+    taskDependencyFilter,
     taskWatchers,
     tasks,
     toggleSubtask,
@@ -1052,12 +1054,14 @@ export function AtlasClient({
             onCreateSection={createSection}
             onCreateTask={createTask}
             onDeleteSection={deleteSection}
+            onDependencyFilterChange={changeTaskDependencyFilter}
             onMoveSection={moveSection}
             onMoveTask={moveTaskToSection}
             onRenameSection={renameSection}
             projectName={selectedProject?.name}
             sections={sections}
             selectedTaskId={selectedTaskId}
+            taskDependencyFilter={taskDependencyFilter}
             tasks={tasks}
           />
 
