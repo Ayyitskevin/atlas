@@ -146,6 +146,7 @@ docs/
 ## Documentation
 
 - [Architecture](docs/architecture.md)
+- [Deployment](docs/deployment.md)
 - [ADRs](docs/decisions)
 - [Notes](docs/notes)
 

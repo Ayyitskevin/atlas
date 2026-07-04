@@ -1,0 +1,12 @@
+[Unit]
+Description=Run Atlas attachment maintenance daily
+Documentation=https://github.com/Ayyitskevin/atlas
+
+[Timer]
+OnCalendar=*-*-* 03:15:00
+RandomizedDelaySec=45m
+Persistent=true
+Unit=atlas-attachment-maintenance.service
+
+[Install]
+WantedBy=timers.target

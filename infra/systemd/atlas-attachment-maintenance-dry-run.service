@@ -1,0 +1,16 @@
+[Unit]
+Description=Atlas attachment maintenance cleanup dry run
+Documentation=https://github.com/Ayyitskevin/atlas
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=atlas
+Group=atlas
+WorkingDirectory=/opt/atlas
+EnvironmentFile=/etc/atlas/atlas.env
+ExecStart=/usr/bin/env corepack pnpm cleanup:attachments
+NoNewPrivileges=true
+PrivateTmp=true
+UMask=0077
