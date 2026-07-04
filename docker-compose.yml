@@ -53,6 +53,12 @@ services:
     entrypoint: ["/bin/sh", "-c"]
     command: ["mc alias set local http://minio:9000 atlas atlas-password && mc mb --ignore-existing local/atlas-local && mc anonymous set none local/atlas-local"]
 
+  clamav:
+    image: clamav/clamav:stable
+    profiles: ["scanner"]
+    ports:
+      - "${CLAMAV_HOST_PORT:-3310}:3310"
+
   migrate:
     build:
       context: .
@@ -82,6 +88,10 @@ services:
         condition: service_completed_successfully
     env_file: .env.example
     environment:
+      ATTACHMENT_SCAN_PROVIDER: ${ATTACHMENT_SCAN_PROVIDER:-noop}
+      CLAMAV_HOST: ${CLAMAV_HOST:-clamav}
+      CLAMAV_PORT: ${CLAMAV_PORT:-3310}
+      CLAMAV_TIMEOUT_MS: ${CLAMAV_TIMEOUT_MS:-10000}
       DATABASE_URL: postgresql://atlas:atlas@postgres:5432/atlas
       REDIS_URL: redis://redis:6379
     ports:

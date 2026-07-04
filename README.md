@@ -70,6 +70,13 @@ POSTGRES_HOST_PORT=55432 REDIS_HOST_PORT=6380 MINIO_API_HOST_PORT=9100 MINIO_CON
 
 The `*:local` verification scripts start isolated Postgres, Redis, and MinIO services. `preflight:local` also signs, uploads, verifies metadata for, and removes a probe object. Use `ATLAS_INTEGRATION_MINIO_API_PORT` and `ATLAS_INTEGRATION_MINIO_CONSOLE_PORT` to avoid clashes with a running development stack.
 
+Optional ClamAV scanner for local compose:
+
+```bash
+docker compose --profile scanner up clamav
+ATTACHMENT_SCAN_PROVIDER=clamav CLAMAV_HOST=127.0.0.1 corepack pnpm preflight
+```
+
 ## Common Commands
 
 ```bash
@@ -105,7 +112,9 @@ Pending upload cleanup note: `pnpm cleanup:pending-uploads` defaults to a dry ru
 
 Deleted attachment retention note: `pnpm cleanup:deleted-attachment-objects` defaults to a dry run and reports retained S3-compatible objects for soft-deleted attachments older than 30 days. Re-run with `-- --confirm` to delete those objects and mark their metadata with `object_deleted_at`; set `ATLAS_DELETED_ATTACHMENT_OBJECT_RETENTION_DAYS` to use a different retention window.
 
-Attachment scan note: `ATTACHMENT_SCAN_PROVIDER=noop` is the default and records a durable `SKIPPED` scan status. Set `ATTACHMENT_SCAN_PROVIDER=clamav` with `CLAMAV_HOST`, `CLAMAV_PORT`, and `CLAMAV_TIMEOUT_MS` to stream completed upload objects to clamd before activation. Clean objects are published; infected or unverifiable objects stay unpublished with `INFECTED` or `ERROR` scan state.
+Attachment scan note: `ATTACHMENT_SCAN_PROVIDER=noop` is the default and records a durable `SKIPPED` scan status. Set `ATTACHMENT_SCAN_PROVIDER=clamav` with `CLAMAV_HOST`, `CLAMAV_PORT`, and `CLAMAV_TIMEOUT_MS` to stream completed upload objects to clamd before activation. Clean objects are published; infected or unverifiable objects stay unpublished with `INFECTED` or `ERROR` scan state. `pnpm preflight` reports `attachmentScanner: "skipped"` for the noop provider and requires a successful clamd `PING` when the ClamAV provider is enabled.
+
+When using the Docker Compose app containers with the scanner profile, set `CLAMAV_HOST=clamav` for the API container; when running the API or `pnpm preflight` directly on the host against the exposed compose service, use `CLAMAV_HOST=127.0.0.1`.
 
 Run the dockerized E2E smoke test against a running API container:
 
@@ -113,7 +122,7 @@ Run the dockerized E2E smoke test against a running API container:
 ATLAS_E2E_DOCKER=1 ATLAS_E2E_BASE_URL=http://localhost:4000 corepack pnpm test:e2e
 ```
 
-API integration tests require `DATABASE_URL` to point at a reachable PostgreSQL database. When `DATABASE_URL` is unset, `pnpm test` still runs the DB-free unit and web suites and reports the integration flow as skipped. Use `pnpm test:integration` when you want the DB-backed flow to be mandatory; use `pnpm test:integration:local` to run the DB-backed suite against isolated Postgres/Redis services. Use `pnpm preflight` to validate the Prisma schema, check migration status, verify `/readyz` against the configured `DATABASE_URL` and `REDIS_URL`, and verify S3-compatible signed upload/download instruction generation; use `pnpm preflight:local` for the same check against disposable local Postgres/Redis services. Use `pnpm smoke:demo:local` to apply migrations, seed the demo workspace, log in with the documented demo account, and verify the launch-critical demo surfaces through the API. The local harness uses Docker Compose when available and falls back to direct Podman containers on Podman hosts without a Compose provider. GitHub Actions runs `pnpm test:unit` and `pnpm test:integration` separately.
+API integration tests require `DATABASE_URL` to point at a reachable PostgreSQL database. When `DATABASE_URL` is unset, `pnpm test` still runs the DB-free unit and web suites and reports the integration flow as skipped. Use `pnpm test:integration` when you want the DB-backed flow to be mandatory; use `pnpm test:integration:local` to run the DB-backed suite against isolated Postgres/Redis services. Use `pnpm preflight` to validate the Prisma schema, check migration status, verify `/readyz` against the configured `DATABASE_URL` and `REDIS_URL`, verify S3-compatible signed upload/download instruction generation plus object writes, and verify clamd reachability when `ATTACHMENT_SCAN_PROVIDER=clamav`; use `pnpm preflight:local` for the same default checks against disposable local Postgres/Redis/MinIO services. Use `pnpm smoke:demo:local` to apply migrations, seed the demo workspace, log in with the documented demo account, and verify the launch-critical demo surfaces through the API. The local harness uses Docker Compose when available and falls back to direct Podman containers on Podman hosts without a Compose provider. GitHub Actions runs `pnpm test:unit` and `pnpm test:integration` separately.
 
 ## Repository Layout
 

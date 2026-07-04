@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import {
   attachmentScanBlockReason,
   attachmentScannerErrorResult,
+  checkClamAvScannerReadiness,
   createClamAvAttachmentScanner,
   noopAttachmentScanner,
 } from "../../src/storage/attachment-scanner.js";
@@ -103,6 +104,25 @@ describe("attachment scanner", () => {
       await fixture.close();
     }
   });
+
+  it("checks ClamAV readiness with a ping command", async () => {
+    const fixture = await startFakeClamAv("PONG\0");
+    try {
+      await expect(checkClamAvScannerReadiness({ host: "127.0.0.1", port: fixture.port, timeoutMs: 1000 })).resolves.toBeUndefined();
+      await expect(fixture.receivedCommand).resolves.toBe("zPING\0");
+    } finally {
+      await fixture.close();
+    }
+  });
+
+  it("rejects unexpected ClamAV readiness responses", async () => {
+    const fixture = await startFakeClamAv("UNKNOWN\0");
+    try {
+      await expect(checkClamAvScannerReadiness({ host: "127.0.0.1", port: fixture.port, timeoutMs: 1000 })).rejects.toThrow("ClamAV ping failed: UNKNOWN.");
+    } finally {
+      await fixture.close();
+    }
+  });
 });
 
 function scanInput() {
@@ -119,13 +139,20 @@ function scanInput() {
 async function startFakeClamAv(response: string): Promise<{
   close: () => Promise<void>;
   port: number;
+  receivedCommand: Promise<string>;
   receivedPayload: Promise<Buffer>;
 }> {
   let resolvePayload!: (payload: Buffer) => void;
   let rejectPayload!: (error: Error) => void;
+  let resolveCommand!: (command: string) => void;
+  let rejectCommand!: (error: Error) => void;
   const receivedPayload = new Promise<Buffer>((resolve, reject) => {
     resolvePayload = resolve;
     rejectPayload = reject;
+  });
+  const receivedCommand = new Promise<string>((resolve, reject) => {
+    resolveCommand = resolve;
+    rejectCommand = reject;
   });
   const server = createServer((socket) => {
     let buffer = Buffer.alloc(0);
@@ -135,20 +162,31 @@ async function startFakeClamAv(response: string): Promise<{
     socket.on("data", (chunk) => {
       buffer = Buffer.concat([buffer, chunk]);
       try {
+        if (buffer.equals(Buffer.from("zPING\0"))) {
+          resolveCommand("zPING\0");
+          resolvePayload(Buffer.alloc(0));
+          socket.end(response);
+          return;
+        }
         const result = readClamAvInstreamPayload(buffer, commandRead, payloadChunks);
         buffer = result.buffer;
         commandRead = result.commandRead;
         if (result.done) {
+          resolveCommand("zINSTREAM\0");
           resolvePayload(Buffer.concat(payloadChunks));
           socket.end(response);
         }
       } catch (error) {
         const normalized = error instanceof Error ? error : new Error(String(error));
+        rejectCommand(normalized);
         rejectPayload(normalized);
         socket.destroy(normalized);
       }
     });
-    socket.once("error", (error) => rejectPayload(error));
+    socket.once("error", (error) => {
+      rejectCommand(error);
+      rejectPayload(error);
+    });
   });
   await listen(server);
 
@@ -161,6 +199,7 @@ async function startFakeClamAv(response: string): Promise<{
   return {
     close: () => closeServer(server),
     port: address.port,
+    receivedCommand,
     receivedPayload,
   };
 }

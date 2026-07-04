@@ -1,5 +1,8 @@
 import type { FastifyInstance } from "fastify";
 
+import { env } from "../src/config/env.js";
+import { checkClamAvScannerReadiness } from "../src/storage/attachment-scanner.js";
+
 type ReadinessResponse = {
   checks?: Record<string, string>;
   status?: string;
@@ -47,11 +50,23 @@ async function main() {
     if (!metadata) throw new Error("Object storage metadata check failed.");
     if (metadata.contentLength !== preflightBody.byteLength) throw new Error("Object storage metadata size mismatch.");
     if (metadata.contentType?.split(";")[0]?.trim().toLowerCase() !== "text/plain") throw new Error("Object storage metadata content type mismatch.");
+    if (env.ATTACHMENT_SCAN_PROVIDER === "clamav") {
+      await checkClamAvScannerReadiness({
+        host: env.CLAMAV_HOST,
+        port: env.CLAMAV_PORT,
+        timeoutMs: env.CLAMAV_TIMEOUT_MS,
+      });
+    }
 
     console.info(
       JSON.stringify(
         {
-          checks: { ...body.checks, objectStorageSigning: "ok", objectStorageWrite: "ok" },
+          checks: {
+            ...body.checks,
+            attachmentScanner: env.ATTACHMENT_SCAN_PROVIDER === "clamav" ? "ok" : "skipped",
+            objectStorageSigning: "ok",
+            objectStorageWrite: "ok",
+          },
           status: "ok",
         },
         null,

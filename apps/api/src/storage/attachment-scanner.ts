@@ -30,11 +30,14 @@ export type AttachmentScanner = {
 
 type AttachmentObjectStream = AsyncIterable<Uint8Array> & { destroy?: (error?: Error) => void };
 
-type ClamAvScannerOptions = {
+type ClamAvConnectionOptions = {
   host: string;
   port: number;
-  readObject?: (objectKey: string) => Promise<AttachmentObjectStream>;
   timeoutMs: number;
+};
+
+type ClamAvScannerOptions = ClamAvConnectionOptions & {
+  readObject?: (objectKey: string) => Promise<AttachmentObjectStream>;
 };
 
 export const noopAttachmentScanner: AttachmentScanner = {
@@ -86,6 +89,14 @@ export function createClamAvAttachmentScanner(input: ClamAvScannerOptions): Atta
   };
 }
 
+export async function checkClamAvScannerReadiness(input: ClamAvConnectionOptions): Promise<void> {
+  const response = await requestClamAv(input, (socket) => writeSocket(socket, Buffer.from("zPING\0")));
+  const message = normalizeClamAvResponse(response);
+  if (message !== "PONG") {
+    throw new Error("ClamAV ping failed: " + (message || "empty response") + ".");
+  }
+}
+
 export function attachmentScanBlockReason(result: AttachmentScanResult): "infected" | "scanner_error" | null {
   if (result.status === "INFECTED") return "infected";
   if (result.status === "ERROR") return "scanner_error";
@@ -102,6 +113,15 @@ export function attachmentScannerErrorResult(error: unknown): AttachmentScanResu
 }
 
 async function scanObjectWithClamAv(stream: AttachmentObjectStream, input: ClamAvScannerOptions): Promise<string> {
+  try {
+    return await requestClamAv(input, (socket) => writeClamAvInstream(socket, stream));
+  } catch (error) {
+    stream.destroy?.(error instanceof Error ? error : new Error(String(error)));
+    throw error;
+  }
+}
+
+async function requestClamAv(input: ClamAvConnectionOptions, writeRequest: (socket: Socket) => Promise<void>): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const socket = createConnection({ host: input.host, port: input.port });
     let response = "";
@@ -112,11 +132,7 @@ async function scanObjectWithClamAv(stream: AttachmentObjectStream, input: ClamA
       settled = true;
       clearTimeout(timeout);
       socket.destroy();
-      if (error) {
-        stream.destroy?.(error instanceof Error ? error : new Error(String(error)));
-        reject(error);
-        return;
-      }
+      if (error) return reject(error);
       resolve(result ?? response);
     };
 
@@ -131,7 +147,7 @@ async function scanObjectWithClamAv(stream: AttachmentObjectStream, input: ClamA
       if (!settled && !hadError) finish(undefined, response);
     });
     socket.once("connect", () => {
-      void writeClamAvInstream(socket, stream).catch(finish);
+      void writeRequest(socket).catch(finish);
     });
   });
 }
@@ -155,10 +171,14 @@ async function writeSocket(socket: Socket, chunk: Buffer) {
 }
 
 function clamAvScanResult(response: string): Omit<AttachmentScanResult, "checkedAt" | "provider"> {
-  const message = response.replace(/\0/g, "").trim() || null;
+  const message = normalizeClamAvResponse(response) || null;
   if (message?.endsWith(" OK")) return { message, status: "CLEAN" };
   if (message?.includes(" FOUND")) return { message, status: "INFECTED" };
   return { message: message ?? "ClamAV returned an empty scan response.", status: "ERROR" };
+}
+
+function normalizeClamAvResponse(response: string): string {
+  return response.replace(/\0/g, "").trim();
 }
 
 function scannerErrorMessage(error: unknown): string {
