@@ -33,7 +33,14 @@ import { Prisma, type TaskPriority, type TaskRecurrenceFrequency, type TaskStatu
 import type { AuthContext } from "../../shared/auth-context.js";
 import { AtlasHttpError } from "../../shared/errors.js";
 import { pageFromLimit } from "../../shared/pagination.js";
-import { createAttachmentObjectKey, createDownloadInstructions, createUploadInstructions, getAttachmentObjectMetadata } from "../../storage/object-storage.js";
+import {
+  attachmentScanBlockReason,
+  attachmentScanner,
+  attachmentScannerErrorResult,
+  type AttachmentScanner,
+  type AttachmentScanResult,
+} from "../../storage/attachment-scanner.js";
+import { createAttachmentObjectKey, createDownloadInstructions, createUploadInstructions, getAttachmentObjectMetadata, type AttachmentObjectMetadata } from "../../storage/object-storage.js";
 import { DomainEventsRepository } from "../events/domain-events.repository.js";
 import { PermissionsService } from "../permissions/permissions.service.js";
 import { defaultListPosition } from "./position.js";
@@ -52,6 +59,7 @@ export class WorkService {
     private readonly workRepository: WorkRepository,
     private readonly events: DomainEventsRepository,
     private readonly permissions: PermissionsService,
+    private readonly scanner: AttachmentScanner = attachmentScanner,
   ) {}
 
   async createSection(ctx: AuthContext, workspaceId: string, projectId: string, input: CreateSectionRequest) {
@@ -727,8 +735,17 @@ export class WorkService {
     const task = await this.getTask(ctx, workspaceId, attachment.taskId);
     const requiredRole = attachment.uploadedById === ctx.userId ? "COMMENTER" : "EDITOR";
     await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, requiredRole);
-    if (!attachment.activatedAt) await this.assertAttachmentObjectMatches({ mimeType: attachment.mimeType, objectKey: attachment.objectKey, sizeBytes: attachment.sizeBytes });
-    const result = await this.workRepository.completeAttachment({ attachmentId, workspaceId });
+    const scan = attachment.activatedAt
+      ? undefined
+      : await this.scanInitialAttachment({
+          attachmentId,
+          fileName: attachment.fileName,
+          mimeType: attachment.mimeType,
+          objectKey: attachment.objectKey,
+          sizeBytes: attachment.sizeBytes,
+          workspaceId,
+        });
+    const result = await this.workRepository.completeAttachment({ attachmentId, scan, workspaceId });
     if (result.conflict || !result.attachment) {
       throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "Attachment changed before upload completion.");
     }
@@ -866,8 +883,17 @@ export class WorkService {
     const task = await this.getTask(ctx, workspaceId, attachment.taskId);
     const requiredRole = version.uploadedById === ctx.userId ? "COMMENTER" : "EDITOR";
     await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, requiredRole);
-    if (!version.activatedAt) await this.assertAttachmentObjectMatches({ mimeType: version.mimeType, objectKey: version.objectKey, sizeBytes: version.sizeBytes });
-    const result = await this.workRepository.completeAttachmentVersion({ attachmentId, versionId, workspaceId });
+    const scan = version.activatedAt
+      ? undefined
+      : await this.scanAttachmentVersion({
+          fileName: version.fileName,
+          mimeType: version.mimeType,
+          objectKey: version.objectKey,
+          sizeBytes: version.sizeBytes,
+          versionId,
+          workspaceId,
+        });
+    const result = await this.workRepository.completeAttachmentVersion({ attachmentId, scan, versionId, workspaceId });
     if (result.conflict || !result.attachment || !result.version) {
       throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "Attachment changed before this version was completed.");
     }
@@ -894,7 +920,7 @@ export class WorkService {
     return result.attachment;
   }
 
-  private async assertAttachmentObjectMatches(input: { mimeType: string; objectKey: string; sizeBytes: number }) {
+  private async assertAttachmentObjectMatches(input: { mimeType: string; objectKey: string; sizeBytes: number }): Promise<AttachmentObjectMetadata> {
     const metadata = await getAttachmentObjectMetadata(input.objectKey);
     if (!metadata) {
       throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "Attachment upload has not finished.", {
@@ -920,6 +946,69 @@ export class WorkService {
         reason: "mime_type_mismatch",
       });
     }
+
+    return metadata;
+  }
+
+  private async scanInitialAttachment(input: {
+    attachmentId: string;
+    fileName: string;
+    mimeType: string;
+    objectKey: string;
+    sizeBytes: number;
+    workspaceId: string;
+  }): Promise<AttachmentScanResult> {
+    const metadata = await this.assertAttachmentObjectMatches(input);
+    const scan = await this.scanAttachmentObject({ ...input, metadata });
+    const blockReason = attachmentScanBlockReason(scan);
+    if (blockReason) {
+      await this.workRepository.recordAttachmentScanResult({ attachmentId: input.attachmentId, scan, workspaceId: input.workspaceId });
+      this.throwAttachmentScanConflict(input.objectKey, scan, blockReason);
+    }
+    return scan;
+  }
+
+  private async scanAttachmentVersion(input: {
+    fileName: string;
+    mimeType: string;
+    objectKey: string;
+    sizeBytes: number;
+    versionId: string;
+    workspaceId: string;
+  }): Promise<AttachmentScanResult> {
+    const metadata = await this.assertAttachmentObjectMatches(input);
+    const scan = await this.scanAttachmentObject({ ...input, metadata });
+    const blockReason = attachmentScanBlockReason(scan);
+    if (blockReason) {
+      await this.workRepository.recordAttachmentVersionScanResult({ scan, versionId: input.versionId, workspaceId: input.workspaceId });
+      this.throwAttachmentScanConflict(input.objectKey, scan, blockReason);
+    }
+    return scan;
+  }
+
+  private async scanAttachmentObject(input: {
+    fileName: string;
+    metadata: AttachmentObjectMetadata;
+    mimeType: string;
+    objectKey: string;
+    sizeBytes: number;
+    workspaceId: string;
+  }): Promise<AttachmentScanResult> {
+    try {
+      return await this.scanner.scan(input);
+    } catch (error) {
+      return attachmentScannerErrorResult(error);
+    }
+  }
+
+  private throwAttachmentScanConflict(objectKey: string, scan: AttachmentScanResult, reason: "infected" | "scanner_error"): never {
+    throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, reason === "infected" ? "Attachment scan detected unsafe content." : "Attachment scan could not verify the upload.", {
+      objectKey,
+      provider: scan.provider,
+      reason,
+      scanMessage: scan.message,
+      scanStatus: scan.status,
+    });
   }
 
   async updateAttachment(ctx: AuthContext, workspaceId: string, attachmentId: string, input: UpdateAttachmentRequest) {

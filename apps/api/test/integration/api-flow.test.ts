@@ -201,14 +201,22 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
         description: string | null;
         id: string;
         objectKey: string;
+        scanCheckedAt: string | null;
+        scanMessage: string | null;
+        scanProvider: string | null;
+        scanStatus: string;
         sizeBytes: number;
         version: number;
-        versions: Array<{ activatedAt: string | null; fileName: string; version: number }>;
+        versions: Array<{ activatedAt: string | null; fileName: string; scanStatus: string; version: number }>;
       };
       upload: { headers: Record<string, string>; method: string; objectKey: string; url: string };
     }>();
     expect(attachmentBody.attachment.activatedAt).toBeNull();
     expect(attachmentBody.attachment.description).toBe("Needs client approval.");
+    expect(attachmentBody.attachment.scanCheckedAt).toBeNull();
+    expect(attachmentBody.attachment.scanMessage).toBeNull();
+    expect(attachmentBody.attachment.scanProvider).toBeNull();
+    expect(attachmentBody.attachment.scanStatus).toBe("PENDING");
     expect(attachmentBody.attachment.version).toBe(1);
     expect(attachmentBody.attachment.versions).toEqual([]);
     expect(attachmentBody.attachment.objectKey).toContain("workspaces/" + workspaceId + "/tasks/" + taskId + "/");
@@ -262,9 +270,29 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id + "/complete",
     });
     expect(completeAttachment.statusCode).toBe(200);
-    expect(completeAttachment.json<{ activatedAt: string | null; versions: Array<{ activatedAt: string | null; fileName: string; version: number }> }>()).toMatchObject({
+    expect(
+      completeAttachment.json<{
+        activatedAt: string | null;
+        scanCheckedAt: string | null;
+        scanProvider: string | null;
+        scanStatus: string;
+        versions: Array<{ activatedAt: string | null; fileName: string; scanCheckedAt: string | null; scanProvider: string | null; scanStatus: string; version: number }>;
+      }>(),
+    ).toMatchObject({
       activatedAt: expect.any(String),
-      versions: [expect.objectContaining({ activatedAt: expect.any(String), fileName: "brief.pdf", version: 1 })],
+      scanCheckedAt: expect.any(String),
+      scanProvider: "noop",
+      scanStatus: "SKIPPED",
+      versions: [
+        expect.objectContaining({
+          activatedAt: expect.any(String),
+          fileName: "brief.pdf",
+          scanCheckedAt: expect.any(String),
+          scanProvider: "noop",
+          scanStatus: "SKIPPED",
+          version: 1,
+        }),
+      ],
     });
     await expectActivityEvent({
       entityId: attachmentBody.attachment.id,
@@ -404,10 +432,10 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     const replaceAttachmentBody = replaceAttachment.json<{
       attachment: { id: string; objectKey: string; version: number };
       upload: { headers: Record<string, string>; method: string; objectKey: string; url: string };
-      version: { activatedAt: string | null; fileName: string; id: string; objectKey: string; sizeBytes: number; version: number };
+      version: { activatedAt: string | null; fileName: string; id: string; objectKey: string; scanStatus: string; sizeBytes: number; version: number };
     }>();
     expect(replaceAttachmentBody.attachment).toMatchObject({ id: attachmentBody.attachment.id, version: 1 });
-    expect(replaceAttachmentBody.version).toMatchObject({ activatedAt: null, fileName: "brief-v2.pdf", version: 2 });
+    expect(replaceAttachmentBody.version).toMatchObject({ activatedAt: null, fileName: "brief-v2.pdf", scanStatus: "PENDING", version: 2 });
     expect(replaceAttachmentBody.version.objectKey).not.toBe(attachmentBody.attachment.objectKey);
     expect(replaceAttachmentBody.upload).toMatchObject({ method: "PUT", objectKey: replaceAttachmentBody.version.objectKey });
     expect(replaceAttachmentBody.upload.url).toContain("X-Amz-Signature");
@@ -450,19 +478,25 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     const completedReplacementBody = completeReplacement.json<{
       fileName: string;
       objectKey: string;
+      scanCheckedAt: string | null;
+      scanProvider: string | null;
+      scanStatus: string;
       sizeBytes: number;
       version: number;
-      versions: Array<{ activatedAt: string | null; fileName: string; version: number }>;
+      versions: Array<{ activatedAt: string | null; fileName: string; scanCheckedAt: string | null; scanProvider: string | null; scanStatus: string; version: number }>;
     }>();
     expect(completedReplacementBody).toMatchObject({
       fileName: "brief-v2.pdf",
       objectKey: replaceAttachmentBody.version.objectKey,
+      scanCheckedAt: expect.any(String),
+      scanProvider: "noop",
+      scanStatus: "SKIPPED",
       sizeBytes: 4096,
       version: 2,
     });
     expect(completedReplacementBody.versions).toEqual([
-      expect.objectContaining({ activatedAt: expect.any(String), fileName: "brief-v2.pdf", version: 2 }),
-      expect.objectContaining({ activatedAt: expect.any(String), fileName: "brief.pdf", version: 1 }),
+      expect.objectContaining({ activatedAt: expect.any(String), fileName: "brief-v2.pdf", scanCheckedAt: expect.any(String), scanProvider: "noop", scanStatus: "SKIPPED", version: 2 }),
+      expect.objectContaining({ activatedAt: expect.any(String), fileName: "brief.pdf", scanCheckedAt: expect.any(String), scanProvider: "noop", scanStatus: "SKIPPED", version: 1 }),
     ]);
     await expectActivityEvent({
       entityId: attachmentBody.attachment.id,

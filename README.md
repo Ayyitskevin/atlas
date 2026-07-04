@@ -14,7 +14,7 @@ The current phase is deliberately foundation-first: production-minded domain bou
 - Realtime WebSocket broadcasts for project/member/task/comment/activity mutations.
 - Durable domain event outbox feeding BullMQ workers for notification fanout plus observable search-index and email-delivery provider seams.
 - Workspace-admin outbox inspection/detail, dispatch attempt history, worker outcome history, and failed-event replay endpoints.
-- Task attachment metadata with S3-compatible signed upload/download URLs, local MinIO support, server-side object validation before activation, file notes, version history, and per-file discussion threads.
+- Task attachment metadata with S3-compatible signed upload/download URLs, local MinIO support, server-side object validation before activation, explicit scan status hooks, file notes, version history, and per-file discussion threads.
 - Docker Compose local stack and Terraform scaffolding for staging-oriented infrastructure.
 
 ## Stack
@@ -104,6 +104,8 @@ Attachment cleanup note: `pnpm cleanup:attachments` defaults to a dry run and re
 Pending upload cleanup note: `pnpm cleanup:pending-uploads` defaults to a dry run and reports pending initial uploads/replacement versions older than 24 hours. Re-run with `-- --confirm` to expire those DB rows and delete their S3-compatible objects; set `ATLAS_PENDING_UPLOAD_TTL_HOURS` to use a different expiry window.
 
 Deleted attachment retention note: `pnpm cleanup:deleted-attachment-objects` defaults to a dry run and reports retained S3-compatible objects for soft-deleted attachments older than 30 days. Re-run with `-- --confirm` to delete those objects and mark their metadata with `object_deleted_at`; set `ATLAS_DELETED_ATTACHMENT_OBJECT_RETENTION_DAYS` to use a different retention window.
+
+Attachment scan note: `ATTACHMENT_SCAN_PROVIDER=noop` is the default. Upload completion records a durable `SKIPPED` scan status today; future scanner adapters should return `CLEAN`, `INFECTED`, or `ERROR` before activation so unsafe or unverifiable objects stay unpublished.
 
 Run the dockerized E2E smoke test against a running API container:
 

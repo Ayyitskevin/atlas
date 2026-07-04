@@ -52,6 +52,14 @@ enum NotificationStatus {
   ARCHIVED
 }
 
+enum AttachmentScanStatus {
+  PENDING
+  CLEAN
+  INFECTED
+  ERROR
+  SKIPPED
+}
+
 model User {
   id                           String                            @id @default(uuid()) @db.Uuid
   email                        String                            @unique @db.Citext
@@ -531,22 +539,26 @@ model Comment {
 }
 
 model Attachment {
-  id              String              @id @default(uuid()) @db.Uuid
-  workspaceId     String              @map("workspace_id") @db.Uuid
-  taskId          String              @map("task_id") @db.Uuid
-  uploadedById    String              @map("uploaded_by_id") @db.Uuid
-  objectKey       String              @map("object_key")
-  fileName        String              @map("file_name")
-  mimeType        String              @map("mime_type")
-  sizeBytes       Int                 @map("size_bytes")
+  id              String               @id @default(uuid()) @db.Uuid
+  workspaceId     String               @map("workspace_id") @db.Uuid
+  taskId          String               @map("task_id") @db.Uuid
+  uploadedById    String               @map("uploaded_by_id") @db.Uuid
+  objectKey       String               @map("object_key")
+  fileName        String               @map("file_name")
+  mimeType        String               @map("mime_type")
+  sizeBytes       Int                  @map("size_bytes")
   description     String?
-  version         Int                 @default(1)
-  activatedAt     DateTime?           @map("activated_at") @db.Timestamptz(6)
-  objectDeletedAt DateTime?           @map("object_deleted_at") @db.Timestamptz(6)
-  createdAt       DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  deletedAt       DateTime?           @map("deleted_at") @db.Timestamptz(6)
-  task            Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  uploadedBy      User                @relation(fields: [uploadedById], references: [id])
+  version         Int                  @default(1)
+  activatedAt     DateTime?            @map("activated_at") @db.Timestamptz(6)
+  objectDeletedAt DateTime?            @map("object_deleted_at") @db.Timestamptz(6)
+  scanStatus      AttachmentScanStatus @default(PENDING) @map("scan_status")
+  scanCheckedAt   DateTime?            @map("scan_checked_at") @db.Timestamptz(6)
+  scanProvider    String?              @map("scan_provider")
+  scanMessage     String?              @map("scan_message")
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  deletedAt       DateTime?            @map("deleted_at") @db.Timestamptz(6)
+  task            Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  uploadedBy      User                 @relation(fields: [uploadedById], references: [id])
   versions        AttachmentVersion[]
   comments        AttachmentComment[]
 
@@ -555,29 +567,35 @@ model Attachment {
   @@index([workspaceId, taskId, activatedAt])
   @@index([workspaceId, uploadedById])
   @@index([workspaceId, deletedAt, objectDeletedAt])
+  @@index([workspaceId, scanStatus])
   @@map("attachments")
 }
 
 model AttachmentVersion {
-  id              String     @id @default(uuid()) @db.Uuid
-  workspaceId     String     @map("workspace_id") @db.Uuid
-  attachmentId    String     @map("attachment_id") @db.Uuid
-  uploadedById    String     @map("uploaded_by_id") @db.Uuid
+  id              String               @id @default(uuid()) @db.Uuid
+  workspaceId     String               @map("workspace_id") @db.Uuid
+  attachmentId    String               @map("attachment_id") @db.Uuid
+  uploadedById    String               @map("uploaded_by_id") @db.Uuid
   version         Int
-  objectKey       String     @map("object_key")
-  fileName        String     @map("file_name")
-  mimeType        String     @map("mime_type")
-  sizeBytes       Int        @map("size_bytes")
-  activatedAt     DateTime?  @map("activated_at") @db.Timestamptz(6)
-  objectDeletedAt DateTime?  @map("object_deleted_at") @db.Timestamptz(6)
-  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  attachment      Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
-  uploadedBy      User       @relation("AttachmentVersionUploader", fields: [uploadedById], references: [id])
+  objectKey       String               @map("object_key")
+  fileName        String               @map("file_name")
+  mimeType        String               @map("mime_type")
+  sizeBytes       Int                  @map("size_bytes")
+  activatedAt     DateTime?            @map("activated_at") @db.Timestamptz(6)
+  objectDeletedAt DateTime?            @map("object_deleted_at") @db.Timestamptz(6)
+  scanStatus      AttachmentScanStatus @default(PENDING) @map("scan_status")
+  scanCheckedAt   DateTime?            @map("scan_checked_at") @db.Timestamptz(6)
+  scanProvider    String?              @map("scan_provider")
+  scanMessage     String?              @map("scan_message")
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  attachment      Attachment           @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  uploadedBy      User                 @relation("AttachmentVersionUploader", fields: [uploadedById], references: [id])
 
   @@unique([workspaceId, attachmentId, version])
   @@unique([workspaceId, objectKey])
   @@index([workspaceId, attachmentId, activatedAt])
   @@index([workspaceId, attachmentId, objectDeletedAt])
+  @@index([workspaceId, scanStatus])
   @@index([workspaceId, uploadedById])
   @@map("attachment_versions")
 }

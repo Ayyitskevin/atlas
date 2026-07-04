@@ -11,6 +11,7 @@ const productionBase = {
 describe("API environment parsing", () => {
   it("allows local development defaults outside production", () => {
     expect(parseEnv({})).toMatchObject({
+      ATTACHMENT_SCAN_PROVIDER: "noop",
       JWT_ACCESS_SECRET: "local-dev-access-secret-change-me",
       JWT_REFRESH_SECRET: "local-dev-refresh-secret-change-me",
       NODE_ENV: "development",

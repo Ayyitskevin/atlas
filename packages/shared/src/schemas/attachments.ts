@@ -35,9 +35,11 @@ export const ALLOWED_ATTACHMENT_EXTENSIONS = [
 
 export const ATTACHMENT_ACCEPT_ATTRIBUTE = [...ALLOWED_ATTACHMENT_MIME_TYPES, ...ALLOWED_ATTACHMENT_EXTENSIONS].join(",");
 export const ATTACHMENT_UPLOAD_HELP_TEXT = "PDF, images, text, CSV, Markdown, JSON, Word, Excel, or PowerPoint files up to 100 MB.";
+export const ATTACHMENT_SCAN_STATUSES = ["PENDING", "CLEAN", "INFECTED", "ERROR", "SKIPPED"] as const;
 
 export type AllowedAttachmentExtension = (typeof ALLOWED_ATTACHMENT_EXTENSIONS)[number];
 export type AllowedAttachmentMimeType = (typeof ALLOWED_ATTACHMENT_MIME_TYPES)[number];
+export type AttachmentScanStatus = (typeof ATTACHMENT_SCAN_STATUSES)[number];
 
 const attachmentMimeTypeByExtension: Record<AllowedAttachmentExtension, AllowedAttachmentMimeType> = {
   ".csv": "text/csv",
@@ -102,6 +104,15 @@ export const attachmentStorageInstructionsSchema = z.object({
   url: z.string().url(),
 });
 
+export const attachmentScanStatusSchema = z.enum(ATTACHMENT_SCAN_STATUSES);
+
+const attachmentScanFields = {
+  scanCheckedAt: z.string().datetime().nullable(),
+  scanMessage: z.string().nullable(),
+  scanProvider: z.string().nullable(),
+  scanStatus: attachmentScanStatusSchema,
+};
+
 export const attachmentVersionResponseSchema = z.object({
   activatedAt: z.string().datetime().nullable(),
   attachmentId: z.string().uuid(),
@@ -110,6 +121,7 @@ export const attachmentVersionResponseSchema = z.object({
   id: z.string().uuid(),
   mimeType: z.string(),
   objectKey: z.string(),
+  ...attachmentScanFields,
   sizeBytes: z.number().int(),
   uploadedById: z.string().uuid(),
   version: z.number().int().positive(),
@@ -135,6 +147,7 @@ export const attachmentResponseSchema = z.object({
   id: z.string().uuid(),
   mimeType: z.string(),
   objectKey: z.string(),
+  ...attachmentScanFields,
   sizeBytes: z.number().int(),
   taskId: z.string().uuid(),
   uploadedById: z.string().uuid(),

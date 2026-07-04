@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   MAX_ATTACHMENT_SIZE_BYTES,
   attachmentMimeTypeForFileName,
+  attachmentScanStatusSchema,
   createAttachmentRequestSchema,
   isAllowedAttachmentFileName,
   isAllowedAttachmentMimeType,
@@ -62,5 +63,10 @@ describe("attachment schemas", () => {
       sizeBytes: 4096,
     });
     expect(replaceAttachmentRequestSchema.safeParse({ description: "Not accepted.", fileName: "brief-v2.pdf", mimeType: "application/pdf", sizeBytes: 4096 }).success).toBe(false);
+  });
+
+  it("validates durable attachment scan statuses", () => {
+    expect(attachmentScanStatusSchema.parse("SKIPPED")).toBe("SKIPPED");
+    expect(attachmentScanStatusSchema.safeParse("UNKNOWN").success).toBe(false);
   });
 });

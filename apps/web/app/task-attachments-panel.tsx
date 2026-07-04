@@ -5,7 +5,7 @@ import type { FormEvent } from "react";
 import { ATTACHMENT_ACCEPT_ATTRIBUTE, ATTACHMENT_UPLOAD_HELP_TEXT } from "@atlas/shared";
 
 import { formatBytes } from "./atlas-format";
-import type { Attachment } from "./atlas-types";
+import type { Attachment, AttachmentScanStatus } from "./atlas-types";
 
 type TaskAttachmentsPanelProps = {
   attachmentStatus: string;
@@ -65,14 +65,28 @@ export function TaskAttachmentsPanel({
             <p className="mt-1 text-xs text-slate-500">
               v{attachment.version} · {attachment.mimeType} · {formatBytes(attachment.sizeBytes)}
             </p>
+            <AttachmentScanBadge
+              checkedAt={attachment.scanCheckedAt}
+              message={attachment.scanMessage}
+              provider={attachment.scanProvider}
+              status={attachment.scanStatus}
+            />
             <time className="mt-1 block text-xs text-slate-500">{new Date(attachment.createdAt).toLocaleString()}</time>
             {attachment.versions?.length ? (
               <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2">
                 <p className="text-xs font-semibold uppercase text-slate-500">Version history</p>
                 <ul className="mt-2 grid gap-1 text-xs text-slate-600">
                   {attachment.versions.map((version) => (
-                    <li className="break-words" key={version.id}>
-                      v{version.version} · {version.fileName} · {formatBytes(version.sizeBytes)}
+                    <li className="grid gap-1 break-words" key={version.id}>
+                      <span>
+                        v{version.version} · {version.fileName} · {formatBytes(version.sizeBytes)}
+                      </span>
+                      <AttachmentScanBadge
+                        checkedAt={version.scanCheckedAt}
+                        message={version.scanMessage}
+                        provider={version.scanProvider}
+                        status={version.scanStatus}
+                      />
                     </li>
                   ))}
                 </ul>
@@ -151,6 +165,43 @@ export function TaskAttachmentsPanel({
       </div>
     </section>
   );
+}
+
+function AttachmentScanBadge({
+  checkedAt,
+  message,
+  provider,
+  status,
+}: {
+  checkedAt?: string | null;
+  message?: string | null;
+  provider?: string | null;
+  status: AttachmentScanStatus;
+}) {
+  const copy = attachmentScanCopy(status);
+  const detail = [provider ? "via " + provider : null, checkedAt ? new Date(checkedAt).toLocaleString() : null].filter(Boolean).join(" · ");
+  return (
+    <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-slate-500">
+      <span className={"rounded px-1.5 py-0.5 font-medium " + copy.className}>{copy.label}</span>
+      {detail ? <span>{detail}</span> : null}
+      {message ? <span>{message}</span> : null}
+    </p>
+  );
+}
+
+function attachmentScanCopy(status: AttachmentScanStatus) {
+  switch (status) {
+    case "CLEAN":
+      return { className: "bg-emerald-100 text-emerald-800", label: "Scan clean" };
+    case "ERROR":
+      return { className: "bg-amber-100 text-amber-800", label: "Scan error" };
+    case "INFECTED":
+      return { className: "bg-rose-100 text-rose-800", label: "Scan blocked" };
+    case "PENDING":
+      return { className: "bg-slate-200 text-slate-700", label: "Scan pending" };
+    case "SKIPPED":
+      return { className: "bg-sky-100 text-sky-800", label: "Scan skipped" };
+  }
 }
 
 function handleAttachmentCommentSubmit(

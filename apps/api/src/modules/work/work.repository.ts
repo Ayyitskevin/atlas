@@ -1,4 +1,4 @@
-import type { Prisma, PrismaClient, TaskPriority, TaskRecurrenceFrequency, TaskStatus } from "@atlas/db";
+import type { AttachmentScanStatus, Prisma, PrismaClient, TaskPriority, TaskRecurrenceFrequency, TaskStatus } from "@atlas/db";
 import type { MyWorkDependencyFilter, MyWorkDueFilter, MyWorkScopeFilter, MyWorkStatusFilter, ProjectTaskQuery, SearchResultType } from "@atlas/shared";
 
 import { paginationArgs } from "../../shared/pagination.js";
@@ -14,6 +14,13 @@ const attachmentWithActiveVersions = {
     orderBy: { version: "desc" as const },
     where: { activatedAt: { not: null } },
   },
+};
+
+type AttachmentScanWrite = {
+  checkedAt: Date;
+  message: string | null;
+  provider: string;
+  status: Exclude<AttachmentScanStatus, "PENDING">;
 };
 
 export class WorkRepository {
@@ -660,7 +667,28 @@ export class WorkRepository {
     return this.prisma.attachment.findFirst({ include: attachmentWithActiveVersions, where: { deletedAt: null, id: attachmentId, workspaceId } });
   }
 
-  completeAttachment(input: { attachmentId: string; workspaceId: string }) {
+  async recordAttachmentScanResult(input: { attachmentId: string; scan: AttachmentScanWrite; workspaceId: string }) {
+    const scanData = attachmentScanData(input.scan);
+    await this.prisma.$transaction([
+      this.prisma.attachment.updateMany({
+        data: scanData,
+        where: { activatedAt: null, deletedAt: null, id: input.attachmentId, workspaceId: input.workspaceId },
+      }),
+      this.prisma.attachmentVersion.updateMany({
+        data: scanData,
+        where: { activatedAt: null, attachmentId: input.attachmentId, version: 1, workspaceId: input.workspaceId },
+      }),
+    ]);
+  }
+
+  async recordAttachmentVersionScanResult(input: { scan: AttachmentScanWrite; versionId: string; workspaceId: string }) {
+    await this.prisma.attachmentVersion.updateMany({
+      data: attachmentScanData(input.scan),
+      where: { activatedAt: null, id: input.versionId, workspaceId: input.workspaceId },
+    });
+  }
+
+  completeAttachment(input: { attachmentId: string; scan?: AttachmentScanWrite; workspaceId: string }) {
     return this.prisma.$transaction(async (tx) => {
       const attachment = await tx.attachment.findFirst({
         include: { versions: { where: { version: 1 } } },
@@ -682,14 +710,15 @@ export class WorkRepository {
       if (!initialVersion || attachment.version !== 1) return { activated: false, attachment: null, conflict: true };
 
       const activatedAt = new Date();
+      const scanData = input.scan ? attachmentScanData(input.scan) : {};
       const updated = await tx.attachment.updateMany({
-        data: { activatedAt },
+        data: { activatedAt, ...scanData },
         where: { activatedAt: null, deletedAt: null, id: input.attachmentId, version: 1, workspaceId: input.workspaceId },
       });
       if (!updated.count) return { activated: false, attachment: null, conflict: true };
 
       await tx.attachmentVersion.updateMany({
-        data: { activatedAt },
+        data: { activatedAt, ...scanData },
         where: { activatedAt: null, attachmentId: input.attachmentId, version: 1, workspaceId: input.workspaceId },
       });
 
@@ -733,6 +762,10 @@ export class WorkRepository {
             fileName: input.fileName,
             mimeType: input.mimeType,
             objectKey: input.objectKey,
+            scanCheckedAt: null,
+            scanMessage: null,
+            scanProvider: null,
+            scanStatus: "PENDING",
             sizeBytes: input.sizeBytes,
             uploadedById: input.uploadedById,
           },
@@ -750,7 +783,7 @@ export class WorkRepository {
     });
   }
 
-  completeAttachmentVersion(input: { attachmentId: string; versionId: string; workspaceId: string }) {
+  completeAttachmentVersion(input: { attachmentId: string; scan?: AttachmentScanWrite; versionId: string; workspaceId: string }) {
     return this.prisma.$transaction(async (tx) => {
       const version = await tx.attachmentVersion.findFirst({
         include: { attachment: true },
@@ -770,11 +803,13 @@ export class WorkRepository {
       }
       if (version.attachment.version !== version.version - 1) return { activated: false, attachment: null, conflict: true, version };
 
+      const scanData = input.scan ? attachmentScanData(input.scan) : {};
       const updated = await tx.attachment.updateMany({
         data: {
           fileName: version.fileName,
           mimeType: version.mimeType,
           objectKey: version.objectKey,
+          ...scanData,
           sizeBytes: version.sizeBytes,
           version: version.version,
         },
@@ -782,7 +817,7 @@ export class WorkRepository {
       });
       if (!updated.count) return { activated: false, attachment: null, conflict: true, version };
 
-      const activatedVersion = await tx.attachmentVersion.update({ data: { activatedAt: new Date() }, where: { id: version.id } });
+      const activatedVersion = await tx.attachmentVersion.update({ data: { activatedAt: new Date(), ...scanData }, where: { id: version.id } });
       return {
         activated: true,
         attachment: await tx.attachment.findFirst({
@@ -922,6 +957,15 @@ const searchResultTypeRank: Record<SearchResultType, number> = {
 
 function compactWhere<TWhere>(items: Array<TWhere | undefined>) {
   return items.filter((item): item is TWhere => Boolean(item));
+}
+
+function attachmentScanData(scan: AttachmentScanWrite) {
+  return {
+    scanCheckedAt: scan.checkedAt,
+    scanMessage: scan.message,
+    scanProvider: scan.provider,
+    scanStatus: scan.status,
+  };
 }
 
 function searchAfterWhere<TWhere>(resultType: SearchResultType, after?: SearchWorkspaceCursor): TWhere | undefined {

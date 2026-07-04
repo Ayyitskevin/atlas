@@ -270,12 +270,18 @@ export type Attachment = {
   id: string;
   mimeType: string;
   objectKey?: string;
+  scanCheckedAt?: string | null;
+  scanMessage?: string | null;
+  scanProvider?: string | null;
+  scanStatus: AttachmentScanStatus;
   sizeBytes: number;
   taskId: string;
   uploadedById?: string;
   version: number;
   versions?: AttachmentVersion[];
 };
+
+export type AttachmentScanStatus = "CLEAN" | "ERROR" | "INFECTED" | "PENDING" | "SKIPPED";
 
 export type AttachmentComment = {
   attachmentId: string;
@@ -294,6 +300,10 @@ export type AttachmentVersion = {
   id: string;
   mimeType: string;
   objectKey?: string;
+  scanCheckedAt?: string | null;
+  scanMessage?: string | null;
+  scanProvider?: string | null;
+  scanStatus: AttachmentScanStatus;
   sizeBytes: number;
   uploadedById?: string;
   version: number;
