@@ -7,6 +7,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@atlas/db";
 
+import { cleanupExpiredPendingAttachmentUploads } from "../../src/storage/pending-upload-cleanup.js";
+
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
 const hasDatabaseUrl = Boolean(process.env.DATABASE_URL);
 
@@ -419,6 +421,134 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     const outboxAfter = await prisma.domainEventOutbox.count();
     expect(outboxAfter).toBeGreaterThan(outboxBefore);
   }, 60_000);
+
+  it("cleans up abandoned pending attachment uploads without touching active or fresh uploads", async () => {
+    const currentUser = await prisma.user.findUniqueOrThrow({ where: { email } });
+    const now = new Date();
+    const staleCreatedAt = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+    const freshCreatedAt = new Date(now.getTime() - 30 * 60 * 1000);
+    const staleInitialObjectKey = "workspaces/" + workspaceId + "/tasks/" + taskId + "/" + randomUUID() + "-stale-initial.pdf";
+    const freshInitialObjectKey = "workspaces/" + workspaceId + "/tasks/" + taskId + "/" + randomUUID() + "-fresh-initial.pdf";
+    const activeObjectKey = "workspaces/" + workspaceId + "/tasks/" + taskId + "/" + randomUUID() + "-active.pdf";
+    const staleReplacementObjectKey = "workspaces/" + workspaceId + "/tasks/" + taskId + "/" + randomUUID() + "-stale-replacement.pdf";
+    const deletedObjectKeys: string[] = [];
+
+    const staleInitial = await prisma.attachment.create({
+      data: {
+        createdAt: staleCreatedAt,
+        fileName: "stale-initial.pdf",
+        mimeType: "application/pdf",
+        objectKey: staleInitialObjectKey,
+        sizeBytes: 2048,
+        taskId,
+        uploadedById: currentUser.id,
+        versions: {
+          create: {
+            createdAt: staleCreatedAt,
+            fileName: "stale-initial.pdf",
+            mimeType: "application/pdf",
+            objectKey: staleInitialObjectKey,
+            sizeBytes: 2048,
+            uploadedById: currentUser.id,
+            version: 1,
+            workspaceId,
+          },
+        },
+        workspaceId,
+      },
+    });
+    const freshInitial = await prisma.attachment.create({
+      data: {
+        createdAt: freshCreatedAt,
+        fileName: "fresh-initial.pdf",
+        mimeType: "application/pdf",
+        objectKey: freshInitialObjectKey,
+        sizeBytes: 2048,
+        taskId,
+        uploadedById: currentUser.id,
+        versions: {
+          create: {
+            createdAt: freshCreatedAt,
+            fileName: "fresh-initial.pdf",
+            mimeType: "application/pdf",
+            objectKey: freshInitialObjectKey,
+            sizeBytes: 2048,
+            uploadedById: currentUser.id,
+            version: 1,
+            workspaceId,
+          },
+        },
+        workspaceId,
+      },
+    });
+    const activeAttachment = await prisma.attachment.create({
+      data: {
+        activatedAt: staleCreatedAt,
+        createdAt: staleCreatedAt,
+        fileName: "active.pdf",
+        mimeType: "application/pdf",
+        objectKey: activeObjectKey,
+        sizeBytes: 2048,
+        taskId,
+        uploadedById: currentUser.id,
+        versions: {
+          create: {
+            activatedAt: staleCreatedAt,
+            createdAt: staleCreatedAt,
+            fileName: "active.pdf",
+            mimeType: "application/pdf",
+            objectKey: activeObjectKey,
+            sizeBytes: 2048,
+            uploadedById: currentUser.id,
+            version: 1,
+            workspaceId,
+          },
+        },
+        workspaceId,
+      },
+    });
+    const staleReplacement = await prisma.attachmentVersion.create({
+      data: {
+        attachmentId: activeAttachment.id,
+        createdAt: staleCreatedAt,
+        fileName: "stale-replacement.pdf",
+        mimeType: "application/pdf",
+        objectKey: staleReplacementObjectKey,
+        sizeBytes: 4096,
+        uploadedById: currentUser.id,
+        version: 2,
+        workspaceId,
+      },
+    });
+
+    const result = await cleanupExpiredPendingAttachmentUploads({
+      deleteObject: async (objectKey) => {
+        deletedObjectKeys.push(objectKey);
+      },
+      now,
+      prisma,
+      ttlMs: 24 * 60 * 60 * 1000,
+    });
+
+    expect(result).toMatchObject({
+      expiredInitialAttachments: 1,
+      expiredReplacementVersions: 1,
+      objectDeletes: { attempted: 2, failed: 0, succeeded: 2 },
+    });
+    expect(deletedObjectKeys).toEqual(expect.arrayContaining([staleInitialObjectKey, staleReplacementObjectKey]));
+    expect(deletedObjectKeys).not.toContain(freshInitialObjectKey);
+    expect(deletedObjectKeys).not.toContain(activeObjectKey);
+
+    await expect(prisma.attachment.findUniqueOrThrow({ where: { id: staleInitial.id } })).resolves.toMatchObject({ deletedAt: expect.any(Date) });
+    await expect(prisma.attachment.findUniqueOrThrow({ where: { id: freshInitial.id } })).resolves.toMatchObject({ deletedAt: null });
+    await expect(prisma.attachmentVersion.count({ where: { attachmentId: staleInitial.id } })).resolves.toBe(0);
+    await expect(prisma.attachmentVersion.findUnique({ where: { id: staleReplacement.id } })).resolves.toBeNull();
+    await expect(prisma.attachment.findUniqueOrThrow({ where: { id: activeAttachment.id } })).resolves.toMatchObject({
+      activatedAt: expect.any(Date),
+      deletedAt: null,
+      objectKey: activeObjectKey,
+    });
+  });
 
   it("records project lifecycle activity and outbox events", async () => {
     const name = "Project Lifecycle " + randomUUID().slice(0, 8);

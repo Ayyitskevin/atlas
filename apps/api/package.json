@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "cleanup:pending-uploads": "tsx scripts/cleanup-pending-uploads.ts",
     "dev": "tsx watch src/main.ts",
     "lint": "eslint .",
     "test": "vitest run --passWithNoTests",

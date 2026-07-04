@@ -14,7 +14,7 @@ The current phase is deliberately foundation-first: production-minded domain bou
 - Realtime WebSocket broadcasts for project/member/task/comment/activity mutations.
 - Durable domain event outbox feeding BullMQ workers for notification fanout plus observable search-index and email-delivery provider seams.
 - Workspace-admin outbox inspection/detail, dispatch attempt history, worker outcome history, and failed-event replay endpoints.
-- Task attachment metadata with S3-compatible signed upload/download URLs, local MinIO support, and server-side object validation before replacement activation.
+- Task attachment metadata with S3-compatible signed upload/download URLs, local MinIO support, server-side object validation before activation, file notes, and version history.
 - Docker Compose local stack and Terraform scaffolding for staging-oriented infrastructure.
 
 ## Stack
@@ -84,6 +84,7 @@ corepack pnpm test:integration:local
 corepack pnpm smoke:demo:local
 corepack pnpm migrate
 corepack pnpm seed
+corepack pnpm cleanup:pending-uploads
 ```
 
 Run the API, web app, and workers in local development mode without Docker-managed app containers:
@@ -95,6 +96,8 @@ corepack pnpm dev
 Worker note: search indexing is intentionally served by direct database queries until an external provider is chosen. Email delivery uses `EMAIL_PROVIDER=noop` by default, returning structured no-op outcomes and writing BullMQ job logs plus durable `worker_job_outcomes` rows so local operators can distinguish delivered, skipped, failed, and stubbed side effects from outbox detail. Set `EMAIL_PROVIDER=resend`, `RESEND_API_KEY`, and a verified-domain `EMAIL_FROM` value to send through Resend.
 
 Production note: when `NODE_ENV=production`, Atlas refuses to start with local JWT placeholders, secrets shorter than 32 characters, or matching access/refresh secrets. Generate unique values for `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` before deploying.
+
+Attachment cleanup note: `pnpm cleanup:pending-uploads` defaults to a dry run and reports pending initial uploads/replacement versions older than 24 hours. Re-run with `-- --confirm` to expire those DB rows and delete their S3-compatible objects; set `ATLAS_PENDING_UPLOAD_TTL_HOURS` to use a different expiry window.
 
 Run the dockerized E2E smoke test against a running API container:
 
