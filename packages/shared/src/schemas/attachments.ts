@@ -82,9 +82,14 @@ function isAllowedAttachmentExtension(extension: string): extension is AllowedAt
 }
 
 export const createAttachmentRequestSchema = z.object({
+  description: z.string().trim().max(1000).nullable().optional(),
   fileName: z.string().trim().min(1).max(500).refine(isAllowedAttachmentFileName, "Unsupported attachment file extension."),
   mimeType: z.string().trim().toLowerCase().min(1).max(255).refine(isAllowedAttachmentMimeType, "Unsupported attachment file type."),
   sizeBytes: z.number().int().positive().max(MAX_ATTACHMENT_SIZE_BYTES),
+});
+
+export const updateAttachmentRequestSchema = z.object({
+  description: z.string().trim().max(1000).nullable(),
 });
 
 export const attachmentStorageInstructionsSchema = z.object({
@@ -97,6 +102,7 @@ export const attachmentStorageInstructionsSchema = z.object({
 
 export const attachmentResponseSchema = z.object({
   createdAt: z.string().datetime(),
+  description: z.string().nullable(),
   fileName: z.string(),
   id: z.string().uuid(),
   mimeType: z.string(),
@@ -118,4 +124,5 @@ export const attachmentDownloadResponseSchema = z.object({
 });
 
 export type CreateAttachmentRequest = z.infer<typeof createAttachmentRequestSchema>;
+export type UpdateAttachmentRequest = z.infer<typeof updateAttachmentRequestSchema>;
 export type AttachmentStorageInstructions = z.infer<typeof attachmentStorageInstructionsSchema>;

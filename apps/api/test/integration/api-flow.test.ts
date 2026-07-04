@@ -187,15 +187,25 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     const attachment = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
-      payload: { fileName: "brief.pdf", mimeType: "application/pdf", sizeBytes: 2048 },
+      payload: { description: "Needs client approval.", fileName: "brief.pdf", mimeType: "application/pdf", sizeBytes: 2048 },
       url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/attachments",
     });
     expect(attachment.statusCode).toBe(201);
-    const attachmentBody = attachment.json<{ attachment: { id: string; objectKey: string }; upload: { method: string; objectKey: string; url: string } }>();
+    const attachmentBody = attachment.json<{ attachment: { description: string | null; id: string; objectKey: string }; upload: { method: string; objectKey: string; url: string } }>();
+    expect(attachmentBody.attachment.description).toBe("Needs client approval.");
     expect(attachmentBody.attachment.objectKey).toContain("workspaces/" + workspaceId + "/tasks/" + taskId + "/");
     expect(attachmentBody.upload.method).toBe("PUT");
     expect(attachmentBody.upload.objectKey).toBe(attachmentBody.attachment.objectKey);
     expect(attachmentBody.upload.url).toContain("X-Amz-Signature");
+
+    const updatedAttachment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: { description: "Approved by legal." },
+      url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id,
+    });
+    expect(updatedAttachment.statusCode).toBe(200);
+    expect(updatedAttachment.json<{ description: string | null }>().description).toBe("Approved by legal.");
 
     const attachments = await app!.inject({
       headers: authHeaders(accessToken),
@@ -203,7 +213,18 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/attachments",
     });
     expect(attachments.statusCode).toBe(200);
-    expect(attachments.json<{ items: unknown[] }>().items.length).toBeGreaterThan(0);
+    expect(attachments.json<{ items: Array<{ description: string | null; id: string }> }>().items).toContainEqual(
+      expect.objectContaining({ description: "Approved by legal.", id: attachmentBody.attachment.id }),
+    );
+    await expectActivityEvent({
+      entityId: attachmentBody.attachment.id,
+      entityType: "attachment",
+      eventType: "AttachmentUpdated",
+      payload: { description: "Approved by legal.", fileName: "brief.pdf", sizeBytes: 2048 },
+      projectId,
+      taskId,
+      workspaceId,
+    });
 
     const download = await app!.inject({
       headers: authHeaders(accessToken),

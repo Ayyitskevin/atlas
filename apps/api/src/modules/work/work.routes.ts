@@ -5,6 +5,7 @@ import {
   activityQuerySchema,
   addTaskDependencyRequestSchema,
   attachmentDownloadResponseSchema,
+  attachmentResponseSchema,
   createAttachmentRequestSchema,
   createAttachmentResponseSchema,
   createCommentRequestSchema,
@@ -23,6 +24,7 @@ import {
   searchResponseSchema,
   searchQuerySchema,
   taskWatcherUserRequestSchema,
+  updateAttachmentRequestSchema,
   updateCommentRequestSchema,
   updateNotificationPreferenceRequestSchema,
   updateSectionRequestSchema,
@@ -109,6 +111,7 @@ export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
   app.post("/workspaces/:workspaceId/tasks/:taskId/attachments", { schema: openApiSchema({ body: createAttachmentRequestSchema, params: taskParamsSchema, response: { 201: createAttachmentResponseSchema }, tags: ["Attachments"] }) }, controller.createAttachment);
   app.get("/workspaces/:workspaceId/tasks/:taskId/attachments", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Attachments"] }) }, controller.listAttachments);
   app.get("/workspaces/:workspaceId/attachments/:attachmentId/download", { schema: openApiSchema({ params: attachmentParamsSchema, response: { 200: attachmentDownloadResponseSchema }, tags: ["Attachments"] }) }, controller.getAttachmentDownload);
+  app.patch("/workspaces/:workspaceId/attachments/:attachmentId", { schema: openApiSchema({ body: updateAttachmentRequestSchema, params: attachmentParamsSchema, response: { 200: attachmentResponseSchema }, tags: ["Attachments"] }) }, controller.updateAttachment);
   app.delete("/workspaces/:workspaceId/attachments/:attachmentId", { schema: openApiSchema({ params: attachmentParamsSchema, tags: ["Attachments"] }) }, controller.deleteAttachment);
 
   app.get("/workspaces/:workspaceId/activity", { schema: openApiSchema({ params: workspaceParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listWorkspaceActivity);

@@ -42,6 +42,7 @@ type TaskDetailPanelProps = {
   onUnassignTaskLabel: (labelId: string) => Promise<void>;
   onUnwatchTask: (userId: string) => Promise<void>;
   onUpdateComment: (commentId: string, body: string) => Promise<void>;
+  onUpdateAttachmentDescription: (event: FormEvent<HTMLFormElement>, attachmentId: string) => Promise<void>;
   onUpdateTask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onUploadAttachment: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onWatchTask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
@@ -83,6 +84,7 @@ export function TaskDetailPanel({
   onUnassignTaskLabel,
   onUnwatchTask,
   onUpdateComment,
+  onUpdateAttachmentDescription,
   onUpdateTask,
   onUploadAttachment,
   onWatchTask,
@@ -168,6 +170,7 @@ export function TaskDetailPanel({
         attachments={attachments}
         onDeleteAttachment={onDeleteAttachment}
         onDownloadAttachment={onDownloadAttachment}
+        onUpdateAttachmentDescription={onUpdateAttachmentDescription}
         onUploadAttachment={onUploadAttachment}
       />
 

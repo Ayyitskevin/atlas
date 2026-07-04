@@ -262,6 +262,7 @@ export type Comment = {
 
 export type Attachment = {
   createdAt: string;
+  description?: string | null;
   fileName: string;
   id: string;
   mimeType: string;

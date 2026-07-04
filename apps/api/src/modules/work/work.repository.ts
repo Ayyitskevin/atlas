@@ -555,6 +555,7 @@ export class WorkRepository {
   }
 
   createAttachment(input: {
+    description?: string | null;
     fileName: string;
     mimeType: string;
     objectKey: string;
@@ -576,6 +577,15 @@ export class WorkRepository {
 
   findAttachment(workspaceId: string, attachmentId: string) {
     return this.prisma.attachment.findFirst({ where: { deletedAt: null, id: attachmentId, workspaceId } });
+  }
+
+  async updateAttachment(input: { attachmentId: string; description: string | null; workspaceId: string }) {
+    const result = await this.prisma.attachment.updateMany({
+      data: { description: input.description },
+      where: { deletedAt: null, id: input.attachmentId, workspaceId: input.workspaceId },
+    });
+    if (!result.count) return null;
+    return this.findAttachment(input.workspaceId, input.attachmentId);
   }
 
   softDeleteAttachment(input: { attachmentId: string; workspaceId: string }) {

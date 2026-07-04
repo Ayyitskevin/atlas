@@ -12,10 +12,18 @@ type TaskAttachmentsPanelProps = {
   attachments: Attachment[];
   onDeleteAttachment: (attachmentId: string) => Promise<void>;
   onDownloadAttachment: (attachmentId: string) => Promise<void>;
+  onUpdateAttachmentDescription: (event: FormEvent<HTMLFormElement>, attachmentId: string) => Promise<void>;
   onUploadAttachment: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
 
-export function TaskAttachmentsPanel({ attachmentStatus, attachments, onDeleteAttachment, onDownloadAttachment, onUploadAttachment }: TaskAttachmentsPanelProps) {
+export function TaskAttachmentsPanel({
+  attachmentStatus,
+  attachments,
+  onDeleteAttachment,
+  onDownloadAttachment,
+  onUpdateAttachmentDescription,
+  onUploadAttachment,
+}: TaskAttachmentsPanelProps) {
   return (
     <section className="grid gap-2 border-t border-slate-200 pt-4">
       <div>
@@ -34,6 +42,10 @@ export function TaskAttachmentsPanel({ attachmentStatus, attachments, onDeleteAt
         <p className="text-xs text-slate-500" id="attachment-upload-help">
           {ATTACHMENT_UPLOAD_HELP_TEXT}
         </p>
+        <label className="grid gap-1 text-xs font-medium text-slate-600">
+          Note
+          <textarea className="min-h-16 rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900" maxLength={1000} name="description" />
+        </label>
         <button className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white" type="submit">
           Upload
         </button>
@@ -46,6 +58,20 @@ export function TaskAttachmentsPanel({ attachmentStatus, attachments, onDeleteAt
               {attachment.mimeType} · {formatBytes(attachment.sizeBytes)}
             </p>
             <time className="mt-1 block text-xs text-slate-500">{new Date(attachment.createdAt).toLocaleString()}</time>
+            <form className="mt-3 grid gap-2" onSubmit={(event) => void onUpdateAttachmentDescription(event, attachment.id)}>
+              <label className="grid gap-1 text-xs font-medium text-slate-600">
+                Note
+                <textarea
+                  className="min-h-16 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
+                  defaultValue={attachment.description ?? ""}
+                  maxLength={1000}
+                  name="description"
+                />
+              </label>
+              <button className="w-fit rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700" type="submit">
+                Save note
+              </button>
+            </form>
             <div className="mt-3 flex flex-wrap gap-2">
               <button className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700" onClick={() => void onDownloadAttachment(attachment.id)} type="button">
                 Download

@@ -536,6 +536,7 @@ model Attachment {
   fileName     String    @map("file_name")
   mimeType     String    @map("mime_type")
   sizeBytes    Int       @map("size_bytes")
+  description  String?
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
   task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)

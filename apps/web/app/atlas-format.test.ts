@@ -31,6 +31,7 @@ describe("atlas format helpers", () => {
     expect(formatActivityTitle("ProjectTemplateUpdated")).toBe("Template updated");
     expect(formatActivityTitle("ProjectCreatedFromTemplate")).toBe("Project created from template");
     expect(formatActivityTitle("TaskDependencyAdded")).toBe("Dependency added");
+    expect(formatActivityTitle("AttachmentUpdated")).toBe("Attachment updated");
     expect(formatActivityTitle("TaskRecurrenceGenerated")).toBe("Recurring task created");
     expect(formatActivityTitle("TaskRecurrencePaused")).toBe("Recurring task paused");
     expect(formatActivityTitle("TaskRecurrenceSkipped")).toBe("Recurring task skipped");
@@ -54,6 +55,17 @@ describe("atlas format helpers", () => {
         taskId: "task-1",
       }),
     ).toBe("File: brief.pdf · 2.0 KB");
+    expect(
+      formatActivityMetadata({
+        entityType: "attachment",
+        eventType: "AttachmentUpdated",
+        payload: { description: "Needs legal approval.", fileName: "brief.pdf", sizeBytes: 2048 },
+        taskId: "task-1",
+      }),
+    ).toEqual([
+      { label: "Size", value: "2.0 KB" },
+      { label: "Note", value: "Needs legal approval." },
+    ]);
     expect(formatActivityDetail({ entityType: "project", eventType: "ProjectUpdated", payload: {}, projectId: "project-1" })).toBe(
       "Project activity",
     );

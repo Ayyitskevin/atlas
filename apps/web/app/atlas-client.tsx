@@ -237,6 +237,7 @@ export function AtlasClient({
     unassignTask,
     unassignTaskLabel,
     unwatchTask,
+    updateAttachmentDescription,
     updateComment,
     updateTaskDetails,
     uploadAttachment,
@@ -1100,6 +1101,7 @@ export function AtlasClient({
             onUnassignTask={unassignTask}
             onUnassignTaskLabel={unassignTaskLabel}
             onUnwatchTask={unwatchTask}
+            onUpdateAttachmentDescription={updateAttachmentDescription}
             onUpdateComment={updateComment}
             onUpdateTask={updateTaskDetails}
             onUploadAttachment={uploadAttachment}

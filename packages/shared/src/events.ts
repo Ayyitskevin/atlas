@@ -47,6 +47,7 @@ export const domainEventTypeSchema = z.enum([
   "CommentUpdated",
   "CommentDeleted",
   "AttachmentAdded",
+  "AttachmentUpdated",
   "AttachmentDeleted",
 ]);
 

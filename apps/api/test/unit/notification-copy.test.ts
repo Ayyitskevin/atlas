@@ -18,6 +18,10 @@ describe("taskNotificationCopy", () => {
       body: "A file was removed from \"Launch checklist\".",
       title: "Attachment removed",
     });
+    expect(taskNotificationCopy(event("AttachmentUpdated"), "Launch checklist")).toEqual({
+      body: "A file note changed on \"Launch checklist\".",
+      title: "Attachment updated",
+    });
     expect(taskNotificationCopy(event("TaskLabelAdded"), "Launch checklist")).toEqual({
       body: "A label was added to \"Launch checklist\".",
       title: "Label added",

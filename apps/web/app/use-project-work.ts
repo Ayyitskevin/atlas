@@ -764,6 +764,7 @@ export function useProjectWork({
     if (!auth || !selectedWorkspaceId || !selectedTaskId) return;
     const form = new FormData(event.currentTarget);
     const file = form.get("file");
+    const description = formString(form.get("description"));
     if (!(file instanceof File)) return;
     const validationMessage = attachmentUploadValidationMessage(file);
     if (validationMessage) {
@@ -779,6 +780,7 @@ export function useProjectWork({
         {
           body: JSON.stringify({
             fileName: file.name,
+            description,
             mimeType,
             sizeBytes: file.size,
           }),
@@ -827,6 +829,28 @@ export function useProjectWork({
         auth.accessToken,
       );
       await loadAttachments(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+    } catch (error) {
+      setAttachmentStatus(errorMessage(error));
+    }
+  }
+
+  async function updateAttachmentDescription(event: FormEvent<HTMLFormElement>, attachmentId: string) {
+    event.preventDefault();
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
+    const form = new FormData(event.currentTarget);
+    try {
+      setAttachmentStatus("Saving note...");
+      await api<Attachment>(
+        `/workspaces/${selectedWorkspaceId}/attachments/${attachmentId}`,
+        {
+          body: JSON.stringify({ description: formString(form.get("description")) }),
+          method: "PATCH",
+        },
+        auth.accessToken,
+      );
+      await loadAttachments(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId);
+      setAttachmentStatus("Note saved.");
     } catch (error) {
       setAttachmentStatus(errorMessage(error));
     }
@@ -882,6 +906,7 @@ export function useProjectWork({
     unassignTask,
     unassignTaskLabel,
     unwatchTask,
+    updateAttachmentDescription,
     updateComment,
     updateTaskDetails,
     uploadAttachment,
@@ -890,4 +915,8 @@ export function useProjectWork({
     labelStatus,
     workspaceLabels,
   };
+}
+
+function formString(value: FormDataEntryValue | null) {
+  return typeof value === "string" ? value : "";
 }

@@ -18,6 +18,7 @@ import {
   reorderSectionsRequestSchema,
   searchQuerySchema,
   taskWatcherUserRequestSchema,
+  updateAttachmentRequestSchema,
   updateCommentRequestSchema,
   updateTaskLabelRequestSchema,
   updateNotificationPreferenceRequestSchema,
@@ -260,6 +261,11 @@ export class WorkController {
   getAttachmentDownload = async (request: FastifyRequest) => {
     const { attachmentId, workspaceId } = parseParams(request, attachmentParamsSchema);
     return this.workService.getAttachmentDownload(await requireAuth(request), workspaceId, attachmentId);
+  };
+
+  updateAttachment = async (request: FastifyRequest) => {
+    const { attachmentId, workspaceId } = parseParams(request, attachmentParamsSchema);
+    return this.workService.updateAttachment(await requireAuth(request), workspaceId, attachmentId, parseBody(request, updateAttachmentRequestSchema));
   };
 
   deleteAttachment = async (request: FastifyRequest) => {

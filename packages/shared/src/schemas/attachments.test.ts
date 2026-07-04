@@ -6,6 +6,7 @@ import {
   createAttachmentRequestSchema,
   isAllowedAttachmentFileName,
   isAllowedAttachmentMimeType,
+  updateAttachmentRequestSchema,
 } from "./attachments.js";
 
 describe("attachment schemas", () => {
@@ -13,10 +14,12 @@ describe("attachment schemas", () => {
     expect(
       createAttachmentRequestSchema.parse({
         fileName: " brief.pdf ",
+        description: " Needs client approval. ",
         mimeType: " application/pdf ",
         sizeBytes: 2048,
       }),
     ).toEqual({
+      description: "Needs client approval.",
       fileName: "brief.pdf",
       mimeType: "application/pdf",
       sizeBytes: 2048,
@@ -43,5 +46,11 @@ describe("attachment schemas", () => {
     expect(isAllowedAttachmentFileName("photo.tiff")).toBe(false);
     expect(isAllowedAttachmentMimeType(" IMAGE/PNG ")).toBe(true);
     expect(isAllowedAttachmentMimeType("application/octet-stream")).toBe(false);
+  });
+
+  it("accepts bounded attachment notes", () => {
+    expect(updateAttachmentRequestSchema.parse({ description: " Reviewed by Maya. " })).toEqual({ description: "Reviewed by Maya." });
+    expect(updateAttachmentRequestSchema.parse({ description: "" })).toEqual({ description: "" });
+    expect(updateAttachmentRequestSchema.safeParse({ description: "x".repeat(1001) }).success).toBe(false);
   });
 });

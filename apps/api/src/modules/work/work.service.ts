@@ -18,6 +18,7 @@ import {
   searchCursorSchema,
   type SearchQuery,
   type SearchResultType,
+  type UpdateAttachmentRequest,
   type UpdateCommentRequest,
   type UpdateTaskLabelRequest,
   type UpdateSectionRequest,
@@ -704,6 +705,7 @@ export class WorkService {
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "COMMENTER");
     const objectKey = createAttachmentObjectKey({ fileName: input.fileName, taskId, workspaceId });
     const attachment = await this.workRepository.createAttachment({
+      description: normalizeAttachmentDescription(input.description),
       fileName: input.fileName,
       mimeType: input.mimeType,
       objectKey,
@@ -717,7 +719,7 @@ export class WorkService {
       entityId: attachment.id,
       entityType: "attachment",
       eventType: "AttachmentAdded",
-      payload: { attachmentId: attachment.id, fileName: attachment.fileName, sizeBytes: attachment.sizeBytes },
+      payload: { attachmentId: attachment.id, description: attachment.description, fileName: attachment.fileName, sizeBytes: attachment.sizeBytes },
       projectId: task.projectId,
       taskId,
       workspaceId,
@@ -735,6 +737,28 @@ export class WorkService {
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
     await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, "VIEWER");
     return { attachment, download: await createDownloadInstructions(attachment.objectKey) };
+  }
+
+  async updateAttachment(ctx: AuthContext, workspaceId: string, attachmentId: string, input: UpdateAttachmentRequest) {
+    const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
+    if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
+    const task = await this.getTask(ctx, workspaceId, attachment.taskId);
+    const requiredRole = attachment.uploadedById === ctx.userId ? "COMMENTER" : "EDITOR";
+    await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, requiredRole);
+    const description = normalizeAttachmentDescription(input.description);
+    const updated = await this.workRepository.updateAttachment({ attachmentId, description, workspaceId });
+    if (!updated) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: attachmentId,
+      entityType: "attachment",
+      eventType: "AttachmentUpdated",
+      payload: { attachmentId, description, fileName: attachment.fileName, sizeBytes: attachment.sizeBytes },
+      projectId: task.projectId,
+      taskId: attachment.taskId,
+      workspaceId,
+    });
+    return updated;
   }
 
   async deleteAttachment(ctx: AuthContext, workspaceId: string, attachmentId: string) {
@@ -1271,6 +1295,11 @@ function emptyDependencySummary(): TaskDependencySummary {
 
 function isPrismaUniqueConstraintError(error: unknown) {
   return error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002";
+}
+
+function normalizeAttachmentDescription(value: string | null | undefined) {
+  const description = value?.trim();
+  return description ? description : null;
 }
 
 type SearchCursor = {
