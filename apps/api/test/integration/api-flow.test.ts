@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@atlas/db";
 
+import { runAttachmentMaintenance } from "../../src/storage/attachment-maintenance.js";
 import { cleanupDeletedAttachmentObjects } from "../../src/storage/deleted-attachment-object-cleanup.js";
 import { cleanupExpiredPendingAttachmentUploads } from "../../src/storage/pending-upload-cleanup.js";
 
@@ -789,6 +790,97 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     await expect(prisma.attachment.findUniqueOrThrow({ where: { id: activeAttachment.id } })).resolves.toMatchObject({
       deletedAt: null,
       objectDeletedAt: null,
+    });
+  });
+
+  it("runs combined attachment maintenance for stale pending uploads and retained deleted objects", async () => {
+    const currentUser = await prisma.user.findUniqueOrThrow({ where: { email } });
+    const now = new Date();
+    const stalePendingCreatedAt = new Date(now.getTime() - 48 * 60 * 60 * 1000);
+    const staleDeletedAt = new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000);
+    const pendingObjectKey = "workspaces/" + workspaceId + "/tasks/" + taskId + "/" + randomUUID() + "-maintenance-pending.pdf";
+    const deletedObjectKey = "workspaces/" + workspaceId + "/tasks/" + taskId + "/" + randomUUID() + "-maintenance-deleted.pdf";
+    const deletedObjectKeys: string[] = [];
+
+    const pendingAttachment = await prisma.attachment.create({
+      data: {
+        createdAt: stalePendingCreatedAt,
+        fileName: "maintenance-pending.pdf",
+        mimeType: "application/pdf",
+        objectKey: pendingObjectKey,
+        sizeBytes: 2048,
+        taskId,
+        uploadedById: currentUser.id,
+        versions: {
+          create: {
+            createdAt: stalePendingCreatedAt,
+            fileName: "maintenance-pending.pdf",
+            mimeType: "application/pdf",
+            objectKey: pendingObjectKey,
+            sizeBytes: 2048,
+            uploadedById: currentUser.id,
+            version: 1,
+            workspaceId,
+          },
+        },
+        workspaceId,
+      },
+    });
+    const deletedAttachment = await prisma.attachment.create({
+      data: {
+        activatedAt: staleDeletedAt,
+        createdAt: staleDeletedAt,
+        deletedAt: staleDeletedAt,
+        fileName: "maintenance-deleted.pdf",
+        mimeType: "application/pdf",
+        objectKey: deletedObjectKey,
+        sizeBytes: 4096,
+        taskId,
+        uploadedById: currentUser.id,
+        versions: {
+          create: {
+            activatedAt: staleDeletedAt,
+            createdAt: staleDeletedAt,
+            fileName: "maintenance-deleted.pdf",
+            mimeType: "application/pdf",
+            objectKey: deletedObjectKey,
+            sizeBytes: 4096,
+            uploadedById: currentUser.id,
+            version: 1,
+            workspaceId,
+          },
+        },
+        workspaceId,
+      },
+    });
+
+    const result = await runAttachmentMaintenance({
+      confirm: true,
+      deleteObject: async (objectKey) => {
+        deletedObjectKeys.push(objectKey);
+      },
+      deletedAttachmentObjectRetentionMs: 30 * 24 * 60 * 60 * 1000,
+      now,
+      pendingUploadTtlMs: 24 * 60 * 60 * 1000,
+      prisma,
+    });
+
+    expect(result.pendingUploads).toMatchObject({
+      expiredInitialAttachments: 1,
+      expiredReplacementVersions: 0,
+      objectDeletes: { attempted: 1, failed: 0, succeeded: 1 },
+    });
+    expect(result.deletedAttachmentObjects).toMatchObject({
+      expiredObjectCount: 1,
+      objectDeletes: { attempted: 1, failed: 0, succeeded: 1 },
+    });
+    expect(deletedObjectKeys).toEqual(expect.arrayContaining([pendingObjectKey, deletedObjectKey]));
+    await expect(prisma.attachment.findUniqueOrThrow({ where: { id: pendingAttachment.id } })).resolves.toMatchObject({
+      deletedAt: expect.any(Date),
+      objectDeletedAt: expect.any(Date),
+    });
+    await expect(prisma.attachment.findUniqueOrThrow({ where: { id: deletedAttachment.id } })).resolves.toMatchObject({
+      objectDeletedAt: expect.any(Date),
     });
   });
 

@@ -84,6 +84,7 @@ corepack pnpm test:integration:local
 corepack pnpm smoke:demo:local
 corepack pnpm migrate
 corepack pnpm seed
+corepack pnpm cleanup:attachments
 corepack pnpm cleanup:pending-uploads
 corepack pnpm cleanup:deleted-attachment-objects
 ```
@@ -98,7 +99,9 @@ Worker note: search indexing is intentionally served by direct database queries 
 
 Production note: when `NODE_ENV=production`, Atlas refuses to start with local JWT placeholders, secrets shorter than 32 characters, or matching access/refresh secrets. Generate unique values for `JWT_ACCESS_SECRET` and `JWT_REFRESH_SECRET` before deploying.
 
-Attachment cleanup note: `pnpm cleanup:pending-uploads` defaults to a dry run and reports pending initial uploads/replacement versions older than 24 hours. Re-run with `-- --confirm` to expire those DB rows and delete their S3-compatible objects; set `ATLAS_PENDING_UPLOAD_TTL_HOURS` to use a different expiry window.
+Attachment cleanup note: `pnpm cleanup:attachments` defaults to a dry run and reports both abandoned pending uploads and retained deleted attachment objects. This is the command to schedule in production, and it must be re-run with `-- --confirm` to mutate rows or delete S3-compatible objects.
+
+Pending upload cleanup note: `pnpm cleanup:pending-uploads` defaults to a dry run and reports pending initial uploads/replacement versions older than 24 hours. Re-run with `-- --confirm` to expire those DB rows and delete their S3-compatible objects; set `ATLAS_PENDING_UPLOAD_TTL_HOURS` to use a different expiry window.
 
 Deleted attachment retention note: `pnpm cleanup:deleted-attachment-objects` defaults to a dry run and reports retained S3-compatible objects for soft-deleted attachments older than 30 days. Re-run with `-- --confirm` to delete those objects and mark their metadata with `object_deleted_at`; set `ATLAS_DELETED_ATTACHMENT_OBJECT_RETENTION_DAYS` to use a different retention window.
 
