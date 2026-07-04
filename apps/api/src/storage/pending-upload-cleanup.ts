@@ -86,13 +86,25 @@ export async function cleanupExpiredPendingAttachmentUploads(input: CleanupOptio
 
   const objectKeys = uniqueObjectKeys([...expiredInitialAttachments, ...expiredReplacementVersions]);
   const failures: PendingUploadCleanupResult["objectDeletes"]["failures"] = [];
+  const successfulObjectKeys = new Set<string>();
 
   for (const objectKey of objectKeys) {
     try {
       await deleteObject(objectKey);
+      successfulObjectKeys.add(objectKey);
     } catch (error) {
       failures.push({ message: error instanceof Error ? error.message : String(error), objectKey });
     }
+  }
+
+  const successfulInitialAttachmentIds = expiredInitialAttachments
+    .filter((attachment) => successfulObjectKeys.has(attachment.objectKey))
+    .map((attachment) => attachment.id);
+  if (successfulInitialAttachmentIds.length) {
+    await input.prisma.attachment.updateMany({
+      data: { objectDeletedAt: now },
+      where: { activatedAt: null, deletedAt: { not: null }, id: { in: successfulInitialAttachmentIds }, objectDeletedAt: null },
+    });
   }
 
   return {

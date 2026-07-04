@@ -7,6 +7,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { prisma } from "@atlas/db";
 
+import { cleanupDeletedAttachmentObjects } from "../../src/storage/deleted-attachment-object-cleanup.js";
 import { cleanupExpiredPendingAttachmentUploads } from "../../src/storage/pending-upload-cleanup.js";
 
 const rootDir = resolve(dirname(fileURLToPath(import.meta.url)), "../../../..");
@@ -539,7 +540,10 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     expect(deletedObjectKeys).not.toContain(freshInitialObjectKey);
     expect(deletedObjectKeys).not.toContain(activeObjectKey);
 
-    await expect(prisma.attachment.findUniqueOrThrow({ where: { id: staleInitial.id } })).resolves.toMatchObject({ deletedAt: expect.any(Date) });
+    await expect(prisma.attachment.findUniqueOrThrow({ where: { id: staleInitial.id } })).resolves.toMatchObject({
+      deletedAt: expect.any(Date),
+      objectDeletedAt: expect.any(Date),
+    });
     await expect(prisma.attachment.findUniqueOrThrow({ where: { id: freshInitial.id } })).resolves.toMatchObject({ deletedAt: null });
     await expect(prisma.attachmentVersion.count({ where: { attachmentId: staleInitial.id } })).resolves.toBe(0);
     await expect(prisma.attachmentVersion.findUnique({ where: { id: staleReplacement.id } })).resolves.toBeNull();
@@ -547,6 +551,146 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       activatedAt: expect.any(Date),
       deletedAt: null,
       objectKey: activeObjectKey,
+    });
+  });
+
+  it("cleans up retained objects for soft-deleted attachments after the retention window", async () => {
+    const currentUser = await prisma.user.findUniqueOrThrow({ where: { email } });
+    const now = new Date();
+    const staleDeletedAt = new Date(now.getTime() - 45 * 24 * 60 * 60 * 1000);
+    const freshDeletedAt = new Date(now.getTime() - 2 * 24 * 60 * 60 * 1000);
+    const staleV1ObjectKey = "workspaces/" + workspaceId + "/tasks/" + taskId + "/" + randomUUID() + "-deleted-v1.pdf";
+    const staleV2ObjectKey = "workspaces/" + workspaceId + "/tasks/" + taskId + "/" + randomUUID() + "-deleted-v2.pdf";
+    const freshDeletedObjectKey = "workspaces/" + workspaceId + "/tasks/" + taskId + "/" + randomUUID() + "-fresh-deleted.pdf";
+    const activeObjectKey = "workspaces/" + workspaceId + "/tasks/" + taskId + "/" + randomUUID() + "-still-active.pdf";
+    const deletedObjectKeys: string[] = [];
+
+    const staleDeletedAttachment = await prisma.attachment.create({
+      data: {
+        activatedAt: staleDeletedAt,
+        createdAt: staleDeletedAt,
+        deletedAt: staleDeletedAt,
+        fileName: "deleted-v2.pdf",
+        mimeType: "application/pdf",
+        objectKey: staleV2ObjectKey,
+        sizeBytes: 4096,
+        taskId,
+        uploadedById: currentUser.id,
+        version: 2,
+        versions: {
+          create: [
+            {
+              activatedAt: staleDeletedAt,
+              createdAt: staleDeletedAt,
+              fileName: "deleted-v1.pdf",
+              mimeType: "application/pdf",
+              objectKey: staleV1ObjectKey,
+              sizeBytes: 2048,
+              uploadedById: currentUser.id,
+              version: 1,
+              workspaceId,
+            },
+            {
+              activatedAt: staleDeletedAt,
+              createdAt: staleDeletedAt,
+              fileName: "deleted-v2.pdf",
+              mimeType: "application/pdf",
+              objectKey: staleV2ObjectKey,
+              sizeBytes: 4096,
+              uploadedById: currentUser.id,
+              version: 2,
+              workspaceId,
+            },
+          ],
+        },
+        workspaceId,
+      },
+    });
+    const freshDeletedAttachment = await prisma.attachment.create({
+      data: {
+        activatedAt: freshDeletedAt,
+        createdAt: freshDeletedAt,
+        deletedAt: freshDeletedAt,
+        fileName: "fresh-deleted.pdf",
+        mimeType: "application/pdf",
+        objectKey: freshDeletedObjectKey,
+        sizeBytes: 2048,
+        taskId,
+        uploadedById: currentUser.id,
+        versions: {
+          create: {
+            activatedAt: freshDeletedAt,
+            createdAt: freshDeletedAt,
+            fileName: "fresh-deleted.pdf",
+            mimeType: "application/pdf",
+            objectKey: freshDeletedObjectKey,
+            sizeBytes: 2048,
+            uploadedById: currentUser.id,
+            version: 1,
+            workspaceId,
+          },
+        },
+        workspaceId,
+      },
+    });
+    const activeAttachment = await prisma.attachment.create({
+      data: {
+        activatedAt: staleDeletedAt,
+        createdAt: staleDeletedAt,
+        fileName: "still-active.pdf",
+        mimeType: "application/pdf",
+        objectKey: activeObjectKey,
+        sizeBytes: 2048,
+        taskId,
+        uploadedById: currentUser.id,
+        versions: {
+          create: {
+            activatedAt: staleDeletedAt,
+            createdAt: staleDeletedAt,
+            fileName: "still-active.pdf",
+            mimeType: "application/pdf",
+            objectKey: activeObjectKey,
+            sizeBytes: 2048,
+            uploadedById: currentUser.id,
+            version: 1,
+            workspaceId,
+          },
+        },
+        workspaceId,
+      },
+    });
+
+    const result = await cleanupDeletedAttachmentObjects({
+      deleteObject: async (objectKey) => {
+        deletedObjectKeys.push(objectKey);
+      },
+      now,
+      prisma,
+      retentionMs: 30 * 24 * 60 * 60 * 1000,
+    });
+
+    expect(result).toMatchObject({
+      expiredObjectCount: 2,
+      objectDeletes: { attempted: 2, failed: 0, succeeded: 2 },
+    });
+    expect(deletedObjectKeys).toEqual(expect.arrayContaining([staleV1ObjectKey, staleV2ObjectKey]));
+    expect(deletedObjectKeys).not.toContain(freshDeletedObjectKey);
+    expect(deletedObjectKeys).not.toContain(activeObjectKey);
+
+    await expect(prisma.attachment.findUniqueOrThrow({ where: { id: staleDeletedAttachment.id } })).resolves.toMatchObject({
+      objectDeletedAt: expect.any(Date),
+    });
+    await expect(
+      prisma.attachmentVersion.count({
+        where: { attachmentId: staleDeletedAttachment.id, objectDeletedAt: { not: null } },
+      }),
+    ).resolves.toBe(2);
+    await expect(prisma.attachment.findUniqueOrThrow({ where: { id: freshDeletedAttachment.id } })).resolves.toMatchObject({
+      objectDeletedAt: null,
+    });
+    await expect(prisma.attachment.findUniqueOrThrow({ where: { id: activeAttachment.id } })).resolves.toMatchObject({
+      deletedAt: null,
+      objectDeletedAt: null,
     });
   });
 

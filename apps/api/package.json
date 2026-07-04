@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "cleanup:deleted-attachment-objects": "tsx scripts/cleanup-deleted-attachment-objects.ts",
     "cleanup:pending-uploads": "tsx scripts/cleanup-pending-uploads.ts",
     "dev": "tsx watch src/main.ts",
     "lint": "eslint .",
