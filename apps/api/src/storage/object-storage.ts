@@ -1,4 +1,5 @@
 import { randomUUID } from "node:crypto";
+import { Readable } from "node:stream";
 
 import { DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
@@ -75,6 +76,12 @@ export async function deleteAttachmentObject(objectKey: string): Promise<void> {
   await s3.send(new DeleteObjectCommand({ Bucket: env.S3_BUCKET, Key: objectKey }));
 }
 
+export async function getAttachmentObjectStream(objectKey: string): Promise<Readable> {
+  const result = await s3.send(new GetObjectCommand({ Bucket: env.S3_BUCKET, Key: objectKey }));
+  if (!result.Body) throw new Error("Attachment object body was empty.");
+  return readableBody(result.Body);
+}
+
 function safeFileName(fileName: string): string {
   const cleaned = fileName.trim().replace(/[^A-Za-z0-9._-]+/g, "-").replace(/^-+|-+$/g, "");
   return cleaned || "attachment";
@@ -90,4 +97,19 @@ function isMissingObjectError(error: unknown) {
     candidate.Code === "NoSuchKey" ||
     candidate.code === "NoSuchKey"
   );
+}
+
+function readableBody(body: unknown): Readable {
+  if (body instanceof Readable) return body;
+  if (isAsyncIterableBody(body)) return Readable.from(body);
+  if (hasTransformToWebStream(body)) return Readable.fromWeb(body.transformToWebStream());
+  throw new Error("Attachment object body is not readable.");
+}
+
+function isAsyncIterableBody(body: unknown): body is AsyncIterable<Uint8Array> {
+  return typeof body === "object" && body !== null && Symbol.asyncIterator in body;
+}
+
+function hasTransformToWebStream(body: unknown): body is { transformToWebStream: () => ReadableStream<Uint8Array> } {
+  return typeof body === "object" && body !== null && "transformToWebStream" in body && typeof (body as { transformToWebStream?: unknown }).transformToWebStream === "function";
 }

@@ -25,7 +25,10 @@ const envSchema = z.object({
   S3_PUBLIC_ENDPOINT: z.string().optional(),
   S3_REGION: z.string().default("us-east-1"),
   S3_SECRET_ACCESS_KEY: z.string().default("atlas-password"),
-  ATTACHMENT_SCAN_PROVIDER: z.enum(["noop"]).default("noop"),
+  ATTACHMENT_SCAN_PROVIDER: z.enum(["noop", "clamav"]).default("noop"),
+  CLAMAV_HOST: z.string().default("127.0.0.1"),
+  CLAMAV_PORT: z.coerce.number().int().positive().default(3310),
+  CLAMAV_TIMEOUT_MS: z.coerce.number().int().positive().default(10_000),
   WEB_ORIGIN: z.string().default("http://localhost:3000"),
 }).superRefine((value, ctx) => {
   if (value.EMAIL_PROVIDER === "resend" && !value.RESEND_API_KEY?.trim()) {

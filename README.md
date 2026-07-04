@@ -105,7 +105,7 @@ Pending upload cleanup note: `pnpm cleanup:pending-uploads` defaults to a dry ru
 
 Deleted attachment retention note: `pnpm cleanup:deleted-attachment-objects` defaults to a dry run and reports retained S3-compatible objects for soft-deleted attachments older than 30 days. Re-run with `-- --confirm` to delete those objects and mark their metadata with `object_deleted_at`; set `ATLAS_DELETED_ATTACHMENT_OBJECT_RETENTION_DAYS` to use a different retention window.
 
-Attachment scan note: `ATTACHMENT_SCAN_PROVIDER=noop` is the default. Upload completion records a durable `SKIPPED` scan status today; future scanner adapters should return `CLEAN`, `INFECTED`, or `ERROR` before activation so unsafe or unverifiable objects stay unpublished.
+Attachment scan note: `ATTACHMENT_SCAN_PROVIDER=noop` is the default and records a durable `SKIPPED` scan status. Set `ATTACHMENT_SCAN_PROVIDER=clamav` with `CLAMAV_HOST`, `CLAMAV_PORT`, and `CLAMAV_TIMEOUT_MS` to stream completed upload objects to clamd before activation. Clean objects are published; infected or unverifiable objects stay unpublished with `INFECTED` or `ERROR` scan state.
 
 Run the dockerized E2E smoke test against a running API container:
 

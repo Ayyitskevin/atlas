@@ -12,9 +12,28 @@ describe("API environment parsing", () => {
   it("allows local development defaults outside production", () => {
     expect(parseEnv({})).toMatchObject({
       ATTACHMENT_SCAN_PROVIDER: "noop",
+      CLAMAV_HOST: "127.0.0.1",
+      CLAMAV_PORT: 3310,
+      CLAMAV_TIMEOUT_MS: 10_000,
       JWT_ACCESS_SECRET: "local-dev-access-secret-change-me",
       JWT_REFRESH_SECRET: "local-dev-refresh-secret-change-me",
       NODE_ENV: "development",
+    });
+  });
+
+  it("accepts a configured ClamAV attachment scanner", () => {
+    expect(
+      parseEnv({
+        ATTACHMENT_SCAN_PROVIDER: "clamav",
+        CLAMAV_HOST: "clamav.internal",
+        CLAMAV_PORT: "3311",
+        CLAMAV_TIMEOUT_MS: "2500",
+      }),
+    ).toMatchObject({
+      ATTACHMENT_SCAN_PROVIDER: "clamav",
+      CLAMAV_HOST: "clamav.internal",
+      CLAMAV_PORT: 3311,
+      CLAMAV_TIMEOUT_MS: 2500,
     });
   });
 
