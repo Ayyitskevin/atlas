@@ -7,6 +7,9 @@ const activityTitles: Record<string, string> = {
   AttachmentDeleted: "Attachment removed",
   AttachmentReplaced: "Attachment replaced",
   AttachmentUpdated: "Attachment updated",
+  AttachmentCommentCreated: "File comment added",
+  AttachmentCommentDeleted: "File comment deleted",
+  AttachmentCommentUpdated: "File comment edited",
   CommentCreated: "Comment added",
   CommentDeleted: "Comment deleted",
   CommentUpdated: "Comment edited",
@@ -83,7 +86,10 @@ export function formatActivityDetail(activity: ActivitySummaryInput) {
     activity.eventType === "AttachmentAdded" ||
     activity.eventType === "AttachmentReplaced" ||
     activity.eventType === "AttachmentUpdated" ||
-    activity.eventType === "AttachmentDeleted"
+    activity.eventType === "AttachmentDeleted" ||
+    activity.eventType === "AttachmentCommentCreated" ||
+    activity.eventType === "AttachmentCommentUpdated" ||
+    activity.eventType === "AttachmentCommentDeleted"
   ) {
     const size = numberPayload(payload, "sizeBytes");
     return name ? "File: " + name + (size ? " · " + formatBytes(size) : "") : scopeLabel(activity);
@@ -102,7 +108,10 @@ export function formatActivityMetadata(activity: ActivitySummaryInput): Activity
     activity.eventType === "AttachmentAdded" ||
     activity.eventType === "AttachmentReplaced" ||
     activity.eventType === "AttachmentUpdated" ||
-    activity.eventType === "AttachmentDeleted"
+    activity.eventType === "AttachmentDeleted" ||
+    activity.eventType === "AttachmentCommentCreated" ||
+    activity.eventType === "AttachmentCommentUpdated" ||
+    activity.eventType === "AttachmentCommentDeleted"
   ) {
     const size = numberPayload(payload, "sizeBytes");
     const items: ActivityMetadataItem[] = size ? [{ label: "Size", value: formatBytes(size) }] : [];

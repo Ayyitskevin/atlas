@@ -2,6 +2,7 @@ import {
   ATLAS_ERROR_CODES,
   type ActivityQuery,
   type AddTaskDependencyRequest,
+  type CreateAttachmentCommentRequest,
   type CreateAttachmentRequest,
   type CreateCommentRequest,
   type CreateSectionRequest,
@@ -19,6 +20,7 @@ import {
   searchCursorSchema,
   type SearchQuery,
   type SearchResultType,
+  type UpdateAttachmentCommentRequest,
   type UpdateAttachmentRequest,
   type UpdateCommentRequest,
   type UpdateTaskLabelRequest,
@@ -750,6 +752,75 @@ export class WorkService {
     return pageFromLimit(await this.workRepository.listAttachments({ ...query, taskId, workspaceId }), query.limit);
   }
 
+  async createAttachmentComment(ctx: AuthContext, workspaceId: string, attachmentId: string, input: CreateAttachmentCommentRequest) {
+    const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
+    if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
+    const task = await this.getTask(ctx, workspaceId, attachment.taskId);
+    await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, "COMMENTER");
+    const comment = await this.workRepository.createAttachmentComment({ attachmentId, authorId: ctx.userId, body: input.body, workspaceId });
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: comment.id,
+      entityType: "attachment_comment",
+      eventType: "AttachmentCommentCreated",
+      payload: attachmentActivityPayload(attachment),
+      projectId: task.projectId,
+      taskId: attachment.taskId,
+      workspaceId,
+    });
+    return comment;
+  }
+
+  async listAttachmentComments(ctx: AuthContext, workspaceId: string, attachmentId: string, query: CursorPaginationQuery) {
+    const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
+    if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
+    await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, "VIEWER");
+    return pageFromLimit(await this.workRepository.listAttachmentComments({ ...query, attachmentId, workspaceId }), query.limit);
+  }
+
+  async updateAttachmentComment(ctx: AuthContext, workspaceId: string, attachmentCommentId: string, input: UpdateAttachmentCommentRequest) {
+    const comment = await this.workRepository.findAttachmentComment({ attachmentCommentId, workspaceId });
+    if (!comment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment comment not found.");
+    const attachment = await this.workRepository.findAttachment(workspaceId, comment.attachmentId);
+    if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment comment not found.");
+    const task = await this.getTask(ctx, workspaceId, attachment.taskId);
+    if (comment.authorId !== ctx.userId) await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, "EDITOR");
+    const updated = await this.workRepository.updateAttachmentComment({ attachmentCommentId, body: input.body, workspaceId });
+    if (!updated) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment comment not found.");
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: attachmentCommentId,
+      entityType: "attachment_comment",
+      eventType: "AttachmentCommentUpdated",
+      payload: attachmentActivityPayload(attachment),
+      projectId: task.projectId,
+      taskId: attachment.taskId,
+      workspaceId,
+    });
+    return updated;
+  }
+
+  async deleteAttachmentComment(ctx: AuthContext, workspaceId: string, attachmentCommentId: string) {
+    const comment = await this.workRepository.findAttachmentComment({ attachmentCommentId, workspaceId });
+    if (!comment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment comment not found.");
+    const attachment = await this.workRepository.findAttachment(workspaceId, comment.attachmentId);
+    if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment comment not found.");
+    const task = await this.getTask(ctx, workspaceId, attachment.taskId);
+    if (comment.authorId !== ctx.userId) await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, "EDITOR");
+    await this.workRepository.softDeleteAttachmentComment({ attachmentCommentId, workspaceId });
+    await this.events.recordActivity({
+      actorUserId: ctx.userId,
+      entityId: attachmentCommentId,
+      entityType: "attachment_comment",
+      eventType: "AttachmentCommentDeleted",
+      payload: attachmentActivityPayload(attachment),
+      projectId: task.projectId,
+      taskId: attachment.taskId,
+      workspaceId,
+    });
+    return { ok: true };
+  }
+
   async getAttachmentDownload(ctx: AuthContext, workspaceId: string, attachmentId: string) {
     const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
@@ -1435,6 +1506,10 @@ function isPrismaUniqueConstraintError(error: unknown) {
 function normalizeAttachmentDescription(value: string | null | undefined) {
   const description = value?.trim();
   return description ? description : null;
+}
+
+function attachmentActivityPayload(attachment: { fileName: string; id: string; sizeBytes: number; version: number }) {
+  return { attachmentId: attachment.id, fileName: attachment.fileName, sizeBytes: attachment.sizeBytes, version: attachment.version };
 }
 
 function normalizeMimeType(value: string | null | undefined) {

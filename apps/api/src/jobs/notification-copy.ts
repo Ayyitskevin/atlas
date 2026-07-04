@@ -73,6 +73,12 @@ export function taskNotificationCopy(event: MutationEventJob, taskTitle: string)
       return { body: "A file note changed on " + quote(title) + ".", title: "Attachment updated" };
     case "AttachmentDeleted":
       return { body: "A file was removed from " + quote(title) + ".", title: "Attachment removed" };
+    case "AttachmentCommentCreated":
+      return { body: "A file comment was added to " + quote(title) + ".", title: "File comment added" };
+    case "AttachmentCommentUpdated":
+      return { body: "A file comment was edited on " + quote(title) + ".", title: "File comment edited" };
+    case "AttachmentCommentDeleted":
+      return { body: "A file comment was deleted from " + quote(title) + ".", title: "File comment deleted" };
     case "TaskUpdated":
       return { body: quote(title) + " was updated.", title: "Task updated" };
     default:

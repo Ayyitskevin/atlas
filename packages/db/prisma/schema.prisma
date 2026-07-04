@@ -80,6 +80,7 @@ model User {
   comments                     Comment[]
   attachments                  Attachment[]
   attachmentVersions           AttachmentVersion[]               @relation("AttachmentVersionUploader")
+  attachmentComments           AttachmentComment[]
   activityEvents               ActivityEvent[]                   @relation("ActivityActor")
   notifications                Notification[]                    @relation("NotificationRecipient")
   notificationPreferences      WorkspaceNotificationPreference[]
@@ -547,6 +548,7 @@ model Attachment {
   task            Task                @relation(fields: [taskId], references: [id], onDelete: Cascade)
   uploadedBy      User                @relation(fields: [uploadedById], references: [id])
   versions        AttachmentVersion[]
+  comments        AttachmentComment[]
 
   @@unique([workspaceId, objectKey])
   @@index([workspaceId, taskId])
@@ -578,6 +580,24 @@ model AttachmentVersion {
   @@index([workspaceId, attachmentId, objectDeletedAt])
   @@index([workspaceId, uploadedById])
   @@map("attachment_versions")
+}
+
+model AttachmentComment {
+  id           String     @id @default(uuid()) @db.Uuid
+  workspaceId  String     @map("workspace_id") @db.Uuid
+  attachmentId String     @map("attachment_id") @db.Uuid
+  authorId     String     @map("author_id") @db.Uuid
+  body         String
+  editedAt     DateTime?  @map("edited_at") @db.Timestamptz(6)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime?  @map("deleted_at") @db.Timestamptz(6)
+  attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  author       User       @relation(fields: [authorId], references: [id])
+
+  @@index([workspaceId, attachmentId, createdAt])
+  @@index([workspaceId, authorId])
+  @@map("attachment_comments")
 }
 
 model ActivityEvent {

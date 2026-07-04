@@ -263,6 +263,7 @@ export type Comment = {
 
 export type Attachment = {
   activatedAt: string | null;
+  comments?: AttachmentComment[];
   createdAt: string;
   description?: string | null;
   fileName: string;
@@ -274,6 +275,15 @@ export type Attachment = {
   uploadedById?: string;
   version: number;
   versions?: AttachmentVersion[];
+};
+
+export type AttachmentComment = {
+  attachmentId: string;
+  authorId?: string;
+  body: string;
+  createdAt: string;
+  editedAt?: string | null;
+  id: string;
 };
 
 export type AttachmentVersion = {

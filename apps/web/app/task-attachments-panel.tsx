@@ -10,9 +10,12 @@ import type { Attachment } from "./atlas-types";
 type TaskAttachmentsPanelProps = {
   attachmentStatus: string;
   attachments: Attachment[];
+  onCreateAttachmentComment: (event: FormEvent<HTMLFormElement>, attachmentId: string) => Promise<void>;
   onDeleteAttachment: (attachmentId: string) => Promise<void>;
+  onDeleteAttachmentComment: (attachmentCommentId: string) => Promise<void>;
   onDownloadAttachment: (attachmentId: string) => Promise<void>;
   onReplaceAttachment: (event: FormEvent<HTMLFormElement>, attachmentId: string) => Promise<void>;
+  onUpdateAttachmentComment: (attachmentCommentId: string, body: string) => Promise<void>;
   onUpdateAttachmentDescription: (event: FormEvent<HTMLFormElement>, attachmentId: string) => Promise<void>;
   onUploadAttachment: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
@@ -20,9 +23,12 @@ type TaskAttachmentsPanelProps = {
 export function TaskAttachmentsPanel({
   attachmentStatus,
   attachments,
+  onCreateAttachmentComment,
   onDeleteAttachment,
+  onDeleteAttachmentComment,
   onDownloadAttachment,
   onReplaceAttachment,
+  onUpdateAttachmentComment,
   onUpdateAttachmentDescription,
   onUploadAttachment,
 }: TaskAttachmentsPanelProps) {
@@ -86,6 +92,37 @@ export function TaskAttachmentsPanel({
                 Save note
               </button>
             </form>
+            <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2">
+              <p className="text-xs font-semibold uppercase text-slate-500">File thread</p>
+              <form className="mt-2 grid gap-2" onSubmit={(event) => void onCreateAttachmentComment(event, attachment.id)}>
+                <textarea className="min-h-16 rounded-md border border-slate-300 px-3 py-2 text-sm" name="body" required />
+                <button className="w-fit rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700" type="submit">
+                  Add file comment
+                </button>
+              </form>
+              <div className="mt-3 grid gap-2">
+                {attachment.comments?.length ? (
+                  attachment.comments.map((comment) => (
+                    <form className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-2" key={comment.id} onSubmit={(event) => handleAttachmentCommentSubmit(event, comment.id, onUpdateAttachmentComment)}>
+                      <textarea className="min-h-16 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm" defaultValue={comment.body} name="body" required />
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <time className="text-xs text-slate-500">{new Date(comment.createdAt).toLocaleString()}{comment.editedAt ? " · edited" : ""}</time>
+                        <div className="flex gap-2">
+                          <button className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700" type="submit">
+                            Save
+                          </button>
+                          <button className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700" onClick={() => void onDeleteAttachmentComment(comment.id)} type="button">
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </form>
+                  ))
+                ) : (
+                  <p className="text-xs text-slate-500">No file comments yet.</p>
+                )}
+              </div>
+            </div>
             <form className="mt-3 grid gap-2" onSubmit={(event) => void onReplaceAttachment(event, attachment.id)}>
               <label className="grid gap-1 text-xs font-medium text-slate-600">
                 Replace file
@@ -114,4 +151,14 @@ export function TaskAttachmentsPanel({
       </div>
     </section>
   );
+}
+
+function handleAttachmentCommentSubmit(
+  event: FormEvent<HTMLFormElement>,
+  attachmentCommentId: string,
+  onUpdateAttachmentComment: (attachmentCommentId: string, body: string) => Promise<void>,
+) {
+  event.preventDefault();
+  const form = new FormData(event.currentTarget);
+  void onUpdateAttachmentComment(attachmentCommentId, String(form.get("body") ?? ""));
 }

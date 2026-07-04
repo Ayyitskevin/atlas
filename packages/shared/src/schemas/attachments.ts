@@ -116,9 +116,20 @@ export const attachmentVersionResponseSchema = z.object({
   workspaceId: z.string().uuid(),
 });
 
+export const attachmentCommentResponseSchema = z.object({
+  attachmentId: z.string().uuid(),
+  authorId: z.string().uuid(),
+  body: z.string(),
+  createdAt: z.string().datetime(),
+  editedAt: z.string().datetime().nullable(),
+  id: z.string().uuid(),
+  workspaceId: z.string().uuid(),
+});
+
 export const attachmentResponseSchema = z.object({
   activatedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
+  comments: z.array(attachmentCommentResponseSchema).optional(),
   description: z.string().nullable(),
   fileName: z.string(),
   id: z.string().uuid(),
@@ -152,4 +163,5 @@ export type CreateAttachmentRequest = z.infer<typeof createAttachmentRequestSche
 export type ReplaceAttachmentRequest = z.infer<typeof replaceAttachmentRequestSchema>;
 export type UpdateAttachmentRequest = z.infer<typeof updateAttachmentRequestSchema>;
 export type AttachmentVersionResponse = z.infer<typeof attachmentVersionResponseSchema>;
+export type AttachmentCommentResponse = z.infer<typeof attachmentCommentResponseSchema>;
 export type AttachmentStorageInstructions = z.infer<typeof attachmentStorageInstructionsSchema>;

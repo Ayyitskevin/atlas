@@ -907,6 +907,57 @@ export function useProjectWork({
     }
   }
 
+  async function createAttachmentComment(event: FormEvent<HTMLFormElement>, attachmentId: string) {
+    event.preventDefault();
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
+    const form = new FormData(event.currentTarget);
+    try {
+      setAttachmentStatus("");
+      await api<Comment>(
+        `/workspaces/${selectedWorkspaceId}/attachments/${attachmentId}/comments`,
+        { body: JSON.stringify({ body: formString(form.get("body")) }), method: "POST" },
+        auth.accessToken,
+      );
+      await loadAttachments(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId);
+      event.currentTarget.reset();
+    } catch (error) {
+      setAttachmentStatus(errorMessage(error));
+    }
+  }
+
+  async function updateAttachmentComment(attachmentCommentId: string, body: string) {
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
+    try {
+      setAttachmentStatus("");
+      await api<Comment>(
+        `/workspaces/${selectedWorkspaceId}/attachment-comments/${attachmentCommentId}`,
+        { body: JSON.stringify({ body }), method: "PATCH" },
+        auth.accessToken,
+      );
+      await loadAttachments(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId);
+    } catch (error) {
+      setAttachmentStatus(errorMessage(error));
+    }
+  }
+
+  async function deleteAttachmentComment(attachmentCommentId: string) {
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
+    try {
+      setAttachmentStatus("");
+      await api<{ ok: boolean }>(
+        `/workspaces/${selectedWorkspaceId}/attachment-comments/${attachmentCommentId}`,
+        { method: "DELETE" },
+        auth.accessToken,
+      );
+      await loadAttachments(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId);
+    } catch (error) {
+      setAttachmentStatus(errorMessage(error));
+    }
+  }
+
   return {
     addTaskDependency,
     dependencyStatus,
@@ -924,11 +975,13 @@ export function useProjectWork({
     completeReadyBlockers,
     changeTaskDependencyFilter,
     createComment,
+    createAttachmentComment,
     createSection,
     createSubtask,
     createTaskLabel,
     createTask,
     deleteAttachment,
+    deleteAttachmentComment,
     deleteComment,
     deleteSection,
     deleteSubtask,
@@ -958,6 +1011,7 @@ export function useProjectWork({
     unassignTask,
     unassignTaskLabel,
     unwatchTask,
+    updateAttachmentComment,
     updateAttachmentDescription,
     updateComment,
     updateTaskDetails,

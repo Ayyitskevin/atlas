@@ -6,6 +6,10 @@ import { myWorkDependencyWhere, myWorkDueDateWhere, myWorkScopeWhere, myWorkStat
 import { completedAtForStatusTransition } from "./task-state.js";
 
 const attachmentWithActiveVersions = {
+  comments: {
+    orderBy: { createdAt: "asc" as const },
+    where: { deletedAt: null },
+  },
   versions: {
     orderBy: { version: "desc" as const },
     where: { activatedAt: { not: null } },
@@ -608,6 +612,40 @@ export class WorkRepository {
       include: attachmentWithActiveVersions,
       orderBy: { createdAt: "desc" },
       where: { activatedAt: { not: null }, deletedAt: null, taskId: input.taskId, workspaceId: input.workspaceId },
+    });
+  }
+
+  createAttachmentComment(input: { attachmentId: string; authorId: string; body: string; workspaceId: string }) {
+    return this.prisma.attachmentComment.create({ data: input });
+  }
+
+  listAttachmentComments(input: { attachmentId: string; cursor?: string; limit: number; workspaceId: string }) {
+    return this.prisma.attachmentComment.findMany({
+      ...paginationArgs(input),
+      orderBy: { createdAt: "asc" },
+      where: { attachmentId: input.attachmentId, deletedAt: null, workspaceId: input.workspaceId },
+    });
+  }
+
+  findAttachmentComment(input: { attachmentCommentId: string; workspaceId: string }) {
+    return this.prisma.attachmentComment.findFirst({
+      where: { deletedAt: null, id: input.attachmentCommentId, workspaceId: input.workspaceId },
+    });
+  }
+
+  async updateAttachmentComment(input: { attachmentCommentId: string; body: string; workspaceId: string }) {
+    const result = await this.prisma.attachmentComment.updateMany({
+      data: { body: input.body, editedAt: new Date() },
+      where: { deletedAt: null, id: input.attachmentCommentId, workspaceId: input.workspaceId },
+    });
+    if (!result.count) return null;
+    return this.findAttachmentComment(input);
+  }
+
+  softDeleteAttachmentComment(input: { attachmentCommentId: string; workspaceId: string }) {
+    return this.prisma.attachmentComment.updateMany({
+      data: { deletedAt: new Date() },
+      where: { deletedAt: null, id: input.attachmentCommentId, workspaceId: input.workspaceId },
     });
   }
 

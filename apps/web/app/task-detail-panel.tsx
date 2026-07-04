@@ -27,10 +27,12 @@ type TaskDetailPanelProps = {
   onAssignTaskLabel: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onCompleteTask: () => Promise<void>;
   onCompleteReadyBlockers: () => Promise<void>;
+  onCreateAttachmentComment: (event: FormEvent<HTMLFormElement>, attachmentId: string) => Promise<void>;
   onCreateComment: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onCreateTaskLabel: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onCreateSubtask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
   onDeleteAttachment: (attachmentId: string) => Promise<void>;
+  onDeleteAttachmentComment: (attachmentCommentId: string) => Promise<void>;
   onDeleteComment: (commentId: string) => Promise<void>;
   onDeleteSubtask: (subtaskId: string) => Promise<void>;
   onDeleteTask: () => Promise<void>;
@@ -42,6 +44,7 @@ type TaskDetailPanelProps = {
   onUnassignTask: (userId: string) => Promise<void>;
   onUnassignTaskLabel: (labelId: string) => Promise<void>;
   onUnwatchTask: (userId: string) => Promise<void>;
+  onUpdateAttachmentComment: (attachmentCommentId: string, body: string) => Promise<void>;
   onUpdateComment: (commentId: string, body: string) => Promise<void>;
   onUpdateAttachmentDescription: (event: FormEvent<HTMLFormElement>, attachmentId: string) => Promise<void>;
   onUpdateTask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
@@ -70,10 +73,12 @@ export function TaskDetailPanel({
   onAssignTaskLabel,
   onCompleteTask,
   onCompleteReadyBlockers,
+  onCreateAttachmentComment,
   onCreateComment,
   onCreateTaskLabel,
   onCreateSubtask,
   onDeleteAttachment,
+  onDeleteAttachmentComment,
   onDeleteComment,
   onDeleteSubtask,
   onDeleteTask,
@@ -85,6 +90,7 @@ export function TaskDetailPanel({
   onUnassignTask,
   onUnassignTaskLabel,
   onUnwatchTask,
+  onUpdateAttachmentComment,
   onUpdateComment,
   onUpdateAttachmentDescription,
   onUpdateTask,
@@ -170,9 +176,12 @@ export function TaskDetailPanel({
       <TaskAttachmentsPanel
         attachmentStatus={attachmentStatus}
         attachments={attachments}
+        onCreateAttachmentComment={onCreateAttachmentComment}
         onDeleteAttachment={onDeleteAttachment}
+        onDeleteAttachmentComment={onDeleteAttachmentComment}
         onDownloadAttachment={onDownloadAttachment}
         onReplaceAttachment={onReplaceAttachment}
+        onUpdateAttachmentComment={onUpdateAttachmentComment}
         onUpdateAttachmentDescription={onUpdateAttachmentDescription}
         onUploadAttachment={onUploadAttachment}
       />

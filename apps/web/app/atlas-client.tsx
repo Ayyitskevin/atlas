@@ -202,12 +202,14 @@ export function AtlasClient({
     completeTask,
     completeReadyBlockers,
     changeTaskDependencyFilter,
+    createAttachmentComment,
     createComment,
     createSection,
     createSubtask,
     createTaskLabel,
     createTask,
     deleteAttachment,
+    deleteAttachmentComment,
     deleteComment,
     deleteSection,
     deleteSubtask,
@@ -238,6 +240,7 @@ export function AtlasClient({
     unassignTask,
     unassignTaskLabel,
     unwatchTask,
+    updateAttachmentComment,
     updateAttachmentDescription,
     updateComment,
     updateTaskDetails,
@@ -1088,10 +1091,12 @@ export function AtlasClient({
             onAssignTaskLabel={assignTaskLabel}
             onCompleteTask={completeTask}
             onCompleteReadyBlockers={completeReadyBlockers}
+            onCreateAttachmentComment={createAttachmentComment}
             onCreateComment={createComment}
             onCreateTaskLabel={createTaskLabel}
             onCreateSubtask={createSubtask}
             onDeleteAttachment={deleteAttachment}
+            onDeleteAttachmentComment={deleteAttachmentComment}
             onDeleteComment={deleteComment}
             onDeleteSubtask={deleteSubtask}
             onDeleteTask={deleteTask}
@@ -1103,6 +1108,7 @@ export function AtlasClient({
             onUnassignTask={unassignTask}
             onUnassignTaskLabel={unassignTaskLabel}
             onUnwatchTask={unwatchTask}
+            onUpdateAttachmentComment={updateAttachmentComment}
             onUpdateAttachmentDescription={updateAttachmentDescription}
             onUpdateComment={updateComment}
             onUpdateTask={updateTaskDetails}

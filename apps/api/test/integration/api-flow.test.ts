@@ -232,6 +232,14 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     });
     expect(pendingDownload.statusCode).toBe(404);
 
+    const pendingAttachmentComment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { body: "Review the pending upload." },
+      url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id + "/comments",
+    });
+    expect(pendingAttachmentComment.statusCode).toBe(404);
+
     const incompleteAttachment = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
@@ -266,6 +274,96 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       taskId,
       workspaceId,
     });
+
+    const attachmentComment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { body: "Please review this file." },
+      url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id + "/comments",
+    });
+    expect(attachmentComment.statusCode).toBe(201);
+    const attachmentCommentBody = attachmentComment.json<{ attachmentId: string; body: string; id: string }>();
+    expect(attachmentCommentBody).toMatchObject({
+      attachmentId: attachmentBody.attachment.id,
+      body: "Please review this file.",
+    });
+    await expectActivityEvent({
+      entityId: attachmentCommentBody.id,
+      entityType: "attachment_comment",
+      eventType: "AttachmentCommentCreated",
+      payload: { attachmentId: attachmentBody.attachment.id, fileName: "brief.pdf", sizeBytes: 2048, version: 1 },
+      projectId,
+      taskId,
+      workspaceId,
+    });
+
+    const attachmentComments = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id + "/comments",
+    });
+    expect(attachmentComments.statusCode).toBe(200);
+    expect(attachmentComments.json<{ items: Array<{ body: string; id: string }> }>().items).toContainEqual(
+      expect.objectContaining({ body: "Please review this file.", id: attachmentCommentBody.id }),
+    );
+
+    const updateAttachmentComment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "PATCH",
+      payload: { body: "Please review this file before launch." },
+      url: "/api/v1/workspaces/" + workspaceId + "/attachment-comments/" + attachmentCommentBody.id,
+    });
+    expect(updateAttachmentComment.statusCode).toBe(200);
+    expect(updateAttachmentComment.json<{ body: string; editedAt: string | null }>())
+      .toMatchObject({ body: "Please review this file before launch.", editedAt: expect.any(String) });
+    await expectActivityEvent({
+      entityId: attachmentCommentBody.id,
+      entityType: "attachment_comment",
+      eventType: "AttachmentCommentUpdated",
+      payload: { attachmentId: attachmentBody.attachment.id, fileName: "brief.pdf", sizeBytes: 2048, version: 1 },
+      projectId,
+      taskId,
+      workspaceId,
+    });
+
+    const attachmentListWithComment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/attachments",
+    });
+    expect(attachmentListWithComment.statusCode).toBe(200);
+    expect(attachmentListWithComment.json<{ items: Array<{ comments?: Array<{ body: string; id: string }> }> }>().items).toContainEqual(
+      expect.objectContaining({
+        comments: expect.arrayContaining([
+          expect.objectContaining({ body: "Please review this file before launch.", id: attachmentCommentBody.id }),
+        ]),
+      }),
+    );
+
+    const deleteAttachmentComment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "DELETE",
+      url: "/api/v1/workspaces/" + workspaceId + "/attachment-comments/" + attachmentCommentBody.id,
+    });
+    expect(deleteAttachmentComment.statusCode).toBe(200);
+    await expectActivityEvent({
+      entityId: attachmentCommentBody.id,
+      entityType: "attachment_comment",
+      eventType: "AttachmentCommentDeleted",
+      payload: { attachmentId: attachmentBody.attachment.id, fileName: "brief.pdf", sizeBytes: 2048, version: 1 },
+      projectId,
+      taskId,
+      workspaceId,
+    });
+    const attachmentCommentsAfterDelete = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id + "/comments",
+    });
+    expect(attachmentCommentsAfterDelete.statusCode).toBe(200);
+    expect(attachmentCommentsAfterDelete.json<{ items: Array<{ id: string }> }>().items).not.toContainEqual(
+      expect.objectContaining({ id: attachmentCommentBody.id }),
+    );
 
     const updatedAttachment = await app!.inject({
       headers: authHeaders(accessToken),

@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   activityQuerySchema,
   addTaskDependencyRequestSchema,
+  createAttachmentCommentRequestSchema,
   createAttachmentRequestSchema,
   createCommentRequestSchema,
   createSectionRequestSchema,
@@ -19,6 +20,7 @@ import {
   reorderSectionsRequestSchema,
   searchQuerySchema,
   taskWatcherUserRequestSchema,
+  updateAttachmentCommentRequestSchema,
   updateAttachmentRequestSchema,
   updateCommentRequestSchema,
   updateTaskLabelRequestSchema,
@@ -43,6 +45,7 @@ const taskDependencyParamsSchema = workspaceParamsSchema.extend({ dependencyId: 
 const subtaskParamsSchema = workspaceParamsSchema.extend({ subtaskId: z.string().uuid() });
 const commentParamsSchema = workspaceParamsSchema.extend({ commentId: z.string().uuid() });
 const attachmentParamsSchema = workspaceParamsSchema.extend({ attachmentId: z.string().uuid() });
+const attachmentCommentParamsSchema = workspaceParamsSchema.extend({ attachmentCommentId: z.string().uuid() });
 const attachmentVersionParamsSchema = attachmentParamsSchema.extend({ versionId: z.string().uuid() });
 const notificationParamsSchema = workspaceParamsSchema.extend({ notificationId: z.string().uuid() });
 const userBodySchema = z.object({ userId: z.string().uuid() });
@@ -258,6 +261,42 @@ export class WorkController {
   listAttachments = async (request: FastifyRequest) => {
     const { taskId, workspaceId } = parseParams(request, taskParamsSchema);
     return this.workService.listAttachments(await requireAuth(request), workspaceId, taskId, parseQuery(request, cursorPaginationQuerySchema));
+  };
+
+  createAttachmentComment = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { attachmentId, workspaceId } = parseParams(request, attachmentParamsSchema);
+    const result = await this.workService.createAttachmentComment(
+      await requireAuth(request),
+      workspaceId,
+      attachmentId,
+      parseBody(request, createAttachmentCommentRequestSchema),
+    );
+    return reply.status(201).send(result);
+  };
+
+  listAttachmentComments = async (request: FastifyRequest) => {
+    const { attachmentId, workspaceId } = parseParams(request, attachmentParamsSchema);
+    return this.workService.listAttachmentComments(
+      await requireAuth(request),
+      workspaceId,
+      attachmentId,
+      parseQuery(request, cursorPaginationQuerySchema),
+    );
+  };
+
+  updateAttachmentComment = async (request: FastifyRequest) => {
+    const { attachmentCommentId, workspaceId } = parseParams(request, attachmentCommentParamsSchema);
+    return this.workService.updateAttachmentComment(
+      await requireAuth(request),
+      workspaceId,
+      attachmentCommentId,
+      parseBody(request, updateAttachmentCommentRequestSchema),
+    );
+  };
+
+  deleteAttachmentComment = async (request: FastifyRequest) => {
+    const { attachmentCommentId, workspaceId } = parseParams(request, attachmentCommentParamsSchema);
+    return this.workService.deleteAttachmentComment(await requireAuth(request), workspaceId, attachmentCommentId);
   };
 
   getAttachmentDownload = async (request: FastifyRequest) => {

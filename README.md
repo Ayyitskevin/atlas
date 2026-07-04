@@ -14,7 +14,7 @@ The current phase is deliberately foundation-first: production-minded domain bou
 - Realtime WebSocket broadcasts for project/member/task/comment/activity mutations.
 - Durable domain event outbox feeding BullMQ workers for notification fanout plus observable search-index and email-delivery provider seams.
 - Workspace-admin outbox inspection/detail, dispatch attempt history, worker outcome history, and failed-event replay endpoints.
-- Task attachment metadata with S3-compatible signed upload/download URLs, local MinIO support, server-side object validation before activation, file notes, and version history.
+- Task attachment metadata with S3-compatible signed upload/download URLs, local MinIO support, server-side object validation before activation, file notes, version history, and per-file discussion threads.
 - Docker Compose local stack and Terraform scaffolding for staging-oriented infrastructure.
 
 ## Stack

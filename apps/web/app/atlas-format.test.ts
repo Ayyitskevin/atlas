@@ -33,6 +33,7 @@ describe("atlas format helpers", () => {
     expect(formatActivityTitle("TaskDependencyAdded")).toBe("Dependency added");
     expect(formatActivityTitle("AttachmentReplaced")).toBe("Attachment replaced");
     expect(formatActivityTitle("AttachmentUpdated")).toBe("Attachment updated");
+    expect(formatActivityTitle("AttachmentCommentCreated")).toBe("File comment added");
     expect(formatActivityTitle("TaskRecurrenceGenerated")).toBe("Recurring task created");
     expect(formatActivityTitle("TaskRecurrencePaused")).toBe("Recurring task paused");
     expect(formatActivityTitle("TaskRecurrenceSkipped")).toBe("Recurring task skipped");
@@ -66,6 +67,25 @@ describe("atlas format helpers", () => {
     ).toEqual([
       { label: "Size", value: "2.0 KB" },
       { label: "Note", value: "Needs legal approval." },
+    ]);
+    expect(
+      formatActivityDetail({
+        entityType: "attachment_comment",
+        eventType: "AttachmentCommentCreated",
+        payload: { fileName: "brief.pdf", sizeBytes: 2048, version: 1 },
+        taskId: "task-1",
+      }),
+    ).toBe("File: brief.pdf · 2.0 KB");
+    expect(
+      formatActivityMetadata({
+        entityType: "attachment_comment",
+        eventType: "AttachmentCommentCreated",
+        payload: { fileName: "brief.pdf", sizeBytes: 2048, version: 1 },
+        taskId: "task-1",
+      }),
+    ).toEqual([
+      { label: "Size", value: "2.0 KB" },
+      { label: "Version", value: "v1" },
     ]);
     expect(
       formatActivityMetadata({
