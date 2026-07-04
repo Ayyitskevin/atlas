@@ -797,6 +797,11 @@ export function useProjectWork({
         method: created.upload.method,
       });
       if (!upload.ok) throw new Error("Attachment upload failed.");
+      await api<Attachment>(
+        `/workspaces/${selectedWorkspaceId}/attachments/${created.attachment.id}/complete`,
+        { method: "POST" },
+        auth.accessToken,
+      );
       await loadAttachments(auth.accessToken, selectedWorkspaceId, selectedTaskId);
       await loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId);
       setAttachmentStatus("");

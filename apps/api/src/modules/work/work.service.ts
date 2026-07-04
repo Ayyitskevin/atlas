@@ -716,17 +716,33 @@ export class WorkService {
       uploadedById: ctx.userId,
       workspaceId,
     });
-    await this.events.recordActivity({
-      actorUserId: ctx.userId,
-      entityId: attachment.id,
-      entityType: "attachment",
-      eventType: "AttachmentAdded",
-      payload: { attachmentId: attachment.id, description: attachment.description, fileName: attachment.fileName, sizeBytes: attachment.sizeBytes },
-      projectId: task.projectId,
-      taskId,
-      workspaceId,
-    });
     return { attachment, upload: await createUploadInstructions({ mimeType: attachment.mimeType, objectKey: attachment.objectKey }) };
+  }
+
+  async completeAttachment(ctx: AuthContext, workspaceId: string, attachmentId: string) {
+    const attachment = await this.workRepository.findAttachmentIncludingPending(workspaceId, attachmentId);
+    if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
+    const task = await this.getTask(ctx, workspaceId, attachment.taskId);
+    const requiredRole = attachment.uploadedById === ctx.userId ? "COMMENTER" : "EDITOR";
+    await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, requiredRole);
+    if (!attachment.activatedAt) await this.assertAttachmentObjectMatches({ mimeType: attachment.mimeType, objectKey: attachment.objectKey, sizeBytes: attachment.sizeBytes });
+    const result = await this.workRepository.completeAttachment({ attachmentId, workspaceId });
+    if (result.conflict || !result.attachment) {
+      throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "Attachment changed before upload completion.");
+    }
+    if (result.activated) {
+      await this.events.recordActivity({
+        actorUserId: ctx.userId,
+        entityId: attachment.id,
+        entityType: "attachment",
+        eventType: "AttachmentAdded",
+        payload: { attachmentId: attachment.id, description: attachment.description, fileName: attachment.fileName, sizeBytes: attachment.sizeBytes },
+        projectId: task.projectId,
+        taskId: attachment.taskId,
+        workspaceId,
+      });
+    }
+    return result.attachment;
   }
 
   async listAttachments(ctx: AuthContext, workspaceId: string, taskId: string, query: CursorPaginationQuery) {

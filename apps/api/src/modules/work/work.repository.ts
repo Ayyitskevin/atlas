@@ -582,14 +582,12 @@ export class WorkRepository {
     uploadedById: string;
     workspaceId: string;
   }) {
-    const activatedAt = new Date();
     return this.prisma.attachment.create({
       data: {
         ...input,
         version: 1,
         versions: {
           create: {
-            activatedAt,
             fileName: input.fileName,
             mimeType: input.mimeType,
             objectKey: input.objectKey,
@@ -609,12 +607,63 @@ export class WorkRepository {
       ...paginationArgs(input),
       include: attachmentWithActiveVersions,
       orderBy: { createdAt: "desc" },
-      where: { deletedAt: null, taskId: input.taskId, workspaceId: input.workspaceId },
+      where: { activatedAt: { not: null }, deletedAt: null, taskId: input.taskId, workspaceId: input.workspaceId },
     });
   }
 
   findAttachment(workspaceId: string, attachmentId: string) {
+    return this.prisma.attachment.findFirst({
+      include: attachmentWithActiveVersions,
+      where: { activatedAt: { not: null }, deletedAt: null, id: attachmentId, workspaceId },
+    });
+  }
+
+  findAttachmentIncludingPending(workspaceId: string, attachmentId: string) {
     return this.prisma.attachment.findFirst({ include: attachmentWithActiveVersions, where: { deletedAt: null, id: attachmentId, workspaceId } });
+  }
+
+  completeAttachment(input: { attachmentId: string; workspaceId: string }) {
+    return this.prisma.$transaction(async (tx) => {
+      const attachment = await tx.attachment.findFirst({
+        include: { versions: { where: { version: 1 } } },
+        where: { deletedAt: null, id: input.attachmentId, workspaceId: input.workspaceId },
+      });
+      if (!attachment) return { activated: false, attachment: null, conflict: false };
+      if (attachment.activatedAt) {
+        return {
+          activated: false,
+          attachment: await tx.attachment.findFirst({
+            include: attachmentWithActiveVersions,
+            where: { activatedAt: { not: null }, deletedAt: null, id: input.attachmentId, workspaceId: input.workspaceId },
+          }),
+          conflict: false,
+        };
+      }
+
+      const initialVersion = attachment.versions[0];
+      if (!initialVersion || attachment.version !== 1) return { activated: false, attachment: null, conflict: true };
+
+      const activatedAt = new Date();
+      const updated = await tx.attachment.updateMany({
+        data: { activatedAt },
+        where: { activatedAt: null, deletedAt: null, id: input.attachmentId, version: 1, workspaceId: input.workspaceId },
+      });
+      if (!updated.count) return { activated: false, attachment: null, conflict: true };
+
+      await tx.attachmentVersion.updateMany({
+        data: { activatedAt },
+        where: { activatedAt: null, attachmentId: input.attachmentId, version: 1, workspaceId: input.workspaceId },
+      });
+
+      return {
+        activated: true,
+        attachment: await tx.attachment.findFirst({
+          include: attachmentWithActiveVersions,
+          where: { activatedAt: { not: null }, deletedAt: null, id: input.attachmentId, workspaceId: input.workspaceId },
+        }),
+        conflict: false,
+      };
+    });
   }
 
   async updateAttachment(input: { attachmentId: string; description: string | null; workspaceId: string }) {

@@ -193,23 +193,76 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     expect(attachment.statusCode).toBe(201);
     const attachmentBody = attachment.json<{
       attachment: {
+        activatedAt: string | null;
         description: string | null;
         id: string;
         objectKey: string;
+        sizeBytes: number;
         version: number;
         versions: Array<{ activatedAt: string | null; fileName: string; version: number }>;
       };
       upload: { headers: Record<string, string>; method: string; objectKey: string; url: string };
     }>();
+    expect(attachmentBody.attachment.activatedAt).toBeNull();
     expect(attachmentBody.attachment.description).toBe("Needs client approval.");
     expect(attachmentBody.attachment.version).toBe(1);
-    expect(attachmentBody.attachment.versions).toContainEqual(
-      expect.objectContaining({ activatedAt: expect.any(String), fileName: "brief.pdf", version: 1 }),
-    );
+    expect(attachmentBody.attachment.versions).toEqual([]);
     expect(attachmentBody.attachment.objectKey).toContain("workspaces/" + workspaceId + "/tasks/" + taskId + "/");
     expect(attachmentBody.upload.method).toBe("PUT");
     expect(attachmentBody.upload.objectKey).toBe(attachmentBody.attachment.objectKey);
     expect(attachmentBody.upload.url).toContain("X-Amz-Signature");
+
+    const pendingAttachments = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/attachments",
+    });
+    expect(pendingAttachments.statusCode).toBe(200);
+    expect(pendingAttachments.json<{ items: Array<{ id: string }> }>().items).not.toContainEqual(
+      expect.objectContaining({ id: attachmentBody.attachment.id }),
+    );
+
+    const pendingDownload = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id + "/download",
+    });
+    expect(pendingDownload.statusCode).toBe(404);
+
+    const incompleteAttachment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id + "/complete",
+    });
+    expect(incompleteAttachment.statusCode).toBe(409);
+    expect(incompleteAttachment.json<{ error: { details: { reason?: string } } }>().error.details.reason).toBe("missing");
+
+    const uploadAttachment = await fetch(attachmentBody.upload.url, {
+      body: Buffer.alloc(attachmentBody.attachment.sizeBytes, "b"),
+      headers: attachmentBody.upload.headers,
+      method: "PUT",
+    });
+    expect(uploadAttachment.status).toBe(200);
+
+    const completeAttachment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id + "/complete",
+    });
+    expect(completeAttachment.statusCode).toBe(200);
+    expect(completeAttachment.json<{ activatedAt: string | null; versions: Array<{ activatedAt: string | null; fileName: string; version: number }> }>()).toMatchObject({
+      activatedAt: expect.any(String),
+      versions: [expect.objectContaining({ activatedAt: expect.any(String), fileName: "brief.pdf", version: 1 })],
+    });
+    await expectActivityEvent({
+      entityId: attachmentBody.attachment.id,
+      entityType: "attachment",
+      eventType: "AttachmentAdded",
+      payload: { description: "Needs client approval.", fileName: "brief.pdf", sizeBytes: 2048 },
+      projectId,
+      taskId,
+      workspaceId,
+    });
 
     const updatedAttachment = await app!.inject({
       headers: authHeaders(accessToken),

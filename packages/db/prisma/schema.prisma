@@ -540,6 +540,7 @@ model Attachment {
   sizeBytes    Int       @map("size_bytes")
   description  String?
   version      Int       @default(1)
+  activatedAt  DateTime? @map("activated_at") @db.Timestamptz(6)
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
   task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
@@ -548,6 +549,7 @@ model Attachment {
 
   @@unique([workspaceId, objectKey])
   @@index([workspaceId, taskId])
+  @@index([workspaceId, taskId, activatedAt])
   @@index([workspaceId, uploadedById])
   @@map("attachments")
 }

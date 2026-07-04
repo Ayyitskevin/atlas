@@ -265,6 +265,11 @@ export class WorkController {
     return this.workService.getAttachmentDownload(await requireAuth(request), workspaceId, attachmentId);
   };
 
+  completeAttachment = async (request: FastifyRequest) => {
+    const { attachmentId, workspaceId } = parseParams(request, attachmentParamsSchema);
+    return this.workService.completeAttachment(await requireAuth(request), workspaceId, attachmentId);
+  };
+
   createAttachmentVersion = async (request: FastifyRequest, reply: FastifyReply) => {
     const { attachmentId, workspaceId } = parseParams(request, attachmentParamsSchema);
     const result = await this.workService.createAttachmentVersion(await requireAuth(request), workspaceId, attachmentId, parseBody(request, replaceAttachmentRequestSchema));

@@ -117,6 +117,7 @@ export const attachmentVersionResponseSchema = z.object({
 });
 
 export const attachmentResponseSchema = z.object({
+  activatedAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   description: z.string().nullable(),
   fileName: z.string(),
