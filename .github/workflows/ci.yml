@@ -35,6 +35,12 @@ jobs:
     env:
       DATABASE_URL: postgresql://atlas:atlas@localhost:5432/atlas
       REDIS_URL: redis://localhost:6379
+      S3_ACCESS_KEY_ID: atlas
+      S3_BUCKET: atlas-local
+      S3_ENDPOINT: http://localhost:9000
+      S3_PUBLIC_ENDPOINT: http://localhost:9000
+      S3_REGION: us-east-1
+      S3_SECRET_ACCESS_KEY: atlas-password
 
     steps:
       - uses: actions/checkout@v5
@@ -51,8 +57,12 @@ jobs:
       - run: pnpm typecheck
       - run: pnpm build
       - run: pnpm test:unit
+      - run: docker compose up --wait -d minio
+      - run: docker compose run --rm minio-init
       - run: pnpm test:integration
       - run: pnpm --filter @atlas/db exec prisma migrate diff --from-empty --to-schema-datamodel prisma/schema.prisma --script
+      - if: always()
+        run: docker compose down -v --remove-orphans
 
   docker-smoke:
     runs-on: ubuntu-latest
