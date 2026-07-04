@@ -12,6 +12,7 @@ type TaskAttachmentsPanelProps = {
   attachments: Attachment[];
   onDeleteAttachment: (attachmentId: string) => Promise<void>;
   onDownloadAttachment: (attachmentId: string) => Promise<void>;
+  onReplaceAttachment: (event: FormEvent<HTMLFormElement>, attachmentId: string) => Promise<void>;
   onUpdateAttachmentDescription: (event: FormEvent<HTMLFormElement>, attachmentId: string) => Promise<void>;
   onUploadAttachment: (event: FormEvent<HTMLFormElement>) => Promise<void>;
 };
@@ -21,6 +22,7 @@ export function TaskAttachmentsPanel({
   attachments,
   onDeleteAttachment,
   onDownloadAttachment,
+  onReplaceAttachment,
   onUpdateAttachmentDescription,
   onUploadAttachment,
 }: TaskAttachmentsPanelProps) {
@@ -55,9 +57,21 @@ export function TaskAttachmentsPanel({
           <article className="rounded-md border border-slate-200 bg-slate-50 p-3 text-sm" key={attachment.id}>
             <p className="break-words font-medium text-slate-900">{attachment.fileName}</p>
             <p className="mt-1 text-xs text-slate-500">
-              {attachment.mimeType} · {formatBytes(attachment.sizeBytes)}
+              v{attachment.version} · {attachment.mimeType} · {formatBytes(attachment.sizeBytes)}
             </p>
             <time className="mt-1 block text-xs text-slate-500">{new Date(attachment.createdAt).toLocaleString()}</time>
+            {attachment.versions?.length ? (
+              <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2">
+                <p className="text-xs font-semibold uppercase text-slate-500">Version history</p>
+                <ul className="mt-2 grid gap-1 text-xs text-slate-600">
+                  {attachment.versions.map((version) => (
+                    <li className="break-words" key={version.id}>
+                      v{version.version} · {version.fileName} · {formatBytes(version.sizeBytes)}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             <form className="mt-3 grid gap-2" onSubmit={(event) => void onUpdateAttachmentDescription(event, attachment.id)}>
               <label className="grid gap-1 text-xs font-medium text-slate-600">
                 Note
@@ -70,6 +84,21 @@ export function TaskAttachmentsPanel({
               </label>
               <button className="w-fit rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700" type="submit">
                 Save note
+              </button>
+            </form>
+            <form className="mt-3 grid gap-2" onSubmit={(event) => void onReplaceAttachment(event, attachment.id)}>
+              <label className="grid gap-1 text-xs font-medium text-slate-600">
+                Replace file
+                <input
+                  accept={ATTACHMENT_ACCEPT_ATTRIBUTE}
+                  className="rounded-md border border-slate-300 bg-white px-3 py-2 text-sm font-normal text-slate-900"
+                  name="file"
+                  required
+                  type="file"
+                />
+              </label>
+              <button className="w-fit rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700" type="submit">
+                Upload new version
               </button>
             </form>
             <div className="mt-3 flex flex-wrap gap-2">

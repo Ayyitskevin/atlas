@@ -6,6 +6,7 @@ import {
   createAttachmentRequestSchema,
   isAllowedAttachmentFileName,
   isAllowedAttachmentMimeType,
+  replaceAttachmentRequestSchema,
   updateAttachmentRequestSchema,
 } from "./attachments.js";
 
@@ -52,5 +53,14 @@ describe("attachment schemas", () => {
     expect(updateAttachmentRequestSchema.parse({ description: " Reviewed by Maya. " })).toEqual({ description: "Reviewed by Maya." });
     expect(updateAttachmentRequestSchema.parse({ description: "" })).toEqual({ description: "" });
     expect(updateAttachmentRequestSchema.safeParse({ description: "x".repeat(1001) }).success).toBe(false);
+  });
+
+  it("validates replacement attachment metadata without notes", () => {
+    expect(replaceAttachmentRequestSchema.parse({ fileName: "brief-v2.pdf", mimeType: "application/pdf", sizeBytes: 4096 })).toEqual({
+      fileName: "brief-v2.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 4096,
+    });
+    expect(replaceAttachmentRequestSchema.safeParse({ description: "Not accepted.", fileName: "brief-v2.pdf", mimeType: "application/pdf", sizeBytes: 4096 }).success).toBe(false);
   });
 });

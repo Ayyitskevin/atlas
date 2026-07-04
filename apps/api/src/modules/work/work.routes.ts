@@ -20,6 +20,8 @@ import {
   notificationPreferenceResponseSchema,
   projectDependencyMapResponseSchema,
   projectTaskQuerySchema,
+  replaceAttachmentRequestSchema,
+  replaceAttachmentResponseSchema,
   reorderSectionsRequestSchema,
   searchResponseSchema,
   searchQuerySchema,
@@ -52,6 +54,7 @@ const taskDependencyParamsSchema = workspaceParamsSchema.extend({ dependencyId: 
 const subtaskParamsSchema = workspaceParamsSchema.extend({ subtaskId: z.string().uuid() });
 const commentParamsSchema = workspaceParamsSchema.extend({ commentId: z.string().uuid() });
 const attachmentParamsSchema = workspaceParamsSchema.extend({ attachmentId: z.string().uuid() });
+const attachmentVersionParamsSchema = attachmentParamsSchema.extend({ versionId: z.string().uuid() });
 const notificationParamsSchema = workspaceParamsSchema.extend({ notificationId: z.string().uuid() });
 const userBodySchema = z.object({ userId: z.string().uuid() });
 
@@ -111,6 +114,8 @@ export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
   app.post("/workspaces/:workspaceId/tasks/:taskId/attachments", { schema: openApiSchema({ body: createAttachmentRequestSchema, params: taskParamsSchema, response: { 201: createAttachmentResponseSchema }, tags: ["Attachments"] }) }, controller.createAttachment);
   app.get("/workspaces/:workspaceId/tasks/:taskId/attachments", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Attachments"] }) }, controller.listAttachments);
   app.get("/workspaces/:workspaceId/attachments/:attachmentId/download", { schema: openApiSchema({ params: attachmentParamsSchema, response: { 200: attachmentDownloadResponseSchema }, tags: ["Attachments"] }) }, controller.getAttachmentDownload);
+  app.post("/workspaces/:workspaceId/attachments/:attachmentId/versions", { schema: openApiSchema({ body: replaceAttachmentRequestSchema, params: attachmentParamsSchema, response: { 201: replaceAttachmentResponseSchema }, tags: ["Attachments"] }) }, controller.createAttachmentVersion);
+  app.post("/workspaces/:workspaceId/attachments/:attachmentId/versions/:versionId/complete", { schema: openApiSchema({ params: attachmentVersionParamsSchema, response: { 200: attachmentResponseSchema }, tags: ["Attachments"] }) }, controller.completeAttachmentVersion);
   app.patch("/workspaces/:workspaceId/attachments/:attachmentId", { schema: openApiSchema({ body: updateAttachmentRequestSchema, params: attachmentParamsSchema, response: { 200: attachmentResponseSchema }, tags: ["Attachments"] }) }, controller.updateAttachment);
   app.delete("/workspaces/:workspaceId/attachments/:attachmentId", { schema: openApiSchema({ params: attachmentParamsSchema, tags: ["Attachments"] }) }, controller.deleteAttachment);
 

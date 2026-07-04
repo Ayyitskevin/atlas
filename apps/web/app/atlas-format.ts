@@ -5,6 +5,7 @@ export function formatEventType(value: string) {
 const activityTitles: Record<string, string> = {
   AttachmentAdded: "Attachment added",
   AttachmentDeleted: "Attachment removed",
+  AttachmentReplaced: "Attachment replaced",
   AttachmentUpdated: "Attachment updated",
   CommentCreated: "Comment added",
   CommentDeleted: "Comment deleted",
@@ -78,7 +79,12 @@ export function formatActivityDetail(activity: ActivitySummaryInput) {
   if (activity.entityType === "project_member") return projectMemberActivityDetail(activity, payload);
 
   const name = stringPayload(payload, "title") ?? stringPayload(payload, "name") ?? stringPayload(payload, "fileName");
-  if (activity.eventType === "AttachmentAdded" || activity.eventType === "AttachmentUpdated" || activity.eventType === "AttachmentDeleted") {
+  if (
+    activity.eventType === "AttachmentAdded" ||
+    activity.eventType === "AttachmentReplaced" ||
+    activity.eventType === "AttachmentUpdated" ||
+    activity.eventType === "AttachmentDeleted"
+  ) {
     const size = numberPayload(payload, "sizeBytes");
     return name ? "File: " + name + (size ? " · " + formatBytes(size) : "") : scopeLabel(activity);
   }
@@ -92,9 +98,19 @@ export function formatActivityMetadata(activity: ActivitySummaryInput): Activity
   if (activity.entityType === "task_dependency") return taskDependencyActivityMetadata(payload);
   if (activity.entityType === "project") return projectActivityMetadata(payload);
   if (activity.entityType === "project_member") return projectMemberActivityMetadata(payload);
-  if (activity.eventType === "AttachmentAdded" || activity.eventType === "AttachmentUpdated" || activity.eventType === "AttachmentDeleted") {
+  if (
+    activity.eventType === "AttachmentAdded" ||
+    activity.eventType === "AttachmentReplaced" ||
+    activity.eventType === "AttachmentUpdated" ||
+    activity.eventType === "AttachmentDeleted"
+  ) {
     const size = numberPayload(payload, "sizeBytes");
     const items: ActivityMetadataItem[] = size ? [{ label: "Size", value: formatBytes(size) }] : [];
+    const version = numberPayload(payload, "version");
+    const previousFileName = stringPayload(payload, "previousFileName");
+    const previousSize = numberPayload(payload, "previousSizeBytes");
+    if (version) items.push({ label: "Version", value: "v" + version });
+    if (previousFileName) items.push({ label: "Previous file", value: previousFileName + (previousSize ? " · " + formatBytes(previousSize) : "") });
     const description = stringPayload(payload, "description");
     if (description) items.push({ label: "Note", value: description });
     return items;

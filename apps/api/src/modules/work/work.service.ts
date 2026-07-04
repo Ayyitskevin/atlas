@@ -13,6 +13,7 @@ import {
   type MyWorkQuery,
   type ProjectTaskQuery,
   type NotificationQuery,
+  type ReplaceAttachmentRequest,
   type UpdateNotificationPreferenceRequest,
   type ReorderSectionsRequest,
   searchCursorSchema,
@@ -738,6 +739,71 @@ export class WorkService {
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
     await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, "VIEWER");
     return { attachment, download: await createDownloadInstructions(attachment.objectKey) };
+  }
+
+  async createAttachmentVersion(ctx: AuthContext, workspaceId: string, attachmentId: string, input: ReplaceAttachmentRequest) {
+    const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
+    if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
+    const requiredRole = attachment.uploadedById === ctx.userId ? "COMMENTER" : "EDITOR";
+    await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, requiredRole);
+    const objectKey = createAttachmentObjectKey({ fileName: input.fileName, taskId: attachment.taskId, workspaceId });
+    try {
+      const version = await this.workRepository.prepareAttachmentVersion({
+        attachmentId,
+        fileName: input.fileName,
+        mimeType: input.mimeType,
+        objectKey,
+        sizeBytes: input.sizeBytes,
+        uploadedById: ctx.userId,
+        version: attachment.version + 1,
+        workspaceId,
+      });
+      return {
+        attachment,
+        upload: await createUploadInstructions({ mimeType: version.mimeType, objectKey: version.objectKey }),
+        version,
+      };
+    } catch (error) {
+      if (isPrismaUniqueConstraintError(error)) {
+        throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "Attachment replacement is already pending.");
+      }
+      throw error;
+    }
+  }
+
+  async completeAttachmentVersion(ctx: AuthContext, workspaceId: string, attachmentId: string, versionId: string) {
+    const version = await this.workRepository.findAttachmentVersion({ attachmentId, versionId, workspaceId });
+    if (!version || version.attachment.deletedAt) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment version not found.");
+    const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
+    if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
+    const task = await this.getTask(ctx, workspaceId, attachment.taskId);
+    const requiredRole = version.uploadedById === ctx.userId ? "COMMENTER" : "EDITOR";
+    await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, requiredRole);
+    const result = await this.workRepository.completeAttachmentVersion({ attachmentId, versionId, workspaceId });
+    if (result.conflict || !result.attachment || !result.version) {
+      throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "Attachment changed before this version was completed.");
+    }
+    if (result.activated) {
+      await this.events.recordActivity({
+        actorUserId: ctx.userId,
+        entityId: attachmentId,
+        entityType: "attachment",
+        eventType: "AttachmentReplaced",
+        payload: {
+          attachmentId,
+          fileName: result.attachment.fileName,
+          previousFileName: attachment.fileName,
+          previousSizeBytes: attachment.sizeBytes,
+          sizeBytes: result.attachment.sizeBytes,
+          version: result.attachment.version,
+          versionId,
+        },
+        projectId: task.projectId,
+        taskId: attachment.taskId,
+        workspaceId,
+      });
+    }
+    return result.attachment;
   }
 
   async updateAttachment(ctx: AuthContext, workspaceId: string, attachmentId: string, input: UpdateAttachmentRequest) {

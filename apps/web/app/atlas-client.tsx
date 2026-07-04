@@ -214,6 +214,7 @@ export function AtlasClient({
     deleteTask,
     downloadAttachment,
     loadAttachments,
+    replaceAttachment,
     loadComments,
     loadProjectData,
     loadSubtasks,
@@ -1095,6 +1096,7 @@ export function AtlasClient({
             onDeleteSubtask={deleteSubtask}
             onDeleteTask={deleteTask}
             onDownloadAttachment={downloadAttachment}
+            onReplaceAttachment={replaceAttachment}
             onRemoveDependency={removeTaskDependency}
             onSkipRecurringTask={skipRecurringTask}
             onToggleSubtask={toggleSubtask}

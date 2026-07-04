@@ -92,12 +92,28 @@ export const updateAttachmentRequestSchema = z.object({
   description: z.string().trim().max(1000).nullable(),
 });
 
+export const replaceAttachmentRequestSchema = createAttachmentRequestSchema.omit({ description: true }).strict();
+
 export const attachmentStorageInstructionsSchema = z.object({
   expiresInSeconds: z.number().int().positive(),
   headers: z.record(z.string()),
   method: z.enum(["GET", "PUT"]),
   objectKey: z.string().min(1),
   url: z.string().url(),
+});
+
+export const attachmentVersionResponseSchema = z.object({
+  activatedAt: z.string().datetime().nullable(),
+  attachmentId: z.string().uuid(),
+  createdAt: z.string().datetime(),
+  fileName: z.string(),
+  id: z.string().uuid(),
+  mimeType: z.string(),
+  objectKey: z.string(),
+  sizeBytes: z.number().int(),
+  uploadedById: z.string().uuid(),
+  version: z.number().int().positive(),
+  workspaceId: z.string().uuid(),
 });
 
 export const attachmentResponseSchema = z.object({
@@ -110,6 +126,8 @@ export const attachmentResponseSchema = z.object({
   sizeBytes: z.number().int(),
   taskId: z.string().uuid(),
   uploadedById: z.string().uuid(),
+  version: z.number().int().positive(),
+  versions: z.array(attachmentVersionResponseSchema).optional(),
   workspaceId: z.string().uuid(),
 });
 
@@ -118,11 +136,19 @@ export const createAttachmentResponseSchema = z.object({
   upload: attachmentStorageInstructionsSchema,
 });
 
+export const replaceAttachmentResponseSchema = z.object({
+  attachment: attachmentResponseSchema,
+  upload: attachmentStorageInstructionsSchema,
+  version: attachmentVersionResponseSchema,
+});
+
 export const attachmentDownloadResponseSchema = z.object({
   attachment: attachmentResponseSchema,
   download: attachmentStorageInstructionsSchema,
 });
 
 export type CreateAttachmentRequest = z.infer<typeof createAttachmentRequestSchema>;
+export type ReplaceAttachmentRequest = z.infer<typeof replaceAttachmentRequestSchema>;
 export type UpdateAttachmentRequest = z.infer<typeof updateAttachmentRequestSchema>;
+export type AttachmentVersionResponse = z.infer<typeof attachmentVersionResponseSchema>;
 export type AttachmentStorageInstructions = z.infer<typeof attachmentStorageInstructionsSchema>;

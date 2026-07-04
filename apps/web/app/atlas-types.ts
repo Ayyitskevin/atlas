@@ -271,6 +271,21 @@ export type Attachment = {
   sizeBytes: number;
   taskId: string;
   uploadedById?: string;
+  version: number;
+  versions?: AttachmentVersion[];
+};
+
+export type AttachmentVersion = {
+  activatedAt?: string | null;
+  attachmentId: string;
+  createdAt: string;
+  fileName: string;
+  id: string;
+  mimeType: string;
+  objectKey?: string;
+  sizeBytes: number;
+  uploadedById?: string;
+  version: number;
 };
 
 export type AttachmentInstructions = {
@@ -287,6 +302,12 @@ export type CreateAttachmentResponse = {
 export type AttachmentDownloadResponse = {
   attachment: Attachment;
   download: AttachmentInstructions;
+};
+
+export type ReplaceAttachmentResponse = {
+  attachment: Attachment;
+  upload: AttachmentInstructions;
+  version: AttachmentVersion;
 };
 
 export type ActivityEvent = {

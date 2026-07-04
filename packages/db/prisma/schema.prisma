@@ -79,6 +79,7 @@ model User {
   subtasks                 Subtask[]             @relation("SubtaskAssignee")
   comments                 Comment[]
   attachments              Attachment[]
+  attachmentVersions       AttachmentVersion[]   @relation("AttachmentVersionUploader")
   activityEvents           ActivityEvent[]       @relation("ActivityActor")
   notifications            Notification[]        @relation("NotificationRecipient")
   notificationPreferences  WorkspaceNotificationPreference[]
@@ -538,15 +539,39 @@ model Attachment {
   mimeType     String    @map("mime_type")
   sizeBytes    Int       @map("size_bytes")
   description  String?
+  version      Int       @default(1)
   createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
   task         Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
   uploadedBy   User      @relation(fields: [uploadedById], references: [id])
+  versions     AttachmentVersion[]
 
   @@unique([workspaceId, objectKey])
   @@index([workspaceId, taskId])
   @@index([workspaceId, uploadedById])
   @@map("attachments")
+}
+
+model AttachmentVersion {
+  id           String    @id @default(uuid()) @db.Uuid
+  workspaceId  String    @map("workspace_id") @db.Uuid
+  attachmentId String    @map("attachment_id") @db.Uuid
+  uploadedById String    @map("uploaded_by_id") @db.Uuid
+  version      Int
+  objectKey    String    @map("object_key")
+  fileName     String    @map("file_name")
+  mimeType     String    @map("mime_type")
+  sizeBytes    Int       @map("size_bytes")
+  activatedAt  DateTime? @map("activated_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  uploadedBy   User      @relation("AttachmentVersionUploader", fields: [uploadedById], references: [id])
+
+  @@unique([workspaceId, attachmentId, version])
+  @@unique([workspaceId, objectKey])
+  @@index([workspaceId, attachmentId, activatedAt])
+  @@index([workspaceId, uploadedById])
+  @@map("attachment_versions")
 }
 
 model ActivityEvent {

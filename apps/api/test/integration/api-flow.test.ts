@@ -191,8 +191,21 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/attachments",
     });
     expect(attachment.statusCode).toBe(201);
-    const attachmentBody = attachment.json<{ attachment: { description: string | null; id: string; objectKey: string }; upload: { method: string; objectKey: string; url: string } }>();
+    const attachmentBody = attachment.json<{
+      attachment: {
+        description: string | null;
+        id: string;
+        objectKey: string;
+        version: number;
+        versions: Array<{ activatedAt: string | null; fileName: string; version: number }>;
+      };
+      upload: { method: string; objectKey: string; url: string };
+    }>();
     expect(attachmentBody.attachment.description).toBe("Needs client approval.");
+    expect(attachmentBody.attachment.version).toBe(1);
+    expect(attachmentBody.attachment.versions).toContainEqual(
+      expect.objectContaining({ activatedAt: expect.any(String), fileName: "brief.pdf", version: 1 }),
+    );
     expect(attachmentBody.attachment.objectKey).toContain("workspaces/" + workspaceId + "/tasks/" + taskId + "/");
     expect(attachmentBody.upload.method).toBe("PUT");
     expect(attachmentBody.upload.objectKey).toBe(attachmentBody.attachment.objectKey);
@@ -226,14 +239,80 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       workspaceId,
     });
 
+    const replaceAttachment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { fileName: "brief-v2.pdf", mimeType: "application/pdf", sizeBytes: 4096 },
+      url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id + "/versions",
+    });
+    expect(replaceAttachment.statusCode).toBe(201);
+    const replaceAttachmentBody = replaceAttachment.json<{
+      attachment: { id: string; objectKey: string; version: number };
+      upload: { method: string; objectKey: string; url: string };
+      version: { activatedAt: string | null; fileName: string; id: string; objectKey: string; version: number };
+    }>();
+    expect(replaceAttachmentBody.attachment).toMatchObject({ id: attachmentBody.attachment.id, version: 1 });
+    expect(replaceAttachmentBody.version).toMatchObject({ activatedAt: null, fileName: "brief-v2.pdf", version: 2 });
+    expect(replaceAttachmentBody.version.objectKey).not.toBe(attachmentBody.attachment.objectKey);
+    expect(replaceAttachmentBody.upload).toMatchObject({ method: "PUT", objectKey: replaceAttachmentBody.version.objectKey });
+    expect(replaceAttachmentBody.upload.url).toContain("X-Amz-Signature");
+
+    const completeReplacement = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url:
+        "/api/v1/workspaces/" +
+        workspaceId +
+        "/attachments/" +
+        attachmentBody.attachment.id +
+        "/versions/" +
+        replaceAttachmentBody.version.id +
+        "/complete",
+    });
+    expect(completeReplacement.statusCode).toBe(200);
+    const completedReplacementBody = completeReplacement.json<{
+      fileName: string;
+      objectKey: string;
+      sizeBytes: number;
+      version: number;
+      versions: Array<{ activatedAt: string | null; fileName: string; version: number }>;
+    }>();
+    expect(completedReplacementBody).toMatchObject({
+      fileName: "brief-v2.pdf",
+      objectKey: replaceAttachmentBody.version.objectKey,
+      sizeBytes: 4096,
+      version: 2,
+    });
+    expect(completedReplacementBody.versions).toEqual([
+      expect.objectContaining({ activatedAt: expect.any(String), fileName: "brief-v2.pdf", version: 2 }),
+      expect.objectContaining({ activatedAt: expect.any(String), fileName: "brief.pdf", version: 1 }),
+    ]);
+    await expectActivityEvent({
+      entityId: attachmentBody.attachment.id,
+      entityType: "attachment",
+      eventType: "AttachmentReplaced",
+      payload: {
+        fileName: "brief-v2.pdf",
+        previousFileName: "brief.pdf",
+        previousSizeBytes: 2048,
+        sizeBytes: 4096,
+        version: 2,
+      },
+      projectId,
+      taskId,
+      workspaceId,
+    });
+
     const download = await app!.inject({
       headers: authHeaders(accessToken),
       method: "GET",
       url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id + "/download",
     });
     expect(download.statusCode).toBe(200);
-    const downloadBody = download.json<{ download: { method: string; url: string } }>();
+    const downloadBody = download.json<{ attachment: { objectKey: string; version: number }; download: { method: string; objectKey: string; url: string } }>();
+    expect(downloadBody.attachment).toMatchObject({ objectKey: replaceAttachmentBody.version.objectKey, version: 2 });
     expect(downloadBody.download.method).toBe("GET");
+    expect(downloadBody.download.objectKey).toBe(replaceAttachmentBody.version.objectKey);
     expect(downloadBody.download.url).toContain("X-Amz-Signature");
 
     const deleteAttachment = await app!.inject({
@@ -256,7 +335,7 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       entityId: attachmentBody.attachment.id,
       entityType: "attachment",
       eventType: "AttachmentDeleted",
-      payload: { fileName: "brief.pdf", sizeBytes: 2048 },
+      payload: { fileName: "brief-v2.pdf", sizeBytes: 4096 },
       projectId,
       taskId,
       workspaceId,

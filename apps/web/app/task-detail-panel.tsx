@@ -35,6 +35,7 @@ type TaskDetailPanelProps = {
   onDeleteSubtask: (subtaskId: string) => Promise<void>;
   onDeleteTask: () => Promise<void>;
   onDownloadAttachment: (attachmentId: string) => Promise<void>;
+  onReplaceAttachment: (event: FormEvent<HTMLFormElement>, attachmentId: string) => Promise<void>;
   onRemoveDependency: (dependencyId: string) => Promise<void>;
   onSkipRecurringTask: () => Promise<void>;
   onToggleSubtask: (subtask: Subtask) => Promise<void>;
@@ -77,6 +78,7 @@ export function TaskDetailPanel({
   onDeleteSubtask,
   onDeleteTask,
   onDownloadAttachment,
+  onReplaceAttachment,
   onRemoveDependency,
   onSkipRecurringTask,
   onToggleSubtask,
@@ -170,6 +172,7 @@ export function TaskDetailPanel({
         attachments={attachments}
         onDeleteAttachment={onDeleteAttachment}
         onDownloadAttachment={onDownloadAttachment}
+        onReplaceAttachment={onReplaceAttachment}
         onUpdateAttachmentDescription={onUpdateAttachmentDescription}
         onUploadAttachment={onUploadAttachment}
       />

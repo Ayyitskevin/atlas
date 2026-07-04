@@ -17,6 +17,7 @@ import type {
   Page,
   ProjectDependencyMap,
   ProjectMember,
+  ReplaceAttachmentResponse,
   Section,
   Subtask,
   Task,
@@ -821,6 +822,49 @@ export function useProjectWork({
     }
   }
 
+  async function replaceAttachment(event: FormEvent<HTMLFormElement>, attachmentId: string) {
+    event.preventDefault();
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
+    const form = new FormData(event.currentTarget);
+    const file = form.get("file");
+    if (!(file instanceof File)) return;
+    const validationMessage = attachmentUploadValidationMessage(file);
+    if (validationMessage) {
+      setAttachmentStatus(validationMessage);
+      return;
+    }
+    const mimeType = attachmentMimeTypeForUpload(file);
+
+    try {
+      setAttachmentStatus("Replacing file...");
+      const prepared = await api<ReplaceAttachmentResponse>(
+        `/workspaces/${selectedWorkspaceId}/attachments/${attachmentId}/versions`,
+        {
+          body: JSON.stringify({ fileName: file.name, mimeType, sizeBytes: file.size }),
+          method: "POST",
+        },
+        auth.accessToken,
+      );
+      const upload = await fetch(prepared.upload.url, {
+        body: file,
+        headers: prepared.upload.headers,
+        method: prepared.upload.method,
+      });
+      if (!upload.ok) throw new Error("Attachment replacement upload failed.");
+      await api<Attachment>(
+        `/workspaces/${selectedWorkspaceId}/attachments/${attachmentId}/versions/${prepared.version.id}/complete`,
+        { method: "POST" },
+        auth.accessToken,
+      );
+      await loadAttachments(auth.accessToken, selectedWorkspaceId, selectedTaskId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId);
+      setAttachmentStatus("File replaced.");
+      event.currentTarget.reset();
+    } catch (error) {
+      setAttachmentStatus(errorMessage(error));
+    }
+  }
+
   async function deleteAttachment(attachmentId: string) {
     if (!auth || !selectedWorkspaceId || !selectedTaskId) return;
     try {
@@ -885,6 +929,7 @@ export function useProjectWork({
     deleteSubtask,
     deleteTask,
     downloadAttachment,
+    replaceAttachment,
     loadAttachments,
     loadComments,
     loadProjectData,

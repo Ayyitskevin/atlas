@@ -5,6 +5,13 @@ import { paginationArgs } from "../../shared/pagination.js";
 import { myWorkDependencyWhere, myWorkDueDateWhere, myWorkScopeWhere, myWorkStatusWhere, taskDependencyWhere } from "./my-work-filters.js";
 import { completedAtForStatusTransition } from "./task-state.js";
 
+const attachmentWithActiveVersions = {
+  versions: {
+    orderBy: { version: "desc" as const },
+    where: { activatedAt: { not: null } },
+  },
+};
+
 export class WorkRepository {
   constructor(private readonly prisma: PrismaClient) {}
 
@@ -575,19 +582,39 @@ export class WorkRepository {
     uploadedById: string;
     workspaceId: string;
   }) {
-    return this.prisma.attachment.create({ data: input });
+    const activatedAt = new Date();
+    return this.prisma.attachment.create({
+      data: {
+        ...input,
+        version: 1,
+        versions: {
+          create: {
+            activatedAt,
+            fileName: input.fileName,
+            mimeType: input.mimeType,
+            objectKey: input.objectKey,
+            sizeBytes: input.sizeBytes,
+            uploadedById: input.uploadedById,
+            version: 1,
+            workspaceId: input.workspaceId,
+          },
+        },
+      },
+      include: attachmentWithActiveVersions,
+    });
   }
 
   listAttachments(input: { cursor?: string; limit: number; taskId: string; workspaceId: string }) {
     return this.prisma.attachment.findMany({
       ...paginationArgs(input),
+      include: attachmentWithActiveVersions,
       orderBy: { createdAt: "desc" },
       where: { deletedAt: null, taskId: input.taskId, workspaceId: input.workspaceId },
     });
   }
 
   findAttachment(workspaceId: string, attachmentId: string) {
-    return this.prisma.attachment.findFirst({ where: { deletedAt: null, id: attachmentId, workspaceId } });
+    return this.prisma.attachment.findFirst({ include: attachmentWithActiveVersions, where: { deletedAt: null, id: attachmentId, workspaceId } });
   }
 
   async updateAttachment(input: { attachmentId: string; description: string | null; workspaceId: string }) {
@@ -597,6 +624,88 @@ export class WorkRepository {
     });
     if (!result.count) return null;
     return this.findAttachment(input.workspaceId, input.attachmentId);
+  }
+
+  prepareAttachmentVersion(input: {
+    attachmentId: string;
+    fileName: string;
+    mimeType: string;
+    objectKey: string;
+    sizeBytes: number;
+    uploadedById: string;
+    version: number;
+    workspaceId: string;
+  }) {
+    return this.prisma.$transaction(async (tx) => {
+      const pending = await tx.attachmentVersion.findFirst({
+        where: { activatedAt: null, attachmentId: input.attachmentId, version: input.version, workspaceId: input.workspaceId },
+      });
+      if (pending) {
+        return tx.attachmentVersion.update({
+          data: {
+            fileName: input.fileName,
+            mimeType: input.mimeType,
+            objectKey: input.objectKey,
+            sizeBytes: input.sizeBytes,
+            uploadedById: input.uploadedById,
+          },
+          where: { id: pending.id },
+        });
+      }
+      return tx.attachmentVersion.create({ data: input });
+    });
+  }
+
+  findAttachmentVersion(input: { attachmentId: string; versionId: string; workspaceId: string }) {
+    return this.prisma.attachmentVersion.findFirst({
+      include: { attachment: true },
+      where: { attachmentId: input.attachmentId, id: input.versionId, workspaceId: input.workspaceId },
+    });
+  }
+
+  completeAttachmentVersion(input: { attachmentId: string; versionId: string; workspaceId: string }) {
+    return this.prisma.$transaction(async (tx) => {
+      const version = await tx.attachmentVersion.findFirst({
+        include: { attachment: true },
+        where: { attachmentId: input.attachmentId, id: input.versionId, workspaceId: input.workspaceId },
+      });
+      if (!version || version.attachment.deletedAt) return { activated: false, attachment: null, conflict: false, version: null };
+      if (version.activatedAt) {
+        return {
+          activated: false,
+          attachment: await tx.attachment.findFirst({
+            include: attachmentWithActiveVersions,
+            where: { deletedAt: null, id: input.attachmentId, workspaceId: input.workspaceId },
+          }),
+          conflict: false,
+          version,
+        };
+      }
+      if (version.attachment.version !== version.version - 1) return { activated: false, attachment: null, conflict: true, version };
+
+      const updated = await tx.attachment.updateMany({
+        data: {
+          fileName: version.fileName,
+          mimeType: version.mimeType,
+          objectKey: version.objectKey,
+          sizeBytes: version.sizeBytes,
+          version: version.version,
+        },
+        where: { deletedAt: null, id: input.attachmentId, version: version.version - 1, workspaceId: input.workspaceId },
+      });
+      if (!updated.count) return { activated: false, attachment: null, conflict: true, version };
+
+      const activatedVersion = await tx.attachmentVersion.update({ data: { activatedAt: new Date() }, where: { id: version.id } });
+      return {
+        activated: true,
+        attachment: await tx.attachment.findFirst({
+          include: attachmentWithActiveVersions,
+          where: { deletedAt: null, id: input.attachmentId, workspaceId: input.workspaceId },
+        }),
+        conflict: false,
+        version: activatedVersion,
+      };
+    });
   }
 
   softDeleteAttachment(input: { attachmentId: string; workspaceId: string }) {

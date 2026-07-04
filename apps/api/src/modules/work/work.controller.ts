@@ -15,6 +15,7 @@ import {
   myWorkQuerySchema,
   notificationQuerySchema,
   projectTaskQuerySchema,
+  replaceAttachmentRequestSchema,
   reorderSectionsRequestSchema,
   searchQuerySchema,
   taskWatcherUserRequestSchema,
@@ -42,6 +43,7 @@ const taskDependencyParamsSchema = workspaceParamsSchema.extend({ dependencyId: 
 const subtaskParamsSchema = workspaceParamsSchema.extend({ subtaskId: z.string().uuid() });
 const commentParamsSchema = workspaceParamsSchema.extend({ commentId: z.string().uuid() });
 const attachmentParamsSchema = workspaceParamsSchema.extend({ attachmentId: z.string().uuid() });
+const attachmentVersionParamsSchema = attachmentParamsSchema.extend({ versionId: z.string().uuid() });
 const notificationParamsSchema = workspaceParamsSchema.extend({ notificationId: z.string().uuid() });
 const userBodySchema = z.object({ userId: z.string().uuid() });
 
@@ -261,6 +263,17 @@ export class WorkController {
   getAttachmentDownload = async (request: FastifyRequest) => {
     const { attachmentId, workspaceId } = parseParams(request, attachmentParamsSchema);
     return this.workService.getAttachmentDownload(await requireAuth(request), workspaceId, attachmentId);
+  };
+
+  createAttachmentVersion = async (request: FastifyRequest, reply: FastifyReply) => {
+    const { attachmentId, workspaceId } = parseParams(request, attachmentParamsSchema);
+    const result = await this.workService.createAttachmentVersion(await requireAuth(request), workspaceId, attachmentId, parseBody(request, replaceAttachmentRequestSchema));
+    return reply.status(201).send(result);
+  };
+
+  completeAttachmentVersion = async (request: FastifyRequest) => {
+    const { attachmentId, versionId, workspaceId } = parseParams(request, attachmentVersionParamsSchema);
+    return this.workService.completeAttachmentVersion(await requireAuth(request), workspaceId, attachmentId, versionId);
   };
 
   updateAttachment = async (request: FastifyRequest) => {
