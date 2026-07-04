@@ -132,6 +132,7 @@ export class WorkService {
       ...input,
       position: input.position ?? defaultListPosition(),
       projectId,
+      recurrenceEndDate: recurrence.recurrenceEndDate,
       recurrenceFrequency: recurrence.recurrenceFrequency,
       recurrenceInterval: recurrence.recurrenceInterval,
       workspaceId,
@@ -960,10 +961,11 @@ export class WorkService {
   }
 
   private createRecurrence(input: CreateTaskRequest) {
-    if (input.recurrenceInterval !== undefined && !input.recurrenceFrequency) {
+    if ((input.recurrenceInterval !== undefined || input.recurrenceEndDate !== undefined) && !input.recurrenceFrequency) {
       throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "Recurring tasks require a recurrence frequency.");
     }
     return {
+      recurrenceEndDate: input.recurrenceFrequency ? input.recurrenceEndDate ?? null : null,
       recurrenceFrequency: input.recurrenceFrequency ?? null,
       recurrenceInterval: input.recurrenceFrequency ? input.recurrenceInterval ?? 1 : null,
     };
@@ -972,6 +974,7 @@ export class WorkService {
   private updateRecurrence(
     input: UpdateTaskRequest,
     task: {
+      recurrenceEndDate?: Date | string | null;
       recurrenceFrequency?: TaskRecurrenceFrequency | null;
       recurrenceInterval?: number | null;
       recurrencePausedAt?: Date | string | null;
@@ -979,9 +982,10 @@ export class WorkService {
     now: Date,
   ) {
     if (input.recurrenceFrequency === null) {
-      return { recurrenceFrequency: null, recurrenceInterval: null, recurrencePausedAt: null };
+      return { recurrenceEndDate: null, recurrenceFrequency: null, recurrenceInterval: null, recurrencePausedAt: null };
     }
     const recurrence = {
+      recurrenceEndDate: datePayloadValue(task.recurrenceEndDate),
       recurrenceFrequency: task.recurrenceFrequency ?? null,
       recurrenceInterval: task.recurrenceInterval ?? null,
       recurrencePausedAt: dateTimeOrNull(task.recurrencePausedAt),
@@ -991,13 +995,19 @@ export class WorkService {
       recurrence.recurrenceInterval = input.recurrenceInterval ?? task.recurrenceInterval ?? 1;
     }
     if (input.recurrenceInterval === null) {
-      return { recurrenceFrequency: null, recurrenceInterval: null, recurrencePausedAt: null };
+      return { recurrenceEndDate: null, recurrenceFrequency: null, recurrenceInterval: null, recurrencePausedAt: null };
     }
     if (input.recurrenceInterval !== undefined && input.recurrenceFrequency === undefined) {
       if (!recurrence.recurrenceFrequency) {
         throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "Recurring tasks require a recurrence frequency.");
       }
       recurrence.recurrenceInterval = input.recurrenceInterval;
+    }
+    if (input.recurrenceEndDate !== undefined) {
+      if (input.recurrenceEndDate !== null && !recurrence.recurrenceFrequency) {
+        throw new AtlasHttpError(400, ATLAS_ERROR_CODES.BAD_REQUEST, "Recurring tasks require a recurrence frequency.");
+      }
+      recurrence.recurrenceEndDate = input.recurrenceEndDate;
     }
     if (input.recurrencePaused === true) {
       if (!recurrence.recurrenceFrequency) {
@@ -1009,10 +1019,12 @@ export class WorkService {
       recurrence.recurrencePausedAt = null;
     }
     if (!recurrence.recurrenceFrequency) {
+      recurrence.recurrenceEndDate = null;
       recurrence.recurrenceInterval = null;
       recurrence.recurrencePausedAt = null;
     }
     if (
+      input.recurrenceEndDate !== undefined ||
       input.recurrenceFrequency !== undefined ||
       input.recurrenceInterval !== undefined ||
       input.recurrencePaused !== undefined
@@ -1032,6 +1044,7 @@ export class WorkService {
       id: string;
       priority: TaskPriority;
       projectId: string;
+      recurrenceEndDate?: Date | string | null;
       recurrenceFrequency?: TaskRecurrenceFrequency | null;
       recurrenceInterval?: number | null;
       recurrencePausedAt?: Date | string | null;
@@ -1040,19 +1053,23 @@ export class WorkService {
     },
   ) {
     if (!task.recurrenceFrequency || !task.recurrenceInterval || task.recurrencePausedAt) return null;
+    const nextDueDate = nextRecurringDueDate({
+      dueDate: task.dueDate,
+      frequency: task.recurrenceFrequency,
+      interval: task.recurrenceInterval,
+    });
+    const recurrenceEndDate = datePayloadValue(task.recurrenceEndDate);
+    if (recurrenceEndDate && nextDueDate > recurrenceEndDate) return null;
     try {
       const nextTask = await this.workRepository.createRecurringTask({
         assigneeIds: task.assignees.map((assignee) => assignee.userId),
         description: task.description,
-        dueDate: nextRecurringDueDate({
-          dueDate: task.dueDate,
-          frequency: task.recurrenceFrequency,
-          interval: task.recurrenceInterval,
-        }),
+        dueDate: nextDueDate,
         generatedFromTaskId: task.id,
         position: defaultListPosition(),
         priority: task.priority,
         projectId: task.projectId,
+        recurrenceEndDate,
         recurrenceFrequency: task.recurrenceFrequency,
         recurrenceInterval: task.recurrenceInterval,
         sectionId: task.sectionId,
@@ -1081,6 +1098,7 @@ function taskAuditPayload(
   task: {
     dueDate?: Date | string | null;
     priority: string;
+    recurrenceEndDate?: Date | string | null;
     recurrenceFrequency?: string | null;
     recurrenceInterval?: number | null;
     recurrencePausedAt?: Date | string | null;
@@ -1092,6 +1110,7 @@ function taskAuditPayload(
   previous?: {
     dueDate?: Date | string | null;
     priority: string;
+    recurrenceEndDate?: Date | string | null;
     recurrenceFrequency?: string | null;
     recurrenceInterval?: number | null;
     recurrencePausedAt?: Date | string | null;
@@ -1103,6 +1122,7 @@ function taskAuditPayload(
   const payload: Record<string, number | string | null> = {
     dueDate: datePayloadValue(task.dueDate),
     priority: task.priority,
+    recurrenceEndDate: datePayloadValue(task.recurrenceEndDate),
     recurrenceFrequency: task.recurrenceFrequency ?? null,
     recurrenceInterval: task.recurrenceInterval ?? null,
     recurrencePausedAt: dateTimePayloadValue(task.recurrencePausedAt),
@@ -1120,6 +1140,10 @@ function taskAuditPayload(
   }
   if ((previous.recurrenceInterval ?? null) !== (task.recurrenceInterval ?? null)) {
     payload.previousRecurrenceInterval = previous.recurrenceInterval ?? null;
+  }
+  const previousRecurrenceEndDate = datePayloadValue(previous.recurrenceEndDate);
+  if (previousRecurrenceEndDate !== payload.recurrenceEndDate) {
+    payload.previousRecurrenceEndDate = previousRecurrenceEndDate;
   }
   const previousRecurrencePausedAt = dateTimePayloadValue(previous.recurrencePausedAt);
   if (previousRecurrencePausedAt !== payload.recurrencePausedAt) {

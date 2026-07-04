@@ -8,11 +8,13 @@ describe("task schemas", () => {
       createTaskRequestSchema.parse({
         recurrenceFrequency: "WEEKLY",
         recurrenceInterval: 2,
+        recurrenceEndDate: "2026-07-31",
         sectionId: "00000000-0000-4000-8000-000000000001",
         title: "Weekly review",
       }),
     ).toMatchObject({
       priority: "MEDIUM",
+      recurrenceEndDate: "2026-07-31",
       recurrenceFrequency: "WEEKLY",
       recurrenceInterval: 2,
       title: "Weekly review",
@@ -28,10 +30,15 @@ describe("task schemas", () => {
   });
 
   it("validates recurring task updates and clears", () => {
-    expect(updateTaskRequestSchema.parse({ recurrenceFrequency: null, recurrenceInterval: null, version: 3 })).toEqual({
+    expect(updateTaskRequestSchema.parse({ recurrenceEndDate: null, recurrenceFrequency: null, recurrenceInterval: null, version: 3 })).toEqual({
+      recurrenceEndDate: null,
       recurrenceFrequency: null,
       recurrenceInterval: null,
       version: 3,
+    });
+    expect(updateTaskRequestSchema.parse({ recurrenceEndDate: "2026-08-15", version: 4 })).toEqual({
+      recurrenceEndDate: "2026-08-15",
+      version: 4,
     });
     expect(updateTaskRequestSchema.parse({ recurrencePaused: true, version: 4 })).toEqual({
       recurrencePaused: true,

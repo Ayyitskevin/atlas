@@ -364,6 +364,7 @@ export function useProjectWork({
       }
 
       const dueDate = String(form.get("dueDate") ?? "");
+      const recurrenceEndDate = String(form.get("recurrenceEndDate") ?? "");
       const recurrenceFrequency = String(form.get("recurrenceFrequency") ?? "");
       const recurrenceInterval = Number(form.get("recurrenceInterval") ?? 1);
       const recurrencePaused = recurrenceFrequency ? form.get("recurrencePaused") === "true" : false;
@@ -374,6 +375,7 @@ export function useProjectWork({
             description: String(form.get("description") ?? ""),
             dueDate: dueDate || null,
             priority: String(form.get("priority")) as TaskPriority,
+            recurrenceEndDate: recurrenceFrequency ? recurrenceEndDate || null : null,
             recurrenceFrequency: recurrenceFrequency || null,
             recurrenceInterval: recurrenceFrequency ? recurrenceInterval : null,
             recurrencePaused,

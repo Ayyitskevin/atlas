@@ -68,6 +68,7 @@ export class WorkRepository {
     dueDate?: string;
     position: number;
     priority: TaskPriority;
+    recurrenceEndDate?: string | null;
     recurrenceFrequency?: TaskRecurrenceFrequency | null;
     recurrenceInterval?: number | null;
     projectId: string;
@@ -82,6 +83,7 @@ export class WorkRepository {
         position: input.position,
         priority: input.priority,
         projectId: input.projectId,
+        recurrenceEndDate: input.recurrenceFrequency && input.recurrenceEndDate ? new Date(input.recurrenceEndDate) : undefined,
         recurrenceFrequency: input.recurrenceFrequency ?? undefined,
         recurrenceInterval: input.recurrenceFrequency ? input.recurrenceInterval ?? 1 : undefined,
         sectionId: input.sectionId,
@@ -152,6 +154,7 @@ export class WorkRepository {
       description?: string | null;
       dueDate?: string | null;
       priority?: TaskPriority;
+      recurrenceEndDate?: string | null;
       recurrenceFrequency?: TaskRecurrenceFrequency | null;
       recurrenceInterval?: number | null;
       recurrencePausedAt?: Date | null;
@@ -167,6 +170,12 @@ export class WorkRepository {
       data: {
         ...input.data,
         dueDate: input.data.dueDate === undefined ? undefined : input.data.dueDate === null ? null : new Date(input.data.dueDate),
+        recurrenceEndDate:
+          input.data.recurrenceEndDate === undefined
+            ? undefined
+            : input.data.recurrenceEndDate === null
+              ? null
+              : new Date(input.data.recurrenceEndDate),
         completedAt: completedAtForStatusTransition(input.data.status, new Date()),
         version: { increment: 1 },
       },
@@ -183,6 +192,7 @@ export class WorkRepository {
     position: number;
     priority: TaskPriority;
     projectId: string;
+    recurrenceEndDate?: string | null;
     recurrenceFrequency: TaskRecurrenceFrequency;
     recurrenceInterval: number;
     sectionId: string;
@@ -196,6 +206,7 @@ export class WorkRepository {
         position: input.position,
         priority: input.priority,
         projectId: input.projectId,
+        recurrenceEndDate: input.recurrenceEndDate ? new Date(input.recurrenceEndDate) : null,
         recurrenceFrequency: input.recurrenceFrequency,
         recurrenceGeneratedFromTaskId: input.generatedFromTaskId,
         recurrenceInterval: input.recurrenceInterval,

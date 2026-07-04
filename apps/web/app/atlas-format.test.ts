@@ -142,6 +142,7 @@ describe("atlas format helpers", () => {
         previousDueDate: null,
         previousStatus: "IN_PROGRESS",
         priority: "HIGH",
+        recurrenceEndDate: "2026-08-01",
         recurrenceFrequency: "WEEKLY",
         recurrenceInterval: 2,
         status: "DONE",
@@ -150,12 +151,15 @@ describe("atlas format helpers", () => {
       taskId: "task-1",
     };
 
-    expect(formatActivityDetail(activity)).toBe("Task: Prep launch QA · in progress -> done · high priority · due 2026-07-05 · every 2 weeks");
+    expect(formatActivityDetail(activity)).toBe(
+      "Task: Prep launch QA · in progress -> done · high priority · due 2026-07-05 · every 2 weeks · until 2026-08-01",
+    );
     expect(formatActivityMetadata(activity)).toEqual([
       { label: "Status", value: "in progress -> done" },
       { label: "Priority", value: "high" },
       { label: "Due", value: "2026-07-05" },
       { label: "Repeat", value: "every 2 weeks" },
+      { label: "Repeat until", value: "2026-08-01" },
     ]);
 
     const pausedActivity = {

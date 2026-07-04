@@ -218,6 +218,7 @@ export type Task = {
   position?: number | string;
   priority: TaskPriority;
   projectId: string;
+  recurrenceEndDate?: string | null;
   recurrenceFrequency?: TaskRecurrenceFrequency | null;
   recurrenceGeneratedFromTaskId?: string | null;
   recurrenceInterval?: number | null;

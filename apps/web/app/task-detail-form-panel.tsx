@@ -105,6 +105,15 @@ export function TaskDetailFormPanel({
             type="number"
           />
         </label>
+        <label className="grid gap-1 text-sm font-medium text-slate-700">
+          Repeat until
+          <input
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            defaultValue={dateInputValue(task.recurrenceEndDate)}
+            name="recurrenceEndDate"
+            type="date"
+          />
+        </label>
         <label className="flex min-h-10 items-center gap-2 self-end rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">
           <input
             className="h-4 w-4 rounded border-slate-300"

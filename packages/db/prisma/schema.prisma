@@ -373,6 +373,7 @@ model Task {
   completedAt   DateTime?       @map("completed_at") @db.Timestamptz(6)
   recurrenceFrequency TaskRecurrenceFrequency? @map("recurrence_frequency")
   recurrenceInterval Int? @map("recurrence_interval")
+  recurrenceEndDate DateTime? @map("recurrence_end_date") @db.Date
   recurrenceGeneratedFromTaskId String? @unique @map("recurrence_generated_from_task_id") @db.Uuid
   recurrencePausedAt DateTime? @map("recurrence_paused_at") @db.Timestamptz(6)
   recurrenceSkippedAt DateTime? @map("recurrence_skipped_at") @db.Timestamptz(6)

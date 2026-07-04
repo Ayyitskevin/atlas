@@ -756,6 +756,93 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       workspaceId,
     });
 
+    const createBoundedRecurringTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: {
+        dueDate: "2026-07-10",
+        recurrenceEndDate: "2026-07-17",
+        recurrenceFrequency: "WEEKLY",
+        recurrenceInterval: 1,
+        sectionId,
+        title: "Bounded recurring integration review",
+      },
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks",
+    });
+    expect(createBoundedRecurringTask.statusCode).toBe(201);
+    const boundedRecurringTask = createBoundedRecurringTask.json<{
+      id: string;
+      recurrenceEndDate: string;
+    }>();
+    expect(boundedRecurringTask.recurrenceEndDate).toEqual(expect.stringMatching(/^2026-07-17/));
+
+    const completeBoundedRecurringTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + boundedRecurringTask.id + "/complete",
+    });
+    expect(completeBoundedRecurringTask.statusCode).toBe(200);
+
+    const tasksAfterBoundedCompletion = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks?limit=100",
+    });
+    expect(tasksAfterBoundedCompletion.statusCode).toBe(200);
+    const generatedBoundedTask = tasksAfterBoundedCompletion
+      .json<{
+        items: Array<{
+          dueDate: string | null;
+          id: string;
+          recurrenceEndDate: string | null;
+          recurrenceGeneratedFromTaskId: string | null;
+          title: string;
+        }>;
+      }>()
+      .items.find((item) => item.recurrenceGeneratedFromTaskId === boundedRecurringTask.id);
+    expect(generatedBoundedTask).toMatchObject({
+      dueDate: expect.stringMatching(/^2026-07-17/),
+      recurrenceEndDate: expect.stringMatching(/^2026-07-17/),
+      recurrenceGeneratedFromTaskId: boundedRecurringTask.id,
+      title: "Bounded recurring integration review",
+    });
+    await expectActivityEvent({
+      entityId: generatedBoundedTask!.id,
+      entityType: "task",
+      eventType: "TaskRecurrenceGenerated",
+      payload: {
+        dueDate: "2026-07-17",
+        generatedFromTaskId: boundedRecurringTask.id,
+        recurrenceEndDate: "2026-07-17",
+        recurrenceFrequency: "WEEKLY",
+        recurrenceInterval: 1,
+        status: "TODO",
+        title: "Bounded recurring integration review",
+      },
+      projectId,
+      taskId: generatedBoundedTask!.id,
+      workspaceId,
+    });
+
+    const completeGeneratedBoundedTask = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + generatedBoundedTask!.id + "/complete",
+    });
+    expect(completeGeneratedBoundedTask.statusCode).toBe(200);
+
+    const tasksAfterBoundedEnd = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/projects/" + projectId + "/tasks?limit=100",
+    });
+    expect(tasksAfterBoundedEnd.statusCode).toBe(200);
+    expect(
+      tasksAfterBoundedEnd
+        .json<{ items: Array<{ recurrenceGeneratedFromTaskId: string | null }> }>()
+        .items.some((item) => item.recurrenceGeneratedFromTaskId === generatedBoundedTask!.id),
+    ).toBe(false);
+
     const createPausedRecurringTask = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",

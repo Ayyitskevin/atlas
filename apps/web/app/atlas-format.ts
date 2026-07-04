@@ -183,12 +183,14 @@ function taskActivityDetail(activity: ActivitySummaryInput, payload: Record<stri
   const priority = stringPayload(payload, "priority");
   const dueDate = stringPayload(payload, "dueDate");
   const recurrence = stringPayload(payload, "recurrenceFrequency");
+  const recurrenceEndDate = stringPayload(payload, "recurrenceEndDate");
   const recurrenceState = taskRecurrenceState(activity.eventType, payload);
   const parts = [
     status,
     priority ? taskStatusLabel(priority) + " priority" : null,
     dueDate ? "due " + dueDate : null,
     recurrence ? taskRecurrenceLabel(recurrence, numberPayload(payload, "recurrenceInterval")) : null,
+    recurrenceEndDate ? "until " + recurrenceEndDate : null,
     recurrenceState,
   ].filter(isString);
   return parts.length ? detail + " · " + parts.join(" · ") : detail;
@@ -201,11 +203,17 @@ function taskActivityMetadata(payload: Record<string, unknown>) {
   const dueDate = changedLabel(stringPayload(payload, "previousDueDate"), stringPayload(payload, "dueDate"), identityLabel);
   const label = stringPayload(payload, "name");
   const recurrence = stringPayload(payload, "recurrenceFrequency");
+  const recurrenceEndDate = changedLabel(
+    stringPayload(payload, "previousRecurrenceEndDate"),
+    stringPayload(payload, "recurrenceEndDate"),
+    identityLabel,
+  );
   const recurrenceState = taskRecurrenceState("", payload);
   if (status) items.push({ label: "Status", value: status });
   if (priority) items.push({ label: "Priority", value: priority });
   if (dueDate) items.push({ label: "Due", value: dueDate });
   if (recurrence) items.push({ label: "Repeat", value: taskRecurrenceLabel(recurrence, numberPayload(payload, "recurrenceInterval")) });
+  if (recurrenceEndDate) items.push({ label: "Repeat until", value: recurrenceEndDate });
   if (recurrenceState) items.push({ label: "Repeat state", value: recurrenceState });
   if (label) items.push({ label: "Label", value: label });
   return items;
