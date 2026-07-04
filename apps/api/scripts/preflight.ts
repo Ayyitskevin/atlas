@@ -14,6 +14,7 @@ async function main() {
     const dbModule = await import("@atlas/db");
     const appModule = await import("../src/app.js");
     const queueModule = await import("../src/jobs/queues.js");
+    const storageModule = await import("../src/storage/object-storage.js");
 
     prisma = dbModule.prisma;
     closeDomainSideEffectQueues = queueModule.closeDomainSideEffectQueues;
@@ -27,11 +28,20 @@ async function main() {
     if (response.statusCode !== 200 || body.status !== "ok") {
       throw new Error("Readiness failed with " + response.statusCode + ": " + response.body);
     }
+    const objectKey = storageModule.createAttachmentObjectKey({
+      fileName: "preflight.txt",
+      taskId: "00000000-0000-0000-0000-000000000002",
+      workspaceId: "00000000-0000-0000-0000-000000000001",
+    });
+    const upload = await storageModule.createUploadInstructions({ mimeType: "text/plain", objectKey });
+    const download = await storageModule.createDownloadInstructions(objectKey);
+    if (upload.method !== "PUT" || upload.objectKey !== objectKey || !upload.url) throw new Error("Upload signing failed.");
+    if (download.method !== "GET" || download.objectKey !== objectKey || !download.url) throw new Error("Download signing failed.");
 
     console.info(
       JSON.stringify(
         {
-          checks: body.checks,
+          checks: { ...body.checks, objectStorageSigning: "ok" },
           status: "ok",
         },
         null,

@@ -4,7 +4,8 @@ if (process.argv.includes("--help")) {
   console.log(`Usage: pnpm preflight
 
 Validates the Prisma schema, checks migration status against DATABASE_URL,
-and verifies API readiness against the configured DATABASE_URL and REDIS_URL.
+verifies API readiness against the configured DATABASE_URL and REDIS_URL,
+and verifies S3-compatible signed upload/download instruction generation.
 
 Set DATABASE_URL and REDIS_URL to values reachable from this process before
 running against existing services. Use pnpm preflight:local for disposable
