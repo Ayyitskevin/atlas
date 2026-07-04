@@ -76,6 +76,8 @@ corepack pnpm typecheck
 corepack pnpm test
 corepack pnpm test:unit
 DATABASE_URL=postgresql://atlas:atlas@localhost:5432/atlas corepack pnpm test:integration
+corepack pnpm preflight
+corepack pnpm preflight:local
 corepack pnpm test:integration:local
 corepack pnpm smoke:demo:local
 corepack pnpm migrate
@@ -98,7 +100,7 @@ Run the dockerized E2E smoke test against a running API container:
 ATLAS_E2E_DOCKER=1 ATLAS_E2E_BASE_URL=http://localhost:4000 corepack pnpm test:e2e
 ```
 
-API integration tests require `DATABASE_URL` to point at a reachable PostgreSQL database. When `DATABASE_URL` is unset, `pnpm test` still runs the DB-free unit and web suites and reports the integration flow as skipped. Use `pnpm test:integration` when you want the DB-backed flow to be mandatory; use `pnpm test:integration:local` to run the DB-backed suite against isolated Postgres/Redis services. Use `pnpm smoke:demo:local` to apply migrations, seed the demo workspace, log in with the documented demo account, and verify the launch-critical demo surfaces through the API. The local harness uses Docker Compose when available and falls back to direct Podman containers on Podman hosts without a Compose provider. GitHub Actions runs `pnpm test:unit` and `pnpm test:integration` separately.
+API integration tests require `DATABASE_URL` to point at a reachable PostgreSQL database. When `DATABASE_URL` is unset, `pnpm test` still runs the DB-free unit and web suites and reports the integration flow as skipped. Use `pnpm test:integration` when you want the DB-backed flow to be mandatory; use `pnpm test:integration:local` to run the DB-backed suite against isolated Postgres/Redis services. Use `pnpm preflight` to validate the Prisma schema, check migration status, and verify `/readyz` against the configured `DATABASE_URL` and `REDIS_URL`; use `pnpm preflight:local` for the same check against disposable local Postgres/Redis services. Use `pnpm smoke:demo:local` to apply migrations, seed the demo workspace, log in with the documented demo account, and verify the launch-critical demo surfaces through the API. The local harness uses Docker Compose when available and falls back to direct Podman containers on Podman hosts without a Compose provider. GitHub Actions runs `pnpm test:unit` and `pnpm test:integration` separately.
 
 ## Repository Layout
 
