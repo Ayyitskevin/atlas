@@ -135,6 +135,16 @@ export const attachmentCommentResponseSchema = z.object({
   createdAt: z.string().datetime(),
   editedAt: z.string().datetime().nullable(),
   id: z.string().uuid(),
+  version: z
+    .object({
+      fileName: z.string(),
+      id: z.string().uuid(),
+      sizeBytes: z.number().int(),
+      version: z.number().int().positive(),
+    })
+    .nullable()
+    .optional(),
+  versionId: z.string().uuid().nullable(),
   workspaceId: z.string().uuid(),
 });
 

@@ -911,11 +911,12 @@ export function useProjectWork({
     event.preventDefault();
     if (!auth || !selectedWorkspaceId || !selectedProjectId || !selectedTaskId) return;
     const form = new FormData(event.currentTarget);
+    const versionId = formString(form.get("versionId"));
     try {
       setAttachmentStatus("");
       await api<Comment>(
         `/workspaces/${selectedWorkspaceId}/attachments/${attachmentId}/comments`,
-        { body: JSON.stringify({ body: formString(form.get("body")) }), method: "POST" },
+        { body: JSON.stringify({ body: formString(form.get("body")), ...(versionId ? { versionId } : {}) }), method: "POST" },
         auth.accessToken,
       );
       await loadAttachments(auth.accessToken, selectedWorkspaceId, selectedTaskId);

@@ -5,7 +5,9 @@ export const createCommentRequestSchema = z.object({
 });
 
 export const updateCommentRequestSchema = createCommentRequestSchema;
-export const createAttachmentCommentRequestSchema = createCommentRequestSchema;
+export const createAttachmentCommentRequestSchema = createCommentRequestSchema.extend({
+  versionId: z.string().uuid().optional(),
+});
 export const updateAttachmentCommentRequestSchema = updateCommentRequestSchema;
 
 export type CreateCommentRequest = z.infer<typeof createCommentRequestSchema>;

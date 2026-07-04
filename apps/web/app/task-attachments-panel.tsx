@@ -109,6 +109,17 @@ export function TaskAttachmentsPanel({
             <div className="mt-3 rounded-md border border-slate-200 bg-white px-3 py-2">
               <p className="text-xs font-semibold uppercase text-slate-500">File thread</p>
               <form className="mt-2 grid gap-2" onSubmit={(event) => void onCreateAttachmentComment(event, attachment.id)}>
+                <label className="grid gap-1 text-xs font-medium text-slate-600">
+                  Version
+                  <select className="rounded-md border border-slate-300 px-3 py-2 text-sm font-normal text-slate-900" name="versionId">
+                    <option value="">General file thread</option>
+                    {(attachment.versions ?? []).map((version) => (
+                      <option key={version.id} value={version.id}>
+                        v{version.version} · {version.fileName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <textarea className="min-h-16 rounded-md border border-slate-300 px-3 py-2 text-sm" name="body" required />
                 <button className="w-fit rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700" type="submit">
                   Add file comment
@@ -118,6 +129,7 @@ export function TaskAttachmentsPanel({
                 {attachment.comments?.length ? (
                   attachment.comments.map((comment) => (
                     <form className="grid gap-2 rounded-md border border-slate-200 bg-slate-50 p-2" key={comment.id} onSubmit={(event) => handleAttachmentCommentSubmit(event, comment.id, onUpdateAttachmentComment)}>
+                      {comment.version ? <p className="text-xs font-medium text-slate-500">v{comment.version.version} · {comment.version.fileName}</p> : null}
                       <textarea className="min-h-16 rounded-md border border-slate-300 bg-white px-3 py-2 text-sm" defaultValue={comment.body} name="body" required />
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <time className="text-xs text-slate-500">{new Date(comment.createdAt).toLocaleString()}{comment.editedAt ? " · edited" : ""}</time>

@@ -5,8 +5,22 @@ import { paginationArgs } from "../../shared/pagination.js";
 import { myWorkDependencyWhere, myWorkDueDateWhere, myWorkScopeWhere, myWorkStatusWhere, taskDependencyWhere } from "./my-work-filters.js";
 import { completedAtForStatusTransition } from "./task-state.js";
 
+const attachmentCommentVersionSelect = {
+  fileName: true,
+  id: true,
+  sizeBytes: true,
+  version: true,
+};
+
+const attachmentCommentInclude = {
+  version: {
+    select: attachmentCommentVersionSelect,
+  },
+};
+
 const attachmentWithActiveVersions = {
   comments: {
+    include: attachmentCommentInclude,
     orderBy: { createdAt: "asc" as const },
     where: { deletedAt: null },
   },
@@ -622,13 +636,14 @@ export class WorkRepository {
     });
   }
 
-  createAttachmentComment(input: { attachmentId: string; authorId: string; body: string; workspaceId: string }) {
-    return this.prisma.attachmentComment.create({ data: input });
+  createAttachmentComment(input: { attachmentId: string; authorId: string; body: string; versionId?: string | null; workspaceId: string }) {
+    return this.prisma.attachmentComment.create({ data: input, include: attachmentCommentInclude });
   }
 
   listAttachmentComments(input: { attachmentId: string; cursor?: string; limit: number; workspaceId: string }) {
     return this.prisma.attachmentComment.findMany({
       ...paginationArgs(input),
+      include: attachmentCommentInclude,
       orderBy: { createdAt: "asc" },
       where: { attachmentId: input.attachmentId, deletedAt: null, workspaceId: input.workspaceId },
     });
@@ -636,6 +651,7 @@ export class WorkRepository {
 
   findAttachmentComment(input: { attachmentCommentId: string; workspaceId: string }) {
     return this.prisma.attachmentComment.findFirst({
+      include: attachmentCommentInclude,
       where: { deletedAt: null, id: input.attachmentCommentId, workspaceId: input.workspaceId },
     });
   }
@@ -780,6 +796,12 @@ export class WorkRepository {
     return this.prisma.attachmentVersion.findFirst({
       include: { attachment: true },
       where: { attachmentId: input.attachmentId, id: input.versionId, workspaceId: input.workspaceId },
+    });
+  }
+
+  findActiveAttachmentVersion(input: { attachmentId: string; versionId: string; workspaceId: string }) {
+    return this.prisma.attachmentVersion.findFirst({
+      where: { activatedAt: { not: null }, attachmentId: input.attachmentId, id: input.versionId, workspaceId: input.workspaceId },
     });
   }
 

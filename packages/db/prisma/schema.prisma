@@ -589,6 +589,7 @@ model AttachmentVersion {
   scanMessage     String?              @map("scan_message")
   createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
   attachment      Attachment           @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  comments        AttachmentComment[]
   uploadedBy      User                 @relation("AttachmentVersionUploader", fields: [uploadedById], references: [id])
 
   @@unique([workspaceId, attachmentId, version])
@@ -601,19 +602,22 @@ model AttachmentVersion {
 }
 
 model AttachmentComment {
-  id           String     @id @default(uuid()) @db.Uuid
-  workspaceId  String     @map("workspace_id") @db.Uuid
-  attachmentId String     @map("attachment_id") @db.Uuid
-  authorId     String     @map("author_id") @db.Uuid
+  id           String             @id @default(uuid()) @db.Uuid
+  workspaceId  String             @map("workspace_id") @db.Uuid
+  attachmentId String             @map("attachment_id") @db.Uuid
+  versionId    String?            @map("version_id") @db.Uuid
+  authorId     String             @map("author_id") @db.Uuid
   body         String
-  editedAt     DateTime?  @map("edited_at") @db.Timestamptz(6)
-  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
-  deletedAt    DateTime?  @map("deleted_at") @db.Timestamptz(6)
-  attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
-  author       User       @relation(fields: [authorId], references: [id])
+  editedAt     DateTime?          @map("edited_at") @db.Timestamptz(6)
+  createdAt    DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime           @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime?          @map("deleted_at") @db.Timestamptz(6)
+  attachment   Attachment         @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+  author       User               @relation(fields: [authorId], references: [id])
+  version      AttachmentVersion? @relation(fields: [versionId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, attachmentId, createdAt])
+  @@index([workspaceId, versionId, createdAt])
   @@index([workspaceId, authorId])
   @@map("attachment_comments")
 }

@@ -774,13 +774,15 @@ export class WorkService {
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
     const task = await this.getTask(ctx, workspaceId, attachment.taskId);
     await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, "COMMENTER");
-    const comment = await this.workRepository.createAttachmentComment({ attachmentId, authorId: ctx.userId, body: input.body, workspaceId });
+    const versionAnchor = input.versionId ? await this.workRepository.findActiveAttachmentVersion({ attachmentId, versionId: input.versionId, workspaceId }) : null;
+    if (input.versionId && !versionAnchor) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment version not found.");
+    const comment = await this.workRepository.createAttachmentComment({ attachmentId, authorId: ctx.userId, body: input.body, versionId: versionAnchor?.id ?? null, workspaceId });
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: comment.id,
       entityType: "attachment_comment",
       eventType: "AttachmentCommentCreated",
-      payload: attachmentActivityPayload(attachment),
+      payload: attachmentActivityPayload(attachment, versionAnchor),
       projectId: task.projectId,
       taskId: attachment.taskId,
       workspaceId,
@@ -809,7 +811,7 @@ export class WorkService {
       entityId: attachmentCommentId,
       entityType: "attachment_comment",
       eventType: "AttachmentCommentUpdated",
-      payload: attachmentActivityPayload(attachment),
+      payload: attachmentActivityPayload(attachment, comment.version),
       projectId: task.projectId,
       taskId: attachment.taskId,
       workspaceId,
@@ -830,7 +832,7 @@ export class WorkService {
       entityId: attachmentCommentId,
       entityType: "attachment_comment",
       eventType: "AttachmentCommentDeleted",
-      payload: attachmentActivityPayload(attachment),
+      payload: attachmentActivityPayload(attachment, comment.version),
       projectId: task.projectId,
       taskId: attachment.taskId,
       workspaceId,
@@ -1597,8 +1599,17 @@ function normalizeAttachmentDescription(value: string | null | undefined) {
   return description ? description : null;
 }
 
-function attachmentActivityPayload(attachment: { fileName: string; id: string; sizeBytes: number; version: number }) {
-  return { attachmentId: attachment.id, fileName: attachment.fileName, sizeBytes: attachment.sizeBytes, version: attachment.version };
+function attachmentActivityPayload(
+  attachment: { fileName: string; id: string; sizeBytes: number; version: number },
+  versionAnchor?: { fileName: string; id: string; sizeBytes: number; version: number } | null,
+) {
+  const payload = {
+    attachmentId: attachment.id,
+    fileName: versionAnchor?.fileName ?? attachment.fileName,
+    sizeBytes: versionAnchor?.sizeBytes ?? attachment.sizeBytes,
+    version: versionAnchor?.version ?? attachment.version,
+  };
+  return versionAnchor ? { ...payload, versionFileName: versionAnchor.fileName, versionId: versionAnchor.id } : payload;
 }
 
 function normalizeMimeType(value: string | null | undefined) {

@@ -290,6 +290,8 @@ export type AttachmentComment = {
   createdAt: string;
   editedAt?: string | null;
   id: string;
+  version?: { fileName: string; id: string; sizeBytes?: number; version: number } | null;
+  versionId: string | null;
 };
 
 export type AttachmentVersion = {

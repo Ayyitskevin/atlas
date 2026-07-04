@@ -440,6 +440,14 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     expect(replaceAttachmentBody.upload).toMatchObject({ method: "PUT", objectKey: replaceAttachmentBody.version.objectKey });
     expect(replaceAttachmentBody.upload.url).toContain("X-Amz-Signature");
 
+    const pendingVersionComment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { body: "Review pending v2.", versionId: replaceAttachmentBody.version.id },
+      url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id + "/comments",
+    });
+    expect(pendingVersionComment.statusCode).toBe(404);
+
     const incompleteReplacement = await app!.inject({
       headers: authHeaders(accessToken),
       method: "POST",
@@ -513,6 +521,63 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
       taskId,
       workspaceId,
     });
+
+    const versionAttachmentComment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      payload: { body: "Review the approved v2.", versionId: replaceAttachmentBody.version.id },
+      url: "/api/v1/workspaces/" + workspaceId + "/attachments/" + attachmentBody.attachment.id + "/comments",
+    });
+    expect(versionAttachmentComment.statusCode).toBe(201);
+    const versionAttachmentCommentBody = versionAttachmentComment.json<{
+      attachmentId: string;
+      body: string;
+      id: string;
+      version: { fileName: string; id: string; sizeBytes: number; version: number };
+      versionId: string | null;
+    }>();
+    expect(versionAttachmentCommentBody).toMatchObject({
+      attachmentId: attachmentBody.attachment.id,
+      body: "Review the approved v2.",
+      version: { fileName: "brief-v2.pdf", id: replaceAttachmentBody.version.id, sizeBytes: 4096, version: 2 },
+      versionId: replaceAttachmentBody.version.id,
+    });
+    await expectActivityEvent({
+      entityId: versionAttachmentCommentBody.id,
+      entityType: "attachment_comment",
+      eventType: "AttachmentCommentCreated",
+      payload: {
+        attachmentId: attachmentBody.attachment.id,
+        fileName: "brief-v2.pdf",
+        sizeBytes: 4096,
+        version: 2,
+        versionFileName: "brief-v2.pdf",
+        versionId: replaceAttachmentBody.version.id,
+      },
+      projectId,
+      taskId,
+      workspaceId,
+    });
+
+    const attachmentListWithVersionComment = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "GET",
+      url: "/api/v1/workspaces/" + workspaceId + "/tasks/" + taskId + "/attachments",
+    });
+    expect(attachmentListWithVersionComment.statusCode).toBe(200);
+    expect(
+      attachmentListWithVersionComment.json<{ items: Array<{ comments?: Array<{ body: string; version?: { fileName: string; version: number }; versionId: string | null }> }> }>().items,
+    ).toContainEqual(
+      expect.objectContaining({
+        comments: expect.arrayContaining([
+          expect.objectContaining({
+            body: "Review the approved v2.",
+            version: expect.objectContaining({ fileName: "brief-v2.pdf", version: 2 }),
+            versionId: replaceAttachmentBody.version.id,
+          }),
+        ]),
+      }),
+    );
 
     const download = await app!.inject({
       headers: authHeaders(accessToken),
