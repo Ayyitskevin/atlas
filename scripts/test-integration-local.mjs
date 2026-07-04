@@ -5,8 +5,8 @@ const config = localIntegrationConfig();
 if (process.argv.includes("--help")) {
   console.log(`Usage: pnpm test:integration:local
 
-Starts isolated Postgres/Redis services, runs DB-backed API integration tests,
-and removes the test services afterward.
+Starts isolated Postgres/Redis/MinIO services, runs DB-backed API integration
+tests, and removes the test services afterward.
 
 ${localIntegrationEnvironmentHelp(config)}
 `);

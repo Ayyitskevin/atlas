@@ -14,7 +14,7 @@ The current phase is deliberately foundation-first: production-minded domain bou
 - Realtime WebSocket broadcasts for project/member/task/comment/activity mutations.
 - Durable domain event outbox feeding BullMQ workers for notification fanout plus observable search-index and email-delivery provider seams.
 - Workspace-admin outbox inspection/detail, dispatch attempt history, worker outcome history, and failed-event replay endpoints.
-- Task attachment metadata with S3-compatible signed upload/download URLs and local MinIO support.
+- Task attachment metadata with S3-compatible signed upload/download URLs, local MinIO support, and server-side object validation before replacement activation.
 - Docker Compose local stack and Terraform scaffolding for staging-oriented infrastructure.
 
 ## Stack
@@ -67,6 +67,8 @@ If standard ports are already in use, override host ports without changing conta
 ```bash
 POSTGRES_HOST_PORT=55432 REDIS_HOST_PORT=6380 MINIO_API_HOST_PORT=9100 MINIO_CONSOLE_HOST_PORT=9101 API_HOST_PORT=4400 WEB_HOST_PORT=3300 docker compose up
 ```
+
+The `*:local` verification scripts start isolated Postgres, Redis, and MinIO services. `preflight:local` also signs, uploads, verifies metadata for, and removes a probe object. Use `ATLAS_INTEGRATION_MINIO_API_PORT` and `ATLAS_INTEGRATION_MINIO_CONSOLE_PORT` to avoid clashes with a running development stack.
 
 ## Common Commands
 

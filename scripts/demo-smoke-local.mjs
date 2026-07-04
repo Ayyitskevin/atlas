@@ -5,7 +5,7 @@ const config = localIntegrationConfig();
 if (process.argv.includes("--help")) {
   console.log(`Usage: pnpm smoke:demo:local
 
-Starts isolated Postgres/Redis services, applies migrations, seeds the demo
+Starts isolated Postgres/Redis/MinIO services, applies migrations, seeds the demo
 workspace, verifies documented demo login and launch-critical API surfaces,
 and removes the local services afterward.
 

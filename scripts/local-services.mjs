@@ -10,19 +10,27 @@ export function localIntegrationConfig(env = process.env) {
   const projectName = env.ATLAS_INTEGRATION_PROJECT || "atlas-integration";
   const postgresPort = env.ATLAS_INTEGRATION_POSTGRES_PORT || "55432";
   const redisPort = env.ATLAS_INTEGRATION_REDIS_PORT || "6380";
+  const minioApiPort = env.ATLAS_INTEGRATION_MINIO_API_PORT || "59000";
+  const minioConsolePort = env.ATLAS_INTEGRATION_MINIO_CONSOLE_PORT || "59001";
   const databaseUrl = env.DATABASE_URL || `postgresql://atlas:atlas@localhost:${postgresPort}/atlas`;
   const redisUrl = env.REDIS_URL || `redis://localhost:${redisPort}`;
+  const s3Endpoint = env.S3_ENDPOINT || `http://localhost:${minioApiPort}`;
+  const s3PublicEndpoint = env.S3_PUBLIC_ENDPOINT || s3Endpoint;
   const keepServices = env.ATLAS_KEEP_TEST_SERVICES === "1";
   const requestedDriver = env.ATLAS_INTEGRATION_DRIVER || "auto";
 
   return {
     databaseUrl,
     keepServices,
+    minioApiPort,
+    minioConsolePort,
     postgresPort,
     projectName,
     redisPort,
     redisUrl,
     requestedDriver,
+    s3Endpoint,
+    s3PublicEndpoint,
   };
 }
 
@@ -31,9 +39,13 @@ export function localIntegrationEnvironmentHelp(config = localIntegrationConfig(
   ATLAS_INTEGRATION_PROJECT        Compose project name. Default: ${config.projectName}
   ATLAS_INTEGRATION_POSTGRES_PORT  Host Postgres port. Default: ${config.postgresPort}
   ATLAS_INTEGRATION_REDIS_PORT     Host Redis port. Default: ${config.redisPort}
+  ATLAS_INTEGRATION_MINIO_API_PORT Host MinIO API port. Default: ${config.minioApiPort}
+  ATLAS_INTEGRATION_MINIO_CONSOLE_PORT Host MinIO console port. Default: ${config.minioConsolePort}
   ATLAS_INTEGRATION_DRIVER         auto, compose, or podman. Default: ${config.requestedDriver}
   DATABASE_URL                     Test database URL. Default: ${config.databaseUrl}
   REDIS_URL                        Test Redis URL. Default: ${config.redisUrl}
+  S3_ENDPOINT                      S3 API endpoint. Default: ${config.s3Endpoint}
+  S3_PUBLIC_ENDPOINT               Signed URL endpoint. Default: ${config.s3PublicEndpoint}
   ATLAS_KEEP_TEST_SERVICES=1       Leave services running after the command.
 `;
 }
@@ -45,6 +57,8 @@ export async function withLocalIntegrationServices(task, options = {}) {
 
   const composeEnv = {
     ...baseEnv,
+    MINIO_API_HOST_PORT: config.minioApiPort,
+    MINIO_CONSOLE_HOST_PORT: config.minioConsolePort,
     POSTGRES_HOST_PORT: config.postgresPort,
     REDIS_HOST_PORT: config.redisPort,
   };
@@ -53,6 +67,12 @@ export async function withLocalIntegrationServices(task, options = {}) {
     ...baseEnv,
     DATABASE_URL: config.databaseUrl,
     REDIS_URL: config.redisUrl,
+    S3_ACCESS_KEY_ID: baseEnv.S3_ACCESS_KEY_ID || "atlas",
+    S3_BUCKET: baseEnv.S3_BUCKET || "atlas-local",
+    S3_ENDPOINT: config.s3Endpoint,
+    S3_PUBLIC_ENDPOINT: config.s3PublicEndpoint,
+    S3_REGION: baseEnv.S3_REGION || "us-east-1",
+    S3_SECRET_ACCESS_KEY: baseEnv.S3_SECRET_ACCESS_KEY || "atlas-password",
   };
 
   let cleaningUp = false;
@@ -84,6 +104,8 @@ export async function withLocalIntegrationServices(task, options = {}) {
     serviceDriver.start();
     waitForService("Postgres", () => serviceDriver.checkPostgres());
     waitForService("Redis", () => serviceDriver.checkRedis());
+    waitForService("MinIO", () => serviceDriver.checkObjectStorage());
+    serviceDriver.initObjectStorage();
     await task({ config, env: serviceEnv, run });
   } finally {
     process.off("SIGINT", handleSigint);
@@ -199,9 +221,23 @@ function dockerComposeDriver(config, composeEnv) {
   return {
     checkPostgres: () => runCompose(["exec", "-T", "postgres", "pg_isready", "-U", "atlas", "-d", "atlas"], { stdio: "ignore", throwOnError: false }),
     checkRedis: () => runCompose(["exec", "-T", "redis", "redis-cli", "ping"], { stdio: "ignore", throwOnError: false }),
+    checkObjectStorage: () =>
+      runCompose(["exec", "-T", "minio", "sh", "-c", "mc alias set local http://127.0.0.1:9000 atlas atlas-password >/dev/null && mc ready local"], {
+        stdio: "ignore",
+        throwOnError: false,
+      }),
     cleanup: () => runCompose(["down", "--volumes", "--remove-orphans"], { throwOnError: false }),
+    initObjectStorage: () =>
+      runCompose([
+        "exec",
+        "-T",
+        "minio",
+        "sh",
+        "-c",
+        "mc alias set local http://127.0.0.1:9000 atlas atlas-password && mc mb --ignore-existing local/atlas-local && mc anonymous set none local/atlas-local",
+      ]),
     name: "Docker Compose",
-    start: () => runCompose(["up", "-d", "postgres", "redis"]),
+    start: () => runCompose(["up", "-d", "postgres", "redis", "minio"]),
   };
 }
 
@@ -209,16 +245,31 @@ function podmanDriver(config) {
   const resourcePrefix = sanitizeResourceName(config.projectName) || "atlas-integration";
   const postgresContainer = resourcePrefix + "-postgres";
   const redisContainer = resourcePrefix + "-redis";
+  const minioContainer = resourcePrefix + "-minio";
   const postgresVolume = resourcePrefix + "-postgres-data";
   const redisVolume = resourcePrefix + "-redis-data";
+  const minioVolume = resourcePrefix + "-minio-data";
 
   return {
     checkPostgres: () => run("podman", ["exec", postgresContainer, "pg_isready", "-U", "atlas", "-d", "atlas"], { stdio: "ignore", throwOnError: false }),
     checkRedis: () => run("podman", ["exec", redisContainer, "redis-cli", "ping"], { stdio: "ignore", throwOnError: false }),
+    checkObjectStorage: () =>
+      run("podman", ["exec", minioContainer, "sh", "-c", "mc alias set local http://127.0.0.1:9000 atlas atlas-password >/dev/null && mc ready local"], {
+        stdio: "ignore",
+        throwOnError: false,
+      }),
     cleanup: () => {
-      run("podman", ["rm", "--force", "--volumes", postgresContainer, redisContainer], { throwOnError: false });
-      run("podman", ["volume", "rm", "--force", postgresVolume, redisVolume], { throwOnError: false });
+      run("podman", ["rm", "--force", "--volumes", postgresContainer, redisContainer, minioContainer], { throwOnError: false });
+      run("podman", ["volume", "rm", "--force", postgresVolume, redisVolume, minioVolume], { throwOnError: false });
     },
+    initObjectStorage: () =>
+      run("podman", [
+        "exec",
+        minioContainer,
+        "sh",
+        "-c",
+        "mc alias set local http://127.0.0.1:9000 atlas atlas-password && mc mb --ignore-existing local/atlas-local && mc anonymous set none local/atlas-local",
+      ]),
     name: "Podman",
     start: () => {
       run("podman", [
@@ -251,6 +302,27 @@ function podmanDriver(config) {
         "redis-server",
         "--appendonly",
         "yes",
+      ]);
+      run("podman", [
+        "run",
+        "--detach",
+        "--name",
+        minioContainer,
+        "--env",
+        "MINIO_ROOT_PASSWORD=atlas-password",
+        "--env",
+        "MINIO_ROOT_USER=atlas",
+        "--publish",
+        config.minioApiPort + ":9000",
+        "--publish",
+        config.minioConsolePort + ":9001",
+        "--volume",
+        minioVolume + ":/data",
+        "docker.io/minio/minio:latest",
+        "server",
+        "/data",
+        "--console-address",
+        ":9001",
       ]);
     },
   };

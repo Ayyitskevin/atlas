@@ -199,7 +199,7 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
         version: number;
         versions: Array<{ activatedAt: string | null; fileName: string; version: number }>;
       };
-      upload: { method: string; objectKey: string; url: string };
+      upload: { headers: Record<string, string>; method: string; objectKey: string; url: string };
     }>();
     expect(attachmentBody.attachment.description).toBe("Needs client approval.");
     expect(attachmentBody.attachment.version).toBe(1);
@@ -248,14 +248,36 @@ describe.skipIf(!hasDatabaseUrl)("API integration flow", () => {
     expect(replaceAttachment.statusCode).toBe(201);
     const replaceAttachmentBody = replaceAttachment.json<{
       attachment: { id: string; objectKey: string; version: number };
-      upload: { method: string; objectKey: string; url: string };
-      version: { activatedAt: string | null; fileName: string; id: string; objectKey: string; version: number };
+      upload: { headers: Record<string, string>; method: string; objectKey: string; url: string };
+      version: { activatedAt: string | null; fileName: string; id: string; objectKey: string; sizeBytes: number; version: number };
     }>();
     expect(replaceAttachmentBody.attachment).toMatchObject({ id: attachmentBody.attachment.id, version: 1 });
     expect(replaceAttachmentBody.version).toMatchObject({ activatedAt: null, fileName: "brief-v2.pdf", version: 2 });
     expect(replaceAttachmentBody.version.objectKey).not.toBe(attachmentBody.attachment.objectKey);
     expect(replaceAttachmentBody.upload).toMatchObject({ method: "PUT", objectKey: replaceAttachmentBody.version.objectKey });
     expect(replaceAttachmentBody.upload.url).toContain("X-Amz-Signature");
+
+    const incompleteReplacement = await app!.inject({
+      headers: authHeaders(accessToken),
+      method: "POST",
+      url:
+        "/api/v1/workspaces/" +
+        workspaceId +
+        "/attachments/" +
+        attachmentBody.attachment.id +
+        "/versions/" +
+        replaceAttachmentBody.version.id +
+        "/complete",
+    });
+    expect(incompleteReplacement.statusCode).toBe(409);
+    expect(incompleteReplacement.json<{ error: { details: { reason?: string } } }>().error.details.reason).toBe("missing");
+
+    const uploadReplacement = await fetch(replaceAttachmentBody.upload.url, {
+      body: Buffer.alloc(replaceAttachmentBody.version.sizeBytes, "a"),
+      headers: replaceAttachmentBody.upload.headers,
+      method: "PUT",
+    });
+    expect(uploadReplacement.status).toBe(200);
 
     const completeReplacement = await app!.inject({
       headers: authHeaders(accessToken),

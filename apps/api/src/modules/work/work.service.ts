@@ -31,7 +31,7 @@ import { Prisma, type TaskPriority, type TaskRecurrenceFrequency, type TaskStatu
 import type { AuthContext } from "../../shared/auth-context.js";
 import { AtlasHttpError } from "../../shared/errors.js";
 import { pageFromLimit } from "../../shared/pagination.js";
-import { createAttachmentObjectKey, createDownloadInstructions, createUploadInstructions } from "../../storage/object-storage.js";
+import { createAttachmentObjectKey, createDownloadInstructions, createUploadInstructions, getAttachmentObjectMetadata } from "../../storage/object-storage.js";
 import { DomainEventsRepository } from "../events/domain-events.repository.js";
 import { PermissionsService } from "../permissions/permissions.service.js";
 import { defaultListPosition } from "./position.js";
@@ -779,6 +779,7 @@ export class WorkService {
     const task = await this.getTask(ctx, workspaceId, attachment.taskId);
     const requiredRole = version.uploadedById === ctx.userId ? "COMMENTER" : "EDITOR";
     await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, requiredRole);
+    if (!version.activatedAt) await this.assertAttachmentObjectMatches({ mimeType: version.mimeType, objectKey: version.objectKey, sizeBytes: version.sizeBytes });
     const result = await this.workRepository.completeAttachmentVersion({ attachmentId, versionId, workspaceId });
     if (result.conflict || !result.attachment || !result.version) {
       throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "Attachment changed before this version was completed.");
@@ -804,6 +805,34 @@ export class WorkService {
       });
     }
     return result.attachment;
+  }
+
+  private async assertAttachmentObjectMatches(input: { mimeType: string; objectKey: string; sizeBytes: number }) {
+    const metadata = await getAttachmentObjectMetadata(input.objectKey);
+    if (!metadata) {
+      throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "Attachment upload has not finished.", {
+        objectKey: input.objectKey,
+        reason: "missing",
+      });
+    }
+
+    if (metadata.contentLength !== input.sizeBytes) {
+      throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "Uploaded attachment size does not match the requested file.", {
+        actualSizeBytes: metadata.contentLength,
+        expectedSizeBytes: input.sizeBytes,
+        objectKey: input.objectKey,
+        reason: "size_mismatch",
+      });
+    }
+
+    if (normalizeMimeType(metadata.contentType) !== normalizeMimeType(input.mimeType)) {
+      throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "Uploaded attachment type does not match the requested file.", {
+        actualMimeType: metadata.contentType,
+        expectedMimeType: input.mimeType,
+        objectKey: input.objectKey,
+        reason: "mime_type_mismatch",
+      });
+    }
   }
 
   async updateAttachment(ctx: AuthContext, workspaceId: string, attachmentId: string, input: UpdateAttachmentRequest) {
@@ -1390,6 +1419,10 @@ function isPrismaUniqueConstraintError(error: unknown) {
 function normalizeAttachmentDescription(value: string | null | undefined) {
   const description = value?.trim();
   return description ? description : null;
+}
+
+function normalizeMimeType(value: string | null | undefined) {
+  return value?.split(";")[0]?.trim().toLowerCase() ?? null;
 }
 
 type SearchCursor = {

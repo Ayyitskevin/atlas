@@ -5,8 +5,8 @@ const config = localIntegrationConfig();
 if (process.argv.includes("--help")) {
   console.log(`Usage: pnpm preflight:local
 
-Starts isolated Postgres/Redis services, applies migrations, runs the standard
-Atlas preflight checks against those services, and removes the services
+Starts isolated Postgres/Redis/MinIO services, applies migrations, runs the
+standard Atlas preflight checks against those services, and removes the services
 afterward.
 
 ${localIntegrationEnvironmentHelp(config)}
