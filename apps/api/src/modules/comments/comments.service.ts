@@ -14,7 +14,7 @@ export class CommentsService extends WorkDomainBase {
   async createComment(ctx: AuthContext, workspaceId: string, taskId: string, input: CreateCommentRequest) {
     const task = await this.getTask(ctx, workspaceId, taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "COMMENTER");
-    const comment = await this.workRepository.createComment({ authorId: ctx.userId, body: input.body, taskId, workspaceId });
+    const comment = await this.commentsRepo.createComment({ authorId: ctx.userId, body: input.body, taskId, workspaceId });
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: comment.id,
@@ -30,16 +30,16 @@ export class CommentsService extends WorkDomainBase {
 
   async listComments(ctx: AuthContext, workspaceId: string, taskId: string, query: CursorPaginationQuery) {
     await this.permissions.requireTaskRole(ctx, workspaceId, taskId, "VIEWER");
-    return pageFromLimit(await this.workRepository.listComments({ ...query, taskId, workspaceId }), query.limit);
+    return pageFromLimit(await this.commentsRepo.listComments({ ...query, taskId, workspaceId }), query.limit);
   }
 
 
   async updateComment(ctx: AuthContext, workspaceId: string, commentId: string, input: UpdateCommentRequest) {
-    const comment = await this.workRepository.findComment(workspaceId, commentId);
+    const comment = await this.commentsRepo.findComment(workspaceId, commentId);
     if (!comment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Comment not found.");
     const task = await this.getTask(ctx, workspaceId, comment.taskId);
     if (comment.authorId !== ctx.userId) await this.permissions.requireTaskRole(ctx, workspaceId, comment.taskId, "EDITOR");
-    const updated = await this.workRepository.updateComment({ body: input.body, commentId, workspaceId });
+    const updated = await this.commentsRepo.updateComment({ body: input.body, commentId, workspaceId });
     if (!updated) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Comment not found.");
     await this.events.recordActivity({
       actorUserId: ctx.userId,
@@ -55,11 +55,11 @@ export class CommentsService extends WorkDomainBase {
 
 
   async deleteComment(ctx: AuthContext, workspaceId: string, commentId: string) {
-    const comment = await this.workRepository.findComment(workspaceId, commentId);
+    const comment = await this.commentsRepo.findComment(workspaceId, commentId);
     if (!comment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Comment not found.");
     const task = await this.getTask(ctx, workspaceId, comment.taskId);
     if (comment.authorId !== ctx.userId) await this.permissions.requireTaskRole(ctx, workspaceId, comment.taskId, "EDITOR");
-    await this.workRepository.softDeleteComment({ commentId, workspaceId });
+    await this.commentsRepo.softDeleteComment({ commentId, workspaceId });
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: commentId,

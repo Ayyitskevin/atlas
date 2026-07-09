@@ -14,7 +14,7 @@ export class SearchService extends WorkDomainBase {
   async search(ctx: AuthContext, workspaceId: string, query: SearchQuery) {
     await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
     const after = decodeSearchCursor(query.cursor, query.type);
-    const [tasks, projects] = await this.workRepository.searchWorkspace({ ...query, after, userId: ctx.userId, workspaceId });
+    const [tasks, projects] = await this.searchRepo.searchWorkspace({ ...query, after, userId: ctx.userId, workspaceId });
     const items: SearchResultItem[] = [
       ...projects.map((project) => ({ type: "project" as const, project })),
       ...tasks.map((task) => ({ type: "task" as const, task })),

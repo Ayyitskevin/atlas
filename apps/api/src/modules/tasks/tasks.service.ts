@@ -23,7 +23,7 @@ export class TasksService extends WorkDomainBase {
     await this.requireSectionInProject(workspaceId, projectId, input.sectionId);
     await this.requireWorkspaceMembers(workspaceId, input.assigneeIds);
     const recurrence = this.createRecurrence(input);
-    const task = await this.workRepository.createTask({
+    const task = await this.tasksRepo.createTask({
       ...input,
       position: input.position ?? defaultListPosition(),
       projectId,
@@ -48,7 +48,7 @@ export class TasksService extends WorkDomainBase {
 
   async listTasks(ctx: AuthContext, workspaceId: string, projectId: string, query: ProjectTaskQuery) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "VIEWER");
-    const tasks = await this.workRepository.listTasks({ ...query, projectId, workspaceId });
+    const tasks = await this.tasksRepo.listTasks({ ...query, projectId, workspaceId });
     return pageFromLimit(await this.withDependencySummaries(workspaceId, tasks), query.limit);
   }
 
@@ -58,7 +58,7 @@ export class TasksService extends WorkDomainBase {
     return pageFromLimit(
       await this.withDependencySummaries(
         workspaceId,
-        await this.workRepository.listMyWork({ ...query, userId: ctx.userId, workspaceId }),
+        await this.tasksRepo.listMyWork({ ...query, userId: ctx.userId, workspaceId }),
       ),
       query.limit,
     );
@@ -75,7 +75,7 @@ export class TasksService extends WorkDomainBase {
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
     if (input.status === "DONE" && task.status !== "DONE") await this.requireTaskNotBlocked(workspaceId, taskId);
     const recurrence = this.updateRecurrence(input, task, new Date());
-    const count = await this.workRepository.updateTask({
+    const count = await this.tasksRepo.updateTask({
       data: {
         description: input.description,
         dueDate: input.dueDate,
@@ -89,7 +89,7 @@ export class TasksService extends WorkDomainBase {
       workspaceId,
     });
     if (!count) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.STALE_VERSION, "Task has changed since it was loaded.");
-    const updated = await this.workRepository.findTask(workspaceId, taskId);
+    const updated = await this.tasksRepo.findTask(workspaceId, taskId);
     if (!updated) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Task not found.");
     const eventType =
       updated.status === "DONE" && task.status !== "DONE"
@@ -115,7 +115,7 @@ export class TasksService extends WorkDomainBase {
 
   async deleteTask(ctx: AuthContext, workspaceId: string, taskId: string) {
     await this.permissions.requireTaskRole(ctx, workspaceId, taskId, "EDITOR");
-    await this.workRepository.softDeleteTask(workspaceId, taskId);
+    await this.tasksRepo.softDeleteTask(workspaceId, taskId);
     return { ok: true };
   }
 
@@ -124,9 +124,9 @@ export class TasksService extends WorkDomainBase {
     const task = await this.getTask(ctx, workspaceId, taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
     await this.requireSectionInProject(workspaceId, task.projectId, input.sectionId);
-    const count = await this.workRepository.moveTask({ ...input, taskId, workspaceId });
+    const count = await this.tasksRepo.moveTask({ ...input, taskId, workspaceId });
     if (!count) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.STALE_VERSION, "Task has changed since it was loaded.");
-    const moved = await this.workRepository.findTask(workspaceId, taskId);
+    const moved = await this.tasksRepo.findTask(workspaceId, taskId);
     if (!moved) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Task not found.");
     await this.events.recordActivity({
       actorUserId: ctx.userId,
@@ -146,7 +146,7 @@ export class TasksService extends WorkDomainBase {
     const task = await this.getTask(ctx, workspaceId, taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
     await this.requireWorkspaceMembers(workspaceId, [userId]);
-    const assignment = await this.workRepository.assignTask({ assignedById: ctx.userId, taskId, userId, workspaceId });
+    const assignment = await this.tasksRepo.assignTask({ assignedById: ctx.userId, taskId, userId, workspaceId });
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: taskId,
@@ -164,7 +164,7 @@ export class TasksService extends WorkDomainBase {
   async unassignTask(ctx: AuthContext, workspaceId: string, taskId: string, userId: string) {
     const task = await this.getTask(ctx, workspaceId, taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
-    await this.workRepository.unassignTask({ taskId, userId, workspaceId });
+    await this.tasksRepo.unassignTask({ taskId, userId, workspaceId });
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: taskId,
@@ -181,7 +181,7 @@ export class TasksService extends WorkDomainBase {
 
   async listTaskWatchers(ctx: AuthContext, workspaceId: string, taskId: string) {
     await this.permissions.requireTaskRole(ctx, workspaceId, taskId, "VIEWER");
-    return pageFromLimit(await this.workRepository.listTaskWatchers({ taskId, workspaceId }), 100);
+    return pageFromLimit(await this.tasksRepo.listTaskWatchers({ taskId, workspaceId }), 100);
   }
 
 
@@ -189,7 +189,7 @@ export class TasksService extends WorkDomainBase {
     const task = await this.getTask(ctx, workspaceId, taskId);
     if (userId !== ctx.userId) await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
     await this.requireWorkspaceMembers(workspaceId, [userId]);
-    const watcher = await this.workRepository.watchTask({ taskId, userId, watchedById: ctx.userId, workspaceId });
+    const watcher = await this.tasksRepo.watchTask({ taskId, userId, watchedById: ctx.userId, workspaceId });
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: taskId,
@@ -207,7 +207,7 @@ export class TasksService extends WorkDomainBase {
   async unwatchTask(ctx: AuthContext, workspaceId: string, taskId: string, userId: string) {
     const task = await this.getTask(ctx, workspaceId, taskId);
     if (userId !== ctx.userId) await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
-    const result = await this.workRepository.unwatchTask({ taskId, userId, workspaceId });
+    const result = await this.tasksRepo.unwatchTask({ taskId, userId, workspaceId });
     if (!result.count) return { ok: true };
     await this.events.recordActivity({
       actorUserId: ctx.userId,
@@ -245,14 +245,14 @@ export class TasksService extends WorkDomainBase {
     }
 
     const now = new Date();
-    const count = await this.workRepository.updateTask({
+    const count = await this.tasksRepo.updateTask({
       data: { recurrenceSkippedAt: now, status: "DONE" },
       taskId,
       version: task.version,
       workspaceId,
     });
     if (!count) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.STALE_VERSION, "Task has changed since it was loaded.");
-    const skipped = await this.workRepository.findTask(workspaceId, taskId);
+    const skipped = await this.tasksRepo.findTask(workspaceId, taskId);
     if (!skipped) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Task not found.");
     await this.events.recordActivity({
       actorUserId: ctx.userId,

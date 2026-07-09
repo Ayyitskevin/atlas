@@ -2,22 +2,25 @@
 
 ## Current
 
-- `api-flow.test.ts` — full golden-path suite (auth → workspace → board → attachments → …).  
-  Skipped when `DATABASE_URL` is unset. Run with:
+| File | Coverage |
+|------|----------|
+| `api-flow.test.ts` | Full golden path (auth → workspace → board → attachments → …) |
+| `auth.integration.test.ts` | First domain slice: register / me / login / refresh / logout |
+| `helpers/app-harness.ts` | Shared migrate + `buildApp` lifecycle |
+
+Skipped when `DATABASE_URL` is unset.
 
 ```bash
 pnpm test:integration
-# or isolated local services:
 pnpm test:integration:local
 ```
 
-## Target split (follow-up)
+## Target split (remaining)
 
-Carve domain-focused files that share a `setup.ts` harness (app build, migrate, tokens):
+Carve more domain files that use `helpers/app-harness.ts`:
 
 | File | Coverage |
 |------|----------|
-| `auth.integration.test.ts` | register/login/refresh/logout |
 | `workspaces.integration.test.ts` | CRUD, invites, members |
 | `projects.integration.test.ts` | projects, templates, messages |
 | `tasks.integration.test.ts` | sections, tasks, my-work, move/complete |
@@ -26,4 +29,4 @@ Carve domain-focused files that share a `setup.ts` harness (app build, migrate, 
 | `notifications.integration.test.ts` | fanout + prefs |
 | `search.integration.test.ts` | workspace search |
 
-Until split lands, treat `api-flow.test.ts` as the single source of truth for golden paths.
+Until those land, `api-flow.test.ts` remains the single full golden-path source of truth.

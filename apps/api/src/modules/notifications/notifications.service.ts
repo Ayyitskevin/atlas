@@ -14,7 +14,7 @@ export class NotificationsService extends WorkDomainBase {
   async listNotifications(ctx: AuthContext, workspaceId: string, query: NotificationQuery) {
     await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
     return pageFromLimit(
-      await this.workRepository.listNotifications({ ...query, recipientId: ctx.userId, workspaceId }),
+      await this.notificationsRepo.listNotifications({ ...query, recipientId: ctx.userId, workspaceId }),
       query.limit,
     );
   }
@@ -22,7 +22,7 @@ export class NotificationsService extends WorkDomainBase {
 
   async getNotificationPreferences(ctx: AuthContext, workspaceId: string) {
     await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
-    const preference = await this.workRepository.findNotificationPreference({ userId: ctx.userId, workspaceId });
+    const preference = await this.notificationsRepo.findNotificationPreference({ userId: ctx.userId, workspaceId });
     return notificationPreferenceResponse({
       emailEnabled: preference?.emailEnabled ?? false,
       updatedAt: preference?.updatedAt ?? null,
@@ -34,7 +34,7 @@ export class NotificationsService extends WorkDomainBase {
 
   async updateNotificationPreferences(ctx: AuthContext, workspaceId: string, input: UpdateNotificationPreferenceRequest) {
     await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
-    const preference = await this.workRepository.upsertNotificationPreference({
+    const preference = await this.notificationsRepo.upsertNotificationPreference({
       emailEnabled: input.emailEnabled,
       userId: ctx.userId,
       workspaceId,
@@ -50,14 +50,14 @@ export class NotificationsService extends WorkDomainBase {
 
   async markNotificationRead(ctx: AuthContext, workspaceId: string, notificationId: string) {
     await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
-    await this.workRepository.markNotificationRead({ notificationId, recipientId: ctx.userId, workspaceId });
+    await this.notificationsRepo.markNotificationRead({ notificationId, recipientId: ctx.userId, workspaceId });
     return { ok: true };
   }
 
 
   async markAllNotificationsRead(ctx: AuthContext, workspaceId: string) {
     await this.permissions.requireWorkspaceRole(ctx, workspaceId, "GUEST");
-    await this.workRepository.markAllNotificationsRead({ recipientId: ctx.userId, workspaceId });
+    await this.notificationsRepo.markAllNotificationsRead({ recipientId: ctx.userId, workspaceId });
     return { ok: true };
   }
 

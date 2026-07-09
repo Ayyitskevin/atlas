@@ -16,7 +16,7 @@ export class SubtasksService extends WorkDomainBase {
     const task = await this.getTask(ctx, workspaceId, taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
     if (input.assigneeId) await this.requireWorkspaceMembers(workspaceId, [input.assigneeId]);
-    const subtask = await this.workRepository.createSubtask({
+    const subtask = await this.subtasksRepo.createSubtask({
       ...input,
       position: input.position ?? defaultListPosition(),
       taskId,
@@ -38,24 +38,24 @@ export class SubtasksService extends WorkDomainBase {
 
   async listSubtasks(ctx: AuthContext, workspaceId: string, taskId: string, query: CursorPaginationQuery) {
     await this.permissions.requireTaskRole(ctx, workspaceId, taskId, "VIEWER");
-    return pageFromLimit(await this.workRepository.listSubtasks({ ...query, taskId, workspaceId }), query.limit);
+    return pageFromLimit(await this.subtasksRepo.listSubtasks({ ...query, taskId, workspaceId }), query.limit);
   }
 
 
   async updateSubtask(ctx: AuthContext, workspaceId: string, subtaskId: string, input: UpdateSubtaskRequest) {
-    const subtask = await this.workRepository.findSubtask(workspaceId, subtaskId);
+    const subtask = await this.subtasksRepo.findSubtask(workspaceId, subtaskId);
     if (!subtask) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Subtask not found.");
     const task = await this.getTask(ctx, workspaceId, subtask.taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
     if (input.assigneeId) await this.requireWorkspaceMembers(workspaceId, [input.assigneeId]);
-    const count = await this.workRepository.updateSubtask({
+    const count = await this.subtasksRepo.updateSubtask({
       data: { assigneeId: input.assigneeId, status: input.status, title: input.title },
       subtaskId,
       version: input.version,
       workspaceId,
     });
     if (!count) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.STALE_VERSION, "Subtask has changed since it was loaded.");
-    const updated = await this.workRepository.findSubtask(workspaceId, subtaskId);
+    const updated = await this.subtasksRepo.findSubtask(workspaceId, subtaskId);
     if (!updated) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Subtask not found.");
     await this.events.recordActivity({
       actorUserId: ctx.userId,
@@ -72,11 +72,11 @@ export class SubtasksService extends WorkDomainBase {
 
 
   async deleteSubtask(ctx: AuthContext, workspaceId: string, subtaskId: string) {
-    const subtask = await this.workRepository.findSubtask(workspaceId, subtaskId);
+    const subtask = await this.subtasksRepo.findSubtask(workspaceId, subtaskId);
     if (!subtask) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Subtask not found.");
     const task = await this.getTask(ctx, workspaceId, subtask.taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "EDITOR");
-    await this.workRepository.softDeleteSubtask(workspaceId, subtaskId);
+    await this.subtasksRepo.softDeleteSubtask(workspaceId, subtaskId);
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: subtaskId,

@@ -24,7 +24,7 @@ export class AttachmentsService extends WorkDomainBase {
     const task = await this.getTask(ctx, workspaceId, taskId);
     await this.permissions.requireProjectRole(ctx, workspaceId, task.projectId, "COMMENTER");
     const objectKey = createAttachmentObjectKey({ fileName: input.fileName, taskId, workspaceId });
-    const attachment = await this.workRepository.createAttachment({
+    const attachment = await this.attachmentsRepo.createAttachment({
       description: normalizeAttachmentDescription(input.description),
       fileName: input.fileName,
       mimeType: input.mimeType,
@@ -39,7 +39,7 @@ export class AttachmentsService extends WorkDomainBase {
 
 
   async completeAttachment(ctx: AuthContext, workspaceId: string, attachmentId: string) {
-    const attachment = await this.workRepository.findAttachmentIncludingPending(workspaceId, attachmentId);
+    const attachment = await this.attachmentsRepo.findAttachmentIncludingPending(workspaceId, attachmentId);
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
     const task = await this.getTask(ctx, workspaceId, attachment.taskId);
     const requiredRole = attachment.uploadedById === ctx.userId ? "COMMENTER" : "EDITOR";
@@ -54,7 +54,7 @@ export class AttachmentsService extends WorkDomainBase {
           sizeBytes: attachment.sizeBytes,
           workspaceId,
         });
-    const result = await this.workRepository.completeAttachment({ attachmentId, scan, workspaceId });
+    const result = await this.attachmentsRepo.completeAttachment({ attachmentId, scan, workspaceId });
     if (result.conflict || !result.attachment) {
       throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "Attachment changed before upload completion.");
     }
@@ -76,18 +76,18 @@ export class AttachmentsService extends WorkDomainBase {
 
   async listAttachments(ctx: AuthContext, workspaceId: string, taskId: string, query: CursorPaginationQuery) {
     await this.permissions.requireTaskRole(ctx, workspaceId, taskId, "VIEWER");
-    return pageFromLimit(await this.workRepository.listAttachments({ ...query, taskId, workspaceId }), query.limit);
+    return pageFromLimit(await this.attachmentsRepo.listAttachments({ ...query, taskId, workspaceId }), query.limit);
   }
 
 
   async createAttachmentComment(ctx: AuthContext, workspaceId: string, attachmentId: string, input: CreateAttachmentCommentRequest) {
-    const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
+    const attachment = await this.attachmentsRepo.findAttachment(workspaceId, attachmentId);
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
     const task = await this.getTask(ctx, workspaceId, attachment.taskId);
     await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, "COMMENTER");
-    const versionAnchor = input.versionId ? await this.workRepository.findActiveAttachmentVersion({ attachmentId, versionId: input.versionId, workspaceId }) : null;
+    const versionAnchor = input.versionId ? await this.attachmentsRepo.findActiveAttachmentVersion({ attachmentId, versionId: input.versionId, workspaceId }) : null;
     if (input.versionId && !versionAnchor) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment version not found.");
-    const comment = await this.workRepository.createAttachmentComment({ attachmentId, authorId: ctx.userId, body: input.body, versionId: versionAnchor?.id ?? null, workspaceId });
+    const comment = await this.attachmentsRepo.createAttachmentComment({ attachmentId, authorId: ctx.userId, body: input.body, versionId: versionAnchor?.id ?? null, workspaceId });
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: comment.id,
@@ -103,21 +103,21 @@ export class AttachmentsService extends WorkDomainBase {
 
 
   async listAttachmentComments(ctx: AuthContext, workspaceId: string, attachmentId: string, query: CursorPaginationQuery) {
-    const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
+    const attachment = await this.attachmentsRepo.findAttachment(workspaceId, attachmentId);
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
     await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, "VIEWER");
-    return pageFromLimit(await this.workRepository.listAttachmentComments({ ...query, attachmentId, workspaceId }), query.limit);
+    return pageFromLimit(await this.attachmentsRepo.listAttachmentComments({ ...query, attachmentId, workspaceId }), query.limit);
   }
 
 
   async updateAttachmentComment(ctx: AuthContext, workspaceId: string, attachmentCommentId: string, input: UpdateAttachmentCommentRequest) {
-    const comment = await this.workRepository.findAttachmentComment({ attachmentCommentId, workspaceId });
+    const comment = await this.attachmentsRepo.findAttachmentComment({ attachmentCommentId, workspaceId });
     if (!comment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment comment not found.");
-    const attachment = await this.workRepository.findAttachment(workspaceId, comment.attachmentId);
+    const attachment = await this.attachmentsRepo.findAttachment(workspaceId, comment.attachmentId);
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment comment not found.");
     const task = await this.getTask(ctx, workspaceId, attachment.taskId);
     if (comment.authorId !== ctx.userId) await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, "EDITOR");
-    const updated = await this.workRepository.updateAttachmentComment({ attachmentCommentId, body: input.body, workspaceId });
+    const updated = await this.attachmentsRepo.updateAttachmentComment({ attachmentCommentId, body: input.body, workspaceId });
     if (!updated) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment comment not found.");
     await this.events.recordActivity({
       actorUserId: ctx.userId,
@@ -134,13 +134,13 @@ export class AttachmentsService extends WorkDomainBase {
 
 
   async deleteAttachmentComment(ctx: AuthContext, workspaceId: string, attachmentCommentId: string) {
-    const comment = await this.workRepository.findAttachmentComment({ attachmentCommentId, workspaceId });
+    const comment = await this.attachmentsRepo.findAttachmentComment({ attachmentCommentId, workspaceId });
     if (!comment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment comment not found.");
-    const attachment = await this.workRepository.findAttachment(workspaceId, comment.attachmentId);
+    const attachment = await this.attachmentsRepo.findAttachment(workspaceId, comment.attachmentId);
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment comment not found.");
     const task = await this.getTask(ctx, workspaceId, attachment.taskId);
     if (comment.authorId !== ctx.userId) await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, "EDITOR");
-    await this.workRepository.softDeleteAttachmentComment({ attachmentCommentId, workspaceId });
+    await this.attachmentsRepo.softDeleteAttachmentComment({ attachmentCommentId, workspaceId });
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: attachmentCommentId,
@@ -156,7 +156,7 @@ export class AttachmentsService extends WorkDomainBase {
 
 
   async getAttachmentDownload(ctx: AuthContext, workspaceId: string, attachmentId: string) {
-    const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
+    const attachment = await this.attachmentsRepo.findAttachment(workspaceId, attachmentId);
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
     await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, "VIEWER");
     return { attachment, download: await createDownloadInstructions(attachment.objectKey) };
@@ -164,13 +164,13 @@ export class AttachmentsService extends WorkDomainBase {
 
 
   async createAttachmentVersion(ctx: AuthContext, workspaceId: string, attachmentId: string, input: ReplaceAttachmentRequest) {
-    const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
+    const attachment = await this.attachmentsRepo.findAttachment(workspaceId, attachmentId);
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
     const requiredRole = attachment.uploadedById === ctx.userId ? "COMMENTER" : "EDITOR";
     await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, requiredRole);
     const objectKey = createAttachmentObjectKey({ fileName: input.fileName, taskId: attachment.taskId, workspaceId });
     try {
-      const version = await this.workRepository.prepareAttachmentVersion({
+      const version = await this.attachmentsRepo.prepareAttachmentVersion({
         attachmentId,
         fileName: input.fileName,
         mimeType: input.mimeType,
@@ -195,9 +195,9 @@ export class AttachmentsService extends WorkDomainBase {
 
 
   async completeAttachmentVersion(ctx: AuthContext, workspaceId: string, attachmentId: string, versionId: string) {
-    const version = await this.workRepository.findAttachmentVersion({ attachmentId, versionId, workspaceId });
+    const version = await this.attachmentsRepo.findAttachmentVersion({ attachmentId, versionId, workspaceId });
     if (!version || version.attachment.deletedAt) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment version not found.");
-    const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
+    const attachment = await this.attachmentsRepo.findAttachment(workspaceId, attachmentId);
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
     const task = await this.getTask(ctx, workspaceId, attachment.taskId);
     const requiredRole = version.uploadedById === ctx.userId ? "COMMENTER" : "EDITOR";
@@ -212,7 +212,7 @@ export class AttachmentsService extends WorkDomainBase {
           versionId,
           workspaceId,
         });
-    const result = await this.workRepository.completeAttachmentVersion({ attachmentId, scan, versionId, workspaceId });
+    const result = await this.attachmentsRepo.completeAttachmentVersion({ attachmentId, scan, versionId, workspaceId });
     if (result.conflict || !result.attachment || !result.version) {
       throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "Attachment changed before this version was completed.");
     }
@@ -241,13 +241,13 @@ export class AttachmentsService extends WorkDomainBase {
 
 
   async updateAttachment(ctx: AuthContext, workspaceId: string, attachmentId: string, input: UpdateAttachmentRequest) {
-    const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
+    const attachment = await this.attachmentsRepo.findAttachment(workspaceId, attachmentId);
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
     const task = await this.getTask(ctx, workspaceId, attachment.taskId);
     const requiredRole = attachment.uploadedById === ctx.userId ? "COMMENTER" : "EDITOR";
     await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, requiredRole);
     const description = normalizeAttachmentDescription(input.description);
-    const updated = await this.workRepository.updateAttachment({ attachmentId, description, workspaceId });
+    const updated = await this.attachmentsRepo.updateAttachment({ attachmentId, description, workspaceId });
     if (!updated) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
     await this.events.recordActivity({
       actorUserId: ctx.userId,
@@ -264,12 +264,12 @@ export class AttachmentsService extends WorkDomainBase {
 
 
   async deleteAttachment(ctx: AuthContext, workspaceId: string, attachmentId: string) {
-    const attachment = await this.workRepository.findAttachment(workspaceId, attachmentId);
+    const attachment = await this.attachmentsRepo.findAttachment(workspaceId, attachmentId);
     if (!attachment) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Attachment not found.");
     const task = await this.getTask(ctx, workspaceId, attachment.taskId);
     const requiredRole = attachment.uploadedById === ctx.userId ? "COMMENTER" : "EDITOR";
     await this.permissions.requireTaskRole(ctx, workspaceId, attachment.taskId, requiredRole);
-    await this.workRepository.softDeleteAttachment({ attachmentId, workspaceId });
+    await this.attachmentsRepo.softDeleteAttachment({ attachmentId, workspaceId });
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: attachmentId,

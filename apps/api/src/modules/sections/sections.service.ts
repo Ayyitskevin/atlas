@@ -15,7 +15,7 @@ import { WorkDomainBase } from "../work/work-domain-base.js";
 export class SectionsService extends WorkDomainBase {
   async createSection(ctx: AuthContext, workspaceId: string, projectId: string, input: CreateSectionRequest) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
-    const section = await this.workRepository.createSection({
+    const section = await this.sectionsRepo.createSection({
       name: input.name,
       position: input.position ?? defaultListPosition(),
       projectId,
@@ -35,13 +35,13 @@ export class SectionsService extends WorkDomainBase {
 
   async listSections(ctx: AuthContext, workspaceId: string, projectId: string, query: CursorPaginationQuery) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "VIEWER");
-    return pageFromLimit(await this.workRepository.listSections({ ...query, projectId, workspaceId }), query.limit);
+    return pageFromLimit(await this.sectionsRepo.listSections({ ...query, projectId, workspaceId }), query.limit);
   }
 
 
   async updateSection(ctx: AuthContext, workspaceId: string, projectId: string, sectionId: string, input: UpdateSectionRequest) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
-    const section = await this.workRepository.updateSection({ data: input, projectId, sectionId, workspaceId });
+    const section = await this.sectionsRepo.updateSection({ data: input, projectId, sectionId, workspaceId });
     if (!section) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Section not found in this Project.");
     await this.events.recordActivity({
       actorUserId: ctx.userId,
@@ -58,9 +58,9 @@ export class SectionsService extends WorkDomainBase {
 
   async deleteSection(ctx: AuthContext, workspaceId: string, projectId: string, sectionId: string) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
-    const section = await this.workRepository.findSection({ projectId, sectionId, workspaceId });
+    const section = await this.sectionsRepo.findSection({ projectId, sectionId, workspaceId });
     if (!section) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Section not found in this Project.");
-    await this.workRepository.softDeleteSection({ projectId, sectionId, workspaceId });
+    await this.sectionsRepo.softDeleteSection({ projectId, sectionId, workspaceId });
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: section.id,
@@ -77,7 +77,7 @@ export class SectionsService extends WorkDomainBase {
   async reorderSections(ctx: AuthContext, workspaceId: string, projectId: string, input: ReorderSectionsRequest) {
     await this.permissions.requireProjectRole(ctx, workspaceId, projectId, "EDITOR");
     await this.requireSectionsInProject(workspaceId, projectId, input.sections.map((section) => section.id));
-    await this.workRepository.reorderSections({ projectId, sections: input.sections, workspaceId });
+    await this.sectionsRepo.reorderSections({ projectId, sections: input.sections, workspaceId });
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: projectId,

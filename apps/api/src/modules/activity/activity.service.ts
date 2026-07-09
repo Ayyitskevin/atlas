@@ -15,7 +15,7 @@ export class ActivityService extends WorkDomainBase {
     } else {
       await this.permissions.requireWorkspaceRole(ctx, workspaceId, "ADMIN");
     }
-    return pageFromLimit(await this.workRepository.listActivity({ ...query, workspaceId }), query.limit);
+    return pageFromLimit(await this.activityRepo.listActivity({ ...query, workspaceId }), query.limit);
   }
 
 }
