@@ -3,18 +3,18 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { usePathname } from "next/navigation";
 
-import { api, clearSession, errorMessage, storeSession } from "./atlas-api";
-import { ActivityPanel } from "./activity-panel";
-import { BoardPanel } from "./board-panel";
-import { slugify } from "./atlas-format";
-import { InviteAcceptancePanel } from "./invite-acceptance-panel";
-import { MyWorkPanel } from "./my-work-panel";
-import { NotificationsPanel } from "./notifications-panel";
-import { OutboxPanel } from "./outbox-panel";
-import { ProjectDependencyMapPanel } from "./project-dependency-map-panel";
-import { ProjectMembersPanel } from "./project-members-panel";
-import { ProjectPanel } from "./project-panel";
-import { ProjectTemplatesPanel } from "./project-templates-panel";
+import { api, clearSession, errorMessage, storeSession } from "./features/shared/atlas-api";
+import { ActivityPanel } from "./features/workspace/activity-panel";
+import { BoardPanel } from "./features/board/board-panel";
+import { slugify } from "./features/shared/atlas-format";
+import { InviteAcceptancePanel } from "./features/admin/invite-acceptance-panel";
+import { MyWorkPanel } from "./features/workspace/my-work-panel";
+import { NotificationsPanel } from "./features/notifications/notifications-panel";
+import { OutboxPanel } from "./features/admin/outbox-panel";
+import { ProjectDependencyMapPanel } from "./features/board/project-dependency-map-panel";
+import { ProjectMembersPanel } from "./features/workspace/project-members-panel";
+import { ProjectPanel } from "./features/board/project-panel";
+import { ProjectTemplatesPanel } from "./features/workspace/project-templates-panel";
 import {
   realtimeEventTouchesProject,
   realtimeEventTouchesProjectList,
@@ -23,24 +23,24 @@ import {
   realtimeEventTouchesProjectTemplates,
   realtimeEventTouchesTask,
   type RealtimeDomainEvent,
-} from "./realtime-utils";
-import { ProjectMessagesPanel } from "./project-messages-panel";
-import { TaskDetailPanel } from "./task-detail-panel";
-import { useActivity } from "./use-activity";
-import { useMyWork } from "./use-my-work";
-import { useNotificationPreferences } from "./use-notification-preferences";
-import { useNotifications } from "./use-notifications";
-import { useOutbox } from "./use-outbox";
-import { useProjectMessages } from "./use-project-messages";
-import { useProjectMembers } from "./use-project-members";
-import { useProjectWork } from "./use-project-work";
-import { useRealtime } from "./use-realtime";
-import { useWorkspaceAdmin } from "./use-workspace-admin";
-import { useWorkspaceDashboardWork } from "./use-workspace-dashboard-work";
-import { useWorkspaceSearch } from "./use-workspace-search";
-import { WorkspaceDashboardPanel } from "./workspace-dashboard-panel";
-import { WorkspaceSearchPanel } from "./workspace-search-panel";
-import { WorkspaceAdminPanel } from "./workspace-admin-panel";
+} from "./features/shared/realtime-utils";
+import { ProjectMessagesPanel } from "./features/workspace/project-messages-panel";
+import { TaskDetailPanel } from "./features/task/task-detail-panel";
+import { useActivity } from "./features/workspace/use-activity";
+import { useMyWork } from "./features/workspace/use-my-work";
+import { useNotificationPreferences } from "./features/notifications/use-notification-preferences";
+import { useNotifications } from "./features/notifications/use-notifications";
+import { useOutbox } from "./features/admin/use-outbox";
+import { useProjectMessages } from "./features/workspace/use-project-messages";
+import { useProjectMembers } from "./features/workspace/use-project-members";
+import { useProjectWork } from "./features/board/use-project-work";
+import { useRealtime } from "./features/shared/use-realtime";
+import { useWorkspaceAdmin } from "./features/workspace/use-workspace-admin";
+import { useWorkspaceDashboardWork } from "./features/workspace/use-workspace-dashboard-work";
+import { useWorkspaceSearch } from "./features/workspace/use-workspace-search";
+import { WorkspaceDashboardPanel } from "./features/workspace/workspace-dashboard-panel";
+import { WorkspaceSearchPanel } from "./features/workspace/workspace-search-panel";
+import { WorkspaceAdminPanel } from "./features/workspace/workspace-admin-panel";
 import type {
   AcceptWorkspaceInvitationResponse,
   AuthPair,
@@ -52,7 +52,7 @@ import type {
   ProjectVisibility,
   User,
   Workspace,
-} from "./atlas-types";
+} from "./features/shared/atlas-types";
 
 export function AtlasClient({
   initialInviteToken = "",
@@ -83,6 +83,9 @@ export function AtlasClient({
   const [invitationToken, setInvitationToken] = useState(initialInviteToken);
   const [invitationMessage, setInvitationMessage] = useState(initialInviteToken ? "Invitation link loaded." : "");
   const [urlHydrated, setUrlHydrated] = useState(!initialWorkspaceId);
+  const [shellView, setShellView] = useState<"home" | "board" | "inbox" | "admin">(
+    initialProjectId ? "board" : "home",
+  );
 
   const selectedWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === selectedWorkspaceId),
@@ -805,6 +808,7 @@ export function AtlasClient({
 
   async function chooseProject(accessToken: string, workspaceId: string, projectId: string) {
     setSelectedProjectId(projectId);
+    setShellView("board");
     setSelectedTaskId("");
     clearBoardState();
     clearProjectMemberState();
@@ -900,17 +904,40 @@ export function AtlasClient({
     );
   }
 
+  const shellTabs: Array<{ id: typeof shellView; label: string; badge?: number }> = [
+    { id: "home", label: "Home" },
+    { id: "board", label: "Board" },
+    { id: "inbox", label: "Inbox", badge: unreadCount || undefined },
+    { id: "admin", label: "Admin" },
+  ];
+
   return (
-    <main className="min-h-screen px-6 py-6">
-      <div className="mx-auto grid max-w-7xl gap-5">
-        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-4">
-          <div>
-            <p className="text-sm font-medium text-slate-500">{user?.email}</p>
-            <h1 className="text-2xl font-semibold text-slate-950">Atlas</h1>
+    <main className="min-h-screen px-4 py-4 md:px-6">
+      <div className="mx-auto grid max-w-[1600px] gap-4">
+        <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 pb-3">
+          <div className="flex flex-wrap items-center gap-4">
+            <div>
+              <p className="text-xs font-medium text-slate-500">{user?.email}</p>
+              <h1 className="text-xl font-semibold tracking-tight text-slate-950">Atlas</h1>
+            </div>
+            <nav aria-label="Primary" className="flex flex-wrap gap-1.5">
+              {shellTabs.map((tab) => (
+                <button
+                  className={shellView === tab.id ? "atlas-chip atlas-chip-active" : "atlas-chip"}
+                  key={tab.id}
+                  onClick={() => setShellView(tab.id)}
+                  type="button"
+                >
+                  {tab.label}
+                  {tab.badge ? <span className="ml-1 opacity-80">({tab.badge})</span> : null}
+                </button>
+              ))}
+            </nav>
           </div>
-          <div className="flex items-center gap-3 text-sm">
-            <span className="rounded-md border border-slate-200 px-3 py-1 text-slate-600">{realtimeStatus}</span>
-            <button className="rounded-md border border-slate-300 px-3 py-2 font-medium" onClick={logout} type="button">
+          <div className="flex items-center gap-2 text-sm">
+            <span className="atlas-chip">{realtimeStatus}</span>
+            {selectedWorkspace ? <span className="atlas-chip">{selectedWorkspace.name}</span> : null}
+            <button className="atlas-btn" onClick={logout} type="button">
               Log out
             </button>
           </div>
@@ -918,254 +945,275 @@ export function AtlasClient({
 
         {message ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p> : null}
 
-        <InviteAcceptancePanel
-          onAcceptInvitation={acceptInvitation}
-          onTokenChange={setInvitationToken}
-          statusMessage={invitationMessage}
-          token={invitationToken}
-        />
-
-        <WorkspaceDashboardPanel
-          activities={activities}
-          dashboardWorkStatus={dashboardWorkStatus}
-          myWorkTasks={dashboardTasks}
-          notifications={notifications}
-          onChooseProject={(projectId) => (auth ? chooseProject(auth.accessToken, selectedWorkspaceId, projectId) : Promise.resolve())}
-          onCreateProject={createProject}
-          onCreateTask={createTask}
-          onOpenTask={openMyWorkTask}
-          projects={projects}
-          sections={sections}
-          selectedProject={selectedProject}
-          tasks={tasks}
-          workspace={selectedWorkspace}
-          workspaceMembers={workspaceMembers}
-        />
-
-        <MyWorkPanel
-          dependencyFilter={myWorkDependencyFilter}
-          dueFilter={myWorkDueFilter}
-          onDependencyFilterChange={changeMyWorkDependencyFilter}
-          onDueFilterChange={changeMyWorkDueFilter}
-          onOpenTask={openMyWorkTask}
-          onRefresh={refreshMyWork}
-          onScopeFilterChange={changeMyWorkScopeFilter}
-          onStatusFilterChange={changeMyWorkStatusFilter}
-          scopeFilter={myWorkScopeFilter}
-          statusFilter={myWorkStatusFilter}
-          statusMessage={myWorkStatus}
-          tasks={myWorkTasks}
-          workspaceSelected={Boolean(selectedWorkspaceId)}
-        />
-
-        <WorkspaceSearchPanel
-          hasMoreResults={hasMoreSearchResults}
-          onLoadMore={loadMoreSearchResults}
-          onOpenResult={openSearchResult}
-          onQueryChange={setSearchQuery}
-          onSearch={searchWorkspace}
-          query={searchQuery}
-          results={searchResults}
-          statusMessage={searchStatus}
-          workspace={selectedWorkspace}
-          workspaceSelected={Boolean(selectedWorkspaceId)}
-        />
-
-        <NotificationsPanel
-          emailNotificationsEnabled={notificationPreference?.emailEnabled ?? false}
-          filter={notificationFilter}
-          notifications={notifications}
-          onEmailNotificationsChange={updateNotificationEmailPreference}
-          onFilterChange={setNotificationFilter}
-          onMarkAllRead={markAllNotificationsRead}
-          onMarkRead={markNotificationRead}
-          onOpenTask={chooseTask}
-          preferenceStatus={notificationPreferenceStatus}
-          tasks={tasks}
-          unreadCount={unreadCount}
-          workspaceSelected={Boolean(selectedWorkspaceId)}
-        />
-
-        <ActivityPanel
-          activities={activities}
-          onScopeChange={setActivityScope}
-          scope={activityScope}
-          selectedProjectId={selectedProjectId}
-          selectedTaskId={selectedTaskId}
-          statusMessage={activityStatus}
-        />
-
-        <ProjectMessagesPanel
-          messages={projectMessages}
-          onCreateMessage={createProjectMessage}
-          onDeleteMessage={deleteProjectMessage}
-          onPinMessage={pinProjectMessage}
-          onRefresh={refreshProjectMessages}
-          onUnpinMessage={unpinProjectMessage}
-          onUpdateMessage={updateProjectMessage}
-          project={selectedProject}
-          statusMessage={projectMessagesStatus}
-        />
-
-        <ProjectTemplatesPanel
-          onCreateProjectFromTemplate={createProjectFromTemplate}
-          onDeleteTemplate={deleteProjectTemplate}
-          onPreviewTemplate={previewProjectTemplate}
-          onRefresh={refreshProjectTemplates}
-          onSaveTemplate={saveProjectTemplate}
-          onUpdateTemplate={updateProjectTemplate}
-          project={selectedProject}
-          selectedTemplate={selectedProjectTemplate}
-          statusMessage={projectTemplatesStatus}
-          templates={projectTemplates}
-          workspaceSelected={Boolean(selectedWorkspaceId)}
-        />
-
-        <WorkspaceAdminPanel
-          acceptToken={workspaceAdminToken}
-          currentUserId={user?.id}
-          invitations={workspaceInvitations}
-          members={workspaceMembers}
-          onCancelInvitation={cancelWorkspaceInvitation}
-          onInviteMember={inviteWorkspaceMember}
-          onRefresh={refreshWorkspaceAdmin}
-          onRemoveMember={removeWorkspaceMember}
-          onResendInvitation={resendWorkspaceInvitation}
-          onTransferOwner={transferWorkspaceOwner}
-          onUpdateMemberRole={updateWorkspaceMemberRole}
-          statusMessage={workspaceAdminMessage}
-          workspace={selectedWorkspace}
-        />
-
-        <ProjectMembersPanel
-          currentUserId={user?.id}
-          members={projectMembers}
-          onAddMember={addProjectMember}
-          onRefresh={refreshProjectMembers}
-          onRemoveMember={removeProjectMember}
-          onUpdateMemberRole={updateProjectMemberRole}
-          project={selectedProject}
-          statusMessage={projectMembersMessage}
-          workspaceMembers={workspaceMembers}
-        />
-
-        <OutboxPanel
-          detail={outboxDetail}
-          eventType={outboxEventType}
-          events={outboxEvents}
-          onEventTypeChange={setOutboxEventType}
-          onInspect={inspectOutboxEvent}
-          onRefresh={refreshOutbox}
-          onReplay={replayOutboxEvent}
-          onStatusChange={changeOutboxStatus}
-          status={outboxStatus}
-          statusMessage={outboxMessage}
-          workspaceSelected={Boolean(selectedWorkspaceId)}
-        />
-
-        <section className="grid gap-4 lg:grid-cols-[240px_280px_minmax(0,1fr)_320px]">
-          <aside className="grid content-start gap-4 rounded-lg border border-slate-200 bg-white p-4">
-            <h2 className="text-sm font-semibold uppercase text-slate-500">Workspaces</h2>
-            <form className="grid gap-2" onSubmit={createWorkspace}>
-              <input className="rounded-md border border-slate-300 px-3 py-2 text-sm" name="name" placeholder="Workspace name" required />
-              <button className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white" type="submit">
-                Create
-              </button>
-            </form>
-            <div className="grid gap-2">
-              {workspaces.map((workspace) => (
-                <button
-                  className={`rounded-md px-3 py-2 text-left text-sm ${
-                    workspace.id === selectedWorkspaceId ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700"
-                  }`}
-                  key={workspace.id}
-                  onClick={() => auth && void chooseWorkspace(auth.accessToken, workspace.id)}
-                  type="button"
-                >
-                  {workspace.name}
-                </button>
-              ))}
-            </div>
-          </aside>
-
-          <ProjectPanel
-            onArchiveProject={archiveProject}
-            onChooseProject={(projectId) => (auth ? chooseProject(auth.accessToken, selectedWorkspaceId, projectId) : Promise.resolve())}
-            onCreateProject={createProject}
-            onDeleteProject={deleteProject}
-            onUpdateProject={updateProject}
-            projects={projects}
-            selectedProject={selectedProject}
-            selectedProjectId={selectedProjectId}
-            workspace={selectedWorkspace}
-          />
-
+        {shellView === "home" ? (
           <div className="grid gap-4">
-            <BoardPanel
-              onChooseTask={chooseTask}
-              onCreateSection={createSection}
+            <InviteAcceptancePanel
+              onAcceptInvitation={acceptInvitation}
+              onTokenChange={setInvitationToken}
+              statusMessage={invitationMessage}
+              token={invitationToken}
+            />
+            <WorkspaceDashboardPanel
+              activities={activities}
+              dashboardWorkStatus={dashboardWorkStatus}
+              myWorkTasks={dashboardTasks}
+              notifications={notifications}
+              onChooseProject={(projectId) => {
+                if (!auth) return Promise.resolve();
+                setShellView("board");
+                return chooseProject(auth.accessToken, selectedWorkspaceId, projectId);
+              }}
+              onCreateProject={createProject}
               onCreateTask={createTask}
-              onDeleteSection={deleteSection}
-              onDependencyFilterChange={changeTaskDependencyFilter}
-              onMoveSection={moveSection}
-              onMoveTask={moveTaskToSection}
-              onRenameSection={renameSection}
-              projectName={selectedProject?.name}
+              onOpenTask={async (task) => {
+                setShellView("board");
+                await openMyWorkTask(task);
+              }}
+              projects={projects}
               sections={sections}
-              selectedTaskId={selectedTaskId}
-              taskDependencyFilter={taskDependencyFilter}
+              selectedProject={selectedProject}
               tasks={tasks}
+              workspace={selectedWorkspace}
+              workspaceMembers={workspaceMembers}
+            />
+            <MyWorkPanel
+              dependencyFilter={myWorkDependencyFilter}
+              dueFilter={myWorkDueFilter}
+              onDependencyFilterChange={changeMyWorkDependencyFilter}
+              onDueFilterChange={changeMyWorkDueFilter}
+              onOpenTask={async (task) => {
+                setShellView("board");
+                await openMyWorkTask(task);
+              }}
+              onRefresh={refreshMyWork}
+              onScopeFilterChange={changeMyWorkScopeFilter}
+              onStatusFilterChange={changeMyWorkStatusFilter}
+              scopeFilter={myWorkScopeFilter}
+              statusFilter={myWorkStatusFilter}
+              statusMessage={myWorkStatus}
+              tasks={myWorkTasks}
+              workspaceSelected={Boolean(selectedWorkspaceId)}
+            />
+            <WorkspaceSearchPanel
+              hasMoreResults={hasMoreSearchResults}
+              onLoadMore={loadMoreSearchResults}
+              onOpenResult={async (result) => {
+                setShellView("board");
+                await openSearchResult(result);
+              }}
+              onQueryChange={setSearchQuery}
+              onSearch={searchWorkspace}
+              query={searchQuery}
+              results={searchResults}
+              statusMessage={searchStatus}
+              workspace={selectedWorkspace}
+              workspaceSelected={Boolean(selectedWorkspaceId)}
+            />
+          </div>
+        ) : null}
+
+        {shellView === "inbox" ? (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <NotificationsPanel
+              emailNotificationsEnabled={notificationPreference?.emailEnabled ?? false}
+              filter={notificationFilter}
+              notifications={notifications}
+              onEmailNotificationsChange={updateNotificationEmailPreference}
+              onFilterChange={setNotificationFilter}
+              onMarkAllRead={markAllNotificationsRead}
+              onMarkRead={markNotificationRead}
+              onOpenTask={async (taskId) => {
+                setShellView("board");
+                await chooseTask(taskId);
+              }}
+              preferenceStatus={notificationPreferenceStatus}
+              tasks={tasks}
+              unreadCount={unreadCount}
+              workspaceSelected={Boolean(selectedWorkspaceId)}
+            />
+            <ActivityPanel
+              activities={activities}
+              onScopeChange={setActivityScope}
+              scope={activityScope}
+              selectedProjectId={selectedProjectId}
+              selectedTaskId={selectedTaskId}
+              statusMessage={activityStatus}
+            />
+          </div>
+        ) : null}
+
+        {shellView === "admin" ? (
+          <div className="grid gap-4">
+            <ProjectTemplatesPanel
+              onCreateProjectFromTemplate={createProjectFromTemplate}
+              onDeleteTemplate={deleteProjectTemplate}
+              onPreviewTemplate={previewProjectTemplate}
+              onRefresh={refreshProjectTemplates}
+              onSaveTemplate={saveProjectTemplate}
+              onUpdateTemplate={updateProjectTemplate}
+              project={selectedProject}
+              selectedTemplate={selectedProjectTemplate}
+              statusMessage={projectTemplatesStatus}
+              templates={projectTemplates}
+              workspaceSelected={Boolean(selectedWorkspaceId)}
+            />
+            <WorkspaceAdminPanel
+              acceptToken={workspaceAdminToken}
+              currentUserId={user?.id}
+              invitations={workspaceInvitations}
+              members={workspaceMembers}
+              onCancelInvitation={cancelWorkspaceInvitation}
+              onInviteMember={inviteWorkspaceMember}
+              onRefresh={refreshWorkspaceAdmin}
+              onRemoveMember={removeWorkspaceMember}
+              onResendInvitation={resendWorkspaceInvitation}
+              onTransferOwner={transferWorkspaceOwner}
+              onUpdateMemberRole={updateWorkspaceMemberRole}
+              statusMessage={workspaceAdminMessage}
+              workspace={selectedWorkspace}
+            />
+            <ProjectMembersPanel
+              currentUserId={user?.id}
+              members={projectMembers}
+              onAddMember={addProjectMember}
+              onRefresh={refreshProjectMembers}
+              onRemoveMember={removeProjectMember}
+              onUpdateMemberRole={updateProjectMemberRole}
+              project={selectedProject}
+              statusMessage={projectMembersMessage}
+              workspaceMembers={workspaceMembers}
+            />
+            <ProjectMessagesPanel
+              messages={projectMessages}
+              onCreateMessage={createProjectMessage}
+              onDeleteMessage={deleteProjectMessage}
+              onPinMessage={pinProjectMessage}
+              onRefresh={refreshProjectMessages}
+              onUnpinMessage={unpinProjectMessage}
+              onUpdateMessage={updateProjectMessage}
+              project={selectedProject}
+              statusMessage={projectMessagesStatus}
+            />
+            <OutboxPanel
+              detail={outboxDetail}
+              eventType={outboxEventType}
+              events={outboxEvents}
+              onEventTypeChange={setOutboxEventType}
+              onInspect={inspectOutboxEvent}
+              onRefresh={refreshOutbox}
+              onReplay={replayOutboxEvent}
+              onStatusChange={changeOutboxStatus}
+              status={outboxStatus}
+              statusMessage={outboxMessage}
+              workspaceSelected={Boolean(selectedWorkspaceId)}
+            />
+          </div>
+        ) : null}
+
+        {shellView === "board" ? (
+          <section className="grid gap-3 lg:grid-cols-[200px_220px_minmax(0,1fr)_300px]">
+            <aside className="grid content-start gap-3 rounded-lg border border-slate-200 bg-white p-3 shadow-sm">
+              <h2 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Workspaces</h2>
+              <form className="grid gap-2" onSubmit={createWorkspace}>
+                <input className="atlas-input" name="name" placeholder="Workspace name" required />
+                <button className="atlas-btn atlas-btn-primary" type="submit">
+                  Create
+                </button>
+              </form>
+              <div className="grid gap-1.5">
+                {workspaces.map((workspace) => (
+                  <button
+                    className={`rounded-md px-2.5 py-1.5 text-left text-sm ${
+                      workspace.id === selectedWorkspaceId ? "bg-slate-950 text-white" : "bg-slate-100 text-slate-700"
+                    }`}
+                    key={workspace.id}
+                    onClick={() => auth && void chooseWorkspace(auth.accessToken, workspace.id)}
+                    type="button"
+                  >
+                    {workspace.name}
+                  </button>
+                ))}
+              </div>
+            </aside>
+
+            <ProjectPanel
+              onArchiveProject={archiveProject}
+              onChooseProject={(projectId) => (auth ? chooseProject(auth.accessToken, selectedWorkspaceId, projectId) : Promise.resolve())}
+              onCreateProject={createProject}
+              onDeleteProject={deleteProject}
+              onUpdateProject={updateProject}
+              projects={projects}
+              selectedProject={selectedProject}
+              selectedProjectId={selectedProjectId}
+              workspace={selectedWorkspace}
             />
 
-            <ProjectDependencyMapPanel dependencyMap={projectDependencyMap} onOpenTask={chooseTask} />
-          </div>
+            <div className="grid gap-3">
+              <BoardPanel
+                onChooseTask={chooseTask}
+                onCreateSection={createSection}
+                onCreateTask={createTask}
+                onDeleteSection={deleteSection}
+                onDependencyFilterChange={changeTaskDependencyFilter}
+                onMoveSection={moveSection}
+                onMoveTask={moveTaskToSection}
+                onRenameSection={renameSection}
+                projectName={selectedProject?.name}
+                sections={sections}
+                selectedTaskId={selectedTaskId}
+                taskDependencyFilter={taskDependencyFilter}
+                tasks={tasks}
+              />
+              <ProjectDependencyMapPanel dependencyMap={projectDependencyMap} onOpenTask={chooseTask} />
+            </div>
 
-          <TaskDetailPanel
-            attachmentStatus={attachmentStatus}
-            attachments={attachments}
-            comments={comments}
-            dependencies={taskDependencies}
-            dependencyStatus={dependencyStatus}
-            labelStatus={labelStatus}
-            labels={workspaceLabels}
-            members={workspaceMembers}
-            onAddDependency={addTaskDependency}
-            onAssignTask={assignTask}
-            onAssignTaskLabel={assignTaskLabel}
-            onCompleteTask={completeTask}
-            onCompleteReadyBlockers={completeReadyBlockers}
-            onCreateAttachmentComment={createAttachmentComment}
-            onCreateComment={createComment}
-            onCreateTaskLabel={createTaskLabel}
-            onCreateSubtask={createSubtask}
-            onDeleteAttachment={deleteAttachment}
-            onDeleteAttachmentComment={deleteAttachmentComment}
-            onDeleteComment={deleteComment}
-            onDeleteSubtask={deleteSubtask}
-            onDeleteTask={deleteTask}
-            onDownloadAttachment={downloadAttachment}
-            onReplaceAttachment={replaceAttachment}
-            onRemoveDependency={removeTaskDependency}
-            onSkipRecurringTask={skipRecurringTask}
-            onToggleSubtask={toggleSubtask}
-            onUnassignTask={unassignTask}
-            onUnassignTaskLabel={unassignTaskLabel}
-            onUnwatchTask={unwatchTask}
-            onUpdateAttachmentComment={updateAttachmentComment}
-            onUpdateAttachmentDescription={updateAttachmentDescription}
-            onUpdateComment={updateComment}
-            onUpdateTask={updateTaskDetails}
-            onUploadAttachment={uploadAttachment}
-            onWatchTask={watchTask}
-            sections={sections}
-            subtasks={subtasks}
-            task={selectedTask}
-            taskLabels={taskLabels}
-            taskWatchers={taskWatchers}
-            tasks={tasks}
-            watcherStatus={watcherStatus}
-          />
-        </section>
+            <TaskDetailPanel
+              attachmentStatus={attachmentStatus}
+              attachments={attachments}
+              comments={comments}
+              dependencies={taskDependencies}
+              dependencyStatus={dependencyStatus}
+              labelStatus={labelStatus}
+              labels={workspaceLabels}
+              members={workspaceMembers}
+              onAddDependency={addTaskDependency}
+              onAssignTask={assignTask}
+              onAssignTaskLabel={assignTaskLabel}
+              onCompleteTask={completeTask}
+              onCompleteReadyBlockers={completeReadyBlockers}
+              onCreateAttachmentComment={createAttachmentComment}
+              onCreateComment={createComment}
+              onCreateTaskLabel={createTaskLabel}
+              onCreateSubtask={createSubtask}
+              onDeleteAttachment={deleteAttachment}
+              onDeleteAttachmentComment={deleteAttachmentComment}
+              onDeleteComment={deleteComment}
+              onDeleteSubtask={deleteSubtask}
+              onDeleteTask={deleteTask}
+              onDownloadAttachment={downloadAttachment}
+              onReplaceAttachment={replaceAttachment}
+              onRemoveDependency={removeTaskDependency}
+              onSkipRecurringTask={skipRecurringTask}
+              onToggleSubtask={toggleSubtask}
+              onUnassignTask={unassignTask}
+              onUnassignTaskLabel={unassignTaskLabel}
+              onUnwatchTask={unwatchTask}
+              onUpdateAttachmentComment={updateAttachmentComment}
+              onUpdateAttachmentDescription={updateAttachmentDescription}
+              onUpdateComment={updateComment}
+              onUpdateTask={updateTaskDetails}
+              onUploadAttachment={uploadAttachment}
+              onWatchTask={watchTask}
+              sections={sections}
+              subtasks={subtasks}
+              task={selectedTask}
+              taskLabels={taskLabels}
+              taskWatchers={taskWatchers}
+              tasks={tasks}
+              watcherStatus={watcherStatus}
+            />
+          </section>
+        ) : null}
       </div>
     </main>
   );

@@ -1,18 +1,14 @@
-# Web feature layout (target)
+# Web features
 
-Atlas UI is migrating from a single `atlas-client.tsx` orchestrator toward feature folders:
+Atlas UI is organized by product surface:
 
 | Folder | Responsibility |
 |--------|----------------|
-| `board/` | sections, board panel, project dependency map |
-| `task/` | task detail, comments, attachments, labels, deps, subtasks |
-| `workspace/` | dashboard, my work, search, project list |
-| `notifications/` | inbox + preferences |
-| `admin/` | members, invitations, outbox |
+| `shared/` | API client, types, formatters, realtime, upload utils |
+| `board/` | Project list, kanban board, dependency map, project work hook |
+| `task/` | Task detail and sub-panels (assignees, comments, attachments, …) |
+| `workspace/` | Home dashboard, My Work, search, admin, messages, templates |
+| `notifications/` | Inbox + preference hooks |
+| `admin/` | Outbox, invite acceptance |
 
-Deep links:
-
-- `/w/[workspaceId]`
-- `/w/[workspaceId]/projects/[projectId]`
-
-Panels currently live next to `atlas-client.tsx`; move files here in a follow-up PR once import paths are updated.
+Shell navigation in `atlas-client.tsx` switches **Home · Board · Inbox · Admin** so operators are not flooded with every panel at once.

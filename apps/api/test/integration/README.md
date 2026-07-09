@@ -5,7 +5,9 @@
 | File | Coverage |
 |------|----------|
 | `api-flow.test.ts` | Full golden path (auth → workspace → board → attachments → …) |
-| `auth.integration.test.ts` | First domain slice: register / me / login / refresh / logout |
+| `auth.integration.test.ts` | register / me / login / refresh / logout |
+| `workspaces.integration.test.ts` | create / list / detail / members / rename |
+| `tasks.integration.test.ts` | sections, tasks, my-work, move, complete, comment |
 | `helpers/app-harness.ts` | Shared migrate + `buildApp` lifecycle |
 
 Skipped when `DATABASE_URL` is unset.
@@ -21,9 +23,7 @@ Carve more domain files that use `helpers/app-harness.ts`:
 
 | File | Coverage |
 |------|----------|
-| `workspaces.integration.test.ts` | CRUD, invites, members |
 | `projects.integration.test.ts` | projects, templates, messages |
-| `tasks.integration.test.ts` | sections, tasks, my-work, move/complete |
 | `collaboration.integration.test.ts` | comments, labels, deps, watchers |
 | `attachments.integration.test.ts` | upload/complete/download/scan |
 | `notifications.integration.test.ts` | fanout + prefs |
