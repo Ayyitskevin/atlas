@@ -81,12 +81,13 @@ describe.skipIf(!hasDatabaseUrl)("integration · tasks board", () => {
       url: `/api/v1/workspaces/${workspaceId}/projects/${projectId}/tasks`,
     });
     expect(create.statusCode).toBe(201);
-    taskId = create.json<{ id: string }>().id;
+    const created = create.json<{ id: string; version: number }>();
+    taskId = created.id;
 
     const patch = await harness!.app.inject({
       headers: authHeader(accessToken),
       method: "PATCH",
-      payload: { priority: "HIGH", title: "Board task updated" },
+      payload: { priority: "HIGH", title: "Board task updated", version: created.version },
       url: `/api/v1/workspaces/${workspaceId}/tasks/${taskId}`,
     });
     expect(patch.statusCode).toBe(200);
