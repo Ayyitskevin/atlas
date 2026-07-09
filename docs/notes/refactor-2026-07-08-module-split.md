@@ -69,3 +69,23 @@ Shared helpers:
 - `work/work.repository.ts` — still shared data access (repo split is next)
 
 Controllers construct domain services via `create-work-service.ts` factories.
+
+## Follow-up: domain repositories
+
+`WorkRepository` is a façade. Data access lives in:
+
+- `sections/sections.repository.ts`
+- `tasks/tasks.repository.ts`
+- `labels/labels.repository.ts`
+- `dependencies/dependencies.repository.ts`
+- `subtasks/subtasks.repository.ts`
+- `comments/comments.repository.ts`
+- `attachments/attachments.repository.ts`
+- `activity/activity.repository.ts`
+- `notifications/notifications.repository.ts`
+- `search/search.repository.ts`
+
+Shared:
+
+- `work/work-repository-base.ts` — Prisma + `accessibleProjectWhere`
+- `work/work-repository-helpers.ts` — attachment includes, search cursors

@@ -236,10 +236,10 @@ export class WorkDomainBase {
       blockingTaskId: blockingTask.id,
       workspaceId,
     });
-    const unblockedRows = rows.filter((row) => row.blockedTask.dependenciesAsBlocked.length === 0);
+    const unblockedRows = rows.filter((row: (typeof rows)[number]) => row.blockedTask.dependenciesAsBlocked.length === 0);
 
     await Promise.all(
-      unblockedRows.map((row) =>
+      unblockedRows.map((row: (typeof unblockedRows)[number]) =>
         this.events.recordActivity({
           actorUserId: ctx.userId,
           entityId: row.id,
