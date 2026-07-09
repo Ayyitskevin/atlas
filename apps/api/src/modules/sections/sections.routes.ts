@@ -9,7 +9,7 @@ import {
 } from "@atlas/shared";
 
 import { openApiSchema } from "../../shared/zod-openapi.js";
-import { createWorkService } from "../work/create-work-service.js";
+import { createSectionsService } from "../work/create-work-service.js";
 import { SectionsController } from "./sections.controller.js";
 
 const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
@@ -17,7 +17,7 @@ const projectParamsSchema = workspaceParamsSchema.extend({ projectId: z.string()
 const sectionParamsSchema = projectParamsSchema.extend({ sectionId: z.string().uuid() });
 
 export async function registerSectionsRoutes(app: FastifyInstance): Promise<void> {
-  const controller = new SectionsController(createWorkService());
+  const controller = new SectionsController(createSectionsService());
 
     app.post("/workspaces/:workspaceId/projects/:projectId/sections", { schema: openApiSchema({ body: createSectionRequestSchema, params: projectParamsSchema, tags: ["Sections"] }) }, controller.createSection);
     app.get("/workspaces/:workspaceId/projects/:projectId/sections", { schema: openApiSchema({ params: projectParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Sections"] }) }, controller.listSections);

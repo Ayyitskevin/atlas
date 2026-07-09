@@ -8,7 +8,7 @@ import {
 } from "@atlas/shared";
 
 import { openApiSchema } from "../../shared/zod-openapi.js";
-import { createWorkService } from "../work/create-work-service.js";
+import { createLabelsService } from "../work/create-work-service.js";
 import { LabelsController } from "./labels.controller.js";
 
 const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
@@ -17,7 +17,7 @@ const labelParamsSchema = workspaceParamsSchema.extend({ labelId: z.string().uui
 const taskLabelParamsSchema = taskParamsSchema.extend({ labelId: z.string().uuid() });
 
 export async function registerLabelsRoutes(app: FastifyInstance): Promise<void> {
-  const controller = new LabelsController(createWorkService());
+  const controller = new LabelsController(createLabelsService());
 
     app.get("/workspaces/:workspaceId/labels", { schema: openApiSchema({ params: workspaceParamsSchema, tags: ["Labels"] }) }, controller.listLabels);
     app.post("/workspaces/:workspaceId/labels", { schema: openApiSchema({ body: createTaskLabelRequestSchema, params: workspaceParamsSchema, tags: ["Labels"] }) }, controller.createLabel);

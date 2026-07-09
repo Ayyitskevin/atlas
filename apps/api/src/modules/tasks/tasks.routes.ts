@@ -12,7 +12,7 @@ import {
 } from "@atlas/shared";
 
 import { openApiSchema } from "../../shared/zod-openapi.js";
-import { createWorkService } from "../work/create-work-service.js";
+import { createTasksService } from "../work/create-work-service.js";
 import { TasksController } from "./tasks.controller.js";
 
 const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
@@ -22,7 +22,7 @@ const taskWatcherParamsSchema = taskParamsSchema.extend({ userId: z.string().uui
 const userBodySchema = z.object({ userId: z.string().uuid() });
 
 export async function registerTasksRoutes(app: FastifyInstance): Promise<void> {
-  const controller = new TasksController(createWorkService());
+  const controller = new TasksController(createTasksService());
 
     app.post("/workspaces/:workspaceId/projects/:projectId/tasks", { schema: openApiSchema({ body: createTaskRequestSchema, params: projectParamsSchema, tags: ["Tasks"] }) }, controller.createTask);
     app.get("/workspaces/:workspaceId/projects/:projectId/tasks", { schema: openApiSchema({ params: projectParamsSchema, querystring: projectTaskQuerySchema, tags: ["Tasks"] }) }, controller.listTasks);

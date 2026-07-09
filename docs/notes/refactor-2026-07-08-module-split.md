@@ -46,3 +46,26 @@ Domain controllers still call the shared `WorkService` / `WorkRepository` (`crea
 1. Split `WorkService` / `WorkRepository` methods into domain services (true domain ownership).
 2. Web App Router deep links (`/w/:workspaceId/projects/:projectId`).
 3. Split `api-flow.test.ts` by domain.
+
+## Follow-up: domain services (same branch)
+
+`WorkService` is now a thin façade. Domain logic lives in:
+
+- `sections/sections.service.ts`
+- `tasks/tasks.service.ts`
+- `labels/labels.service.ts`
+- `dependencies/dependencies.service.ts`
+- `subtasks/subtasks.service.ts`
+- `comments/comments.service.ts`
+- `attachments/attachments.service.ts`
+- `activity/activity.service.ts`
+- `notifications/notifications.service.ts`
+- `search/search.service.ts`
+
+Shared helpers:
+
+- `work/work-domain-base.ts` — protected helpers + `getTask`
+- `work/work-helpers.ts` — pure functions (search cursors, dependency map, audit payloads)
+- `work/work.repository.ts` — still shared data access (repo split is next)
+
+Controllers construct domain services via `create-work-service.ts` factories.

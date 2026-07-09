@@ -8,14 +8,14 @@ import {
 } from "@atlas/shared";
 
 import { openApiSchema } from "../../shared/zod-openapi.js";
-import { createWorkService } from "../work/create-work-service.js";
+import { createNotificationsService } from "../work/create-work-service.js";
 import { NotificationsController } from "./notifications.controller.js";
 
 const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
 const notificationParamsSchema = workspaceParamsSchema.extend({ notificationId: z.string().uuid() });
 
 export async function registerNotificationsRoutes(app: FastifyInstance): Promise<void> {
-  const controller = new NotificationsController(createWorkService());
+  const controller = new NotificationsController(createNotificationsService());
 
   app.get(
     "/workspaces/:workspaceId/notifications",

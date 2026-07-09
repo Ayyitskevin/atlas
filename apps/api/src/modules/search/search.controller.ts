@@ -7,15 +7,15 @@ import {
 
 import { requireAuth } from "../../shared/auth-context.js";
 import { parseParams, parseQuery } from "../../shared/validation.js";
-import { WorkService } from "../work/work.service.js";
+import { SearchService } from "./search.service.js";
 
 const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
 
 export class SearchController {
-  constructor(private readonly workService: WorkService) {}
+  constructor(private readonly service: SearchService) {}
 
   search = async (request: FastifyRequest) => {
     const { workspaceId } = parseParams(request, workspaceParamsSchema);
-    return this.workService.search(await requireAuth(request), workspaceId, parseQuery(request, searchQuerySchema));
+    return this.service.search(await requireAuth(request), workspaceId, parseQuery(request, searchQuerySchema));
   };
 }

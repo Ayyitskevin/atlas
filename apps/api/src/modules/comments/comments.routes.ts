@@ -8,7 +8,7 @@ import {
 } from "@atlas/shared";
 
 import { openApiSchema } from "../../shared/zod-openapi.js";
-import { createWorkService } from "../work/create-work-service.js";
+import { createCommentsService } from "../work/create-work-service.js";
 import { CommentsController } from "./comments.controller.js";
 
 const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
@@ -16,7 +16,7 @@ const taskParamsSchema = workspaceParamsSchema.extend({ taskId: z.string().uuid(
 const commentParamsSchema = workspaceParamsSchema.extend({ commentId: z.string().uuid() });
 
 export async function registerCommentsRoutes(app: FastifyInstance): Promise<void> {
-  const controller = new CommentsController(createWorkService());
+  const controller = new CommentsController(createCommentsService());
 
     app.post("/workspaces/:workspaceId/tasks/:taskId/comments", { schema: openApiSchema({ body: createCommentRequestSchema, params: taskParamsSchema, tags: ["Comments"] }) }, controller.createComment);
     app.get("/workspaces/:workspaceId/tasks/:taskId/comments", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Comments"] }) }, controller.listComments);

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { addTaskDependencyRequestSchema, projectDependencyMapResponseSchema } from "@atlas/shared";
 
 import { openApiSchema } from "../../shared/zod-openapi.js";
-import { createWorkService } from "../work/create-work-service.js";
+import { createDependenciesService } from "../work/create-work-service.js";
 import { DependenciesController } from "./dependencies.controller.js";
 
 const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
@@ -13,7 +13,7 @@ const taskParamsSchema = workspaceParamsSchema.extend({ taskId: z.string().uuid(
 const taskDependencyParamsSchema = workspaceParamsSchema.extend({ dependencyId: z.string().uuid() });
 
 export async function registerDependenciesRoutes(app: FastifyInstance): Promise<void> {
-  const controller = new DependenciesController(createWorkService());
+  const controller = new DependenciesController(createDependenciesService());
 
   app.get(
     "/workspaces/:workspaceId/projects/:projectId/dependencies",

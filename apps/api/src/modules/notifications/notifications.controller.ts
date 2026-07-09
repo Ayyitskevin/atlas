@@ -8,25 +8,25 @@ import {
 
 import { requireAuth } from "../../shared/auth-context.js";
 import { parseBody, parseParams, parseQuery } from "../../shared/validation.js";
-import { WorkService } from "../work/work.service.js";
+import { NotificationsService } from "./notifications.service.js";
 
 const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
 const notificationParamsSchema = workspaceParamsSchema.extend({ notificationId: z.string().uuid() });
 
 export class NotificationsController {
-  constructor(private readonly workService: WorkService) {}
+  constructor(private readonly service: NotificationsService) {}
 
   listNotifications = async (request: FastifyRequest) => {
     const { workspaceId } = parseParams(request, workspaceParamsSchema);
-    return this.workService.listNotifications(await requireAuth(request), workspaceId, parseQuery(request, notificationQuerySchema));
+    return this.service.listNotifications(await requireAuth(request), workspaceId, parseQuery(request, notificationQuerySchema));
   };
   getNotificationPreferences = async (request: FastifyRequest) => {
     const { workspaceId } = parseParams(request, workspaceParamsSchema);
-    return this.workService.getNotificationPreferences(await requireAuth(request), workspaceId);
+    return this.service.getNotificationPreferences(await requireAuth(request), workspaceId);
   };
   updateNotificationPreferences = async (request: FastifyRequest) => {
     const { workspaceId } = parseParams(request, workspaceParamsSchema);
-    return this.workService.updateNotificationPreferences(
+    return this.service.updateNotificationPreferences(
       await requireAuth(request),
       workspaceId,
       parseBody(request, updateNotificationPreferenceRequestSchema),
@@ -34,10 +34,10 @@ export class NotificationsController {
   };
   markNotificationRead = async (request: FastifyRequest) => {
     const { notificationId, workspaceId } = parseParams(request, notificationParamsSchema);
-    return this.workService.markNotificationRead(await requireAuth(request), workspaceId, notificationId);
+    return this.service.markNotificationRead(await requireAuth(request), workspaceId, notificationId);
   };
   markAllNotificationsRead = async (request: FastifyRequest) => {
     const { workspaceId } = parseParams(request, workspaceParamsSchema);
-    return this.workService.markAllNotificationsRead(await requireAuth(request), workspaceId);
+    return this.service.markAllNotificationsRead(await requireAuth(request), workspaceId);
   };
 }

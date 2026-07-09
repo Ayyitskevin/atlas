@@ -6,7 +6,7 @@ import {
 } from "@atlas/shared";
 
 import { openApiSchema } from "../../shared/zod-openapi.js";
-import { createWorkService } from "../work/create-work-service.js";
+import { createActivityService } from "../work/create-work-service.js";
 import { ActivityController } from "./activity.controller.js";
 
 const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
@@ -14,7 +14,7 @@ const projectParamsSchema = workspaceParamsSchema.extend({ projectId: z.string()
 const taskParamsSchema = workspaceParamsSchema.extend({ taskId: z.string().uuid() });
 
 export async function registerActivityRoutes(app: FastifyInstance): Promise<void> {
-  const controller = new ActivityController(createWorkService());
+  const controller = new ActivityController(createActivityService());
 
     app.get("/workspaces/:workspaceId/activity", { schema: openApiSchema({ params: workspaceParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listWorkspaceActivity);
     app.get("/workspaces/:workspaceId/projects/:projectId/activity", { schema: openApiSchema({ params: projectParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listProjectActivity);

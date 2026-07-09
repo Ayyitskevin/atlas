@@ -1,5 +1,7 @@
 import type { PrismaClient, ProjectRole, ProjectVisibility, WorkspaceRole } from "@atlas/db";
-import { ATLAS_ERROR_CODES } from "@atlas/shared";
+import {
+  ATLAS_ERROR_CODES,
+} from "@atlas/shared";
 
 import type { AuthContext } from "../../shared/auth-context.js";
 import { AtlasHttpError } from "../../shared/errors.js";
