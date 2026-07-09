@@ -28,7 +28,13 @@ Local development runs PostgreSQL, Redis, MinIO, the API, workers, and the web s
 ```text
 apps/
   api/          # Fastify REST API, WebSocket gateway, OpenAPI
+    modules/
+      auth|workspaces|projects|outbox|permissions|events
+      sections|tasks|labels|dependencies|subtasks|comments
+      attachments|activity|notifications|search
+      work/     # WorkService + WorkRepository + route composition root
   web/          # Next.js App Router shell
+    app/w/[workspaceId]/projects/[projectId]  # deep-linked board
 packages/
   db/           # Prisma schema, migrations, seed
   shared/       # DTOs, Zod schemas, constants, event types
@@ -38,6 +44,7 @@ infra/
   terraform/    # staging-ready AWS modules
 docs/
   decisions/    # ADRs
+  notes/        # refactor notes, golden paths
 ```
 
 ## Domain Model

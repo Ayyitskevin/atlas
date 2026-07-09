@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
+import { usePathname } from "next/navigation";
 
 import { api, clearSession, errorMessage, storeSession } from "./atlas-api";
 import { ActivityPanel } from "./activity-panel";
@@ -56,10 +57,17 @@ import type {
 export function AtlasClient({
   initialInviteToken = "",
   initialMode = "login",
+  initialWorkspaceId = "",
+  initialProjectId = "",
 }: {
   initialInviteToken?: string;
   initialMode?: "login" | "register";
+  /** Deep-link workspace id from App Router (`/w/[workspaceId]`). */
+  initialWorkspaceId?: string;
+  /** Deep-link project id from App Router (`/w/.../projects/[projectId]`). */
+  initialProjectId?: string;
 }) {
+  const pathname = usePathname();
   const [mode, setMode] = useState<"login" | "register">(initialMode);
   const [auth, setAuth] = useState<AuthPair | null>(null);
   const [user, setUser] = useState<User | null>(null);
@@ -68,12 +76,13 @@ export function AtlasClient({
   const [projectTemplates, setProjectTemplates] = useState<ProjectTemplate[]>([]);
   const [selectedProjectTemplate, setSelectedProjectTemplate] = useState<ProjectTemplateDetail | null>(null);
   const [projectTemplatesStatus, setProjectTemplatesStatus] = useState("");
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("");
-  const [selectedProjectId, setSelectedProjectId] = useState("");
+  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState(initialWorkspaceId);
+  const [selectedProjectId, setSelectedProjectId] = useState(initialProjectId);
   const [selectedTaskId, setSelectedTaskId] = useState("");
   const [message, setMessage] = useState("");
   const [invitationToken, setInvitationToken] = useState(initialInviteToken);
   const [invitationMessage, setInvitationMessage] = useState(initialInviteToken ? "Invitation link loaded." : "");
+  const [urlHydrated, setUrlHydrated] = useState(!initialWorkspaceId);
 
   const selectedWorkspace = useMemo(
     () => workspaces.find((workspace) => workspace.id === selectedWorkspaceId),
@@ -391,8 +400,14 @@ export function AtlasClient({
       setUser(me.user);
       const workspacePage = await api<Page<Workspace>>("/workspaces", {}, currentAuth.accessToken);
       setWorkspaces(workspacePage.items);
-      if (workspacePage.items[0]) {
-        await chooseWorkspace(currentAuth.accessToken, workspacePage.items[0].id, me.user.id);
+      const deepLinkWorkspaceId =
+        initialWorkspaceId && workspacePage.items.some((workspace) => workspace.id === initialWorkspaceId)
+          ? initialWorkspaceId
+          : workspacePage.items[0]?.id;
+      if (deepLinkWorkspaceId) {
+        await chooseWorkspace(currentAuth.accessToken, deepLinkWorkspaceId, me.user.id, {
+          preferredProjectId: initialProjectId || undefined,
+        });
       } else {
         setSelectedWorkspaceId("");
         setSelectedProjectId("");
@@ -411,11 +426,30 @@ export function AtlasClient({
         clearDashboardWork();
         clearProjectTemplates();
       }
+      setUrlHydrated(true);
     } catch (error) {
       clearSession();
       setMessage(errorMessage(error));
+      setUrlHydrated(true);
     }
   }
+
+  // Keep shareable deep-link URLs in sync without remounting via App Router navigation.
+  useEffect(() => {
+    if (!urlHydrated || !auth) return;
+    if (pathname.startsWith("/login") || pathname.startsWith("/register") || pathname.startsWith("/invite")) return;
+
+    let target = "/";
+    if (selectedWorkspaceId && selectedProjectId) {
+      target = `/w/${selectedWorkspaceId}/projects/${selectedProjectId}`;
+    } else if (selectedWorkspaceId) {
+      target = `/w/${selectedWorkspaceId}`;
+    }
+
+    if (window.location.pathname !== target) {
+      window.history.replaceState(window.history.state, "", target);
+    }
+  }, [auth, pathname, selectedProjectId, selectedWorkspaceId, urlHydrated]);
 
   async function submitAuth(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -491,7 +525,12 @@ export function AtlasClient({
     }
   }
 
-  async function chooseWorkspace(accessToken: string, workspaceId: string, currentUserId = user?.id) {
+  async function chooseWorkspace(
+    accessToken: string,
+    workspaceId: string,
+    currentUserId = user?.id,
+    options?: { preferredProjectId?: string },
+  ) {
     setSelectedWorkspaceId(workspaceId);
     setSelectedProjectId("");
     setSelectedTaskId("");
@@ -525,7 +564,11 @@ export function AtlasClient({
         setMessage(errorMessage(error));
       }
       await loadOutbox(accessToken, workspaceId, outboxStatus, outboxEventType);
-      if (projectPage.items[0]) await chooseProject(accessToken, workspaceId, projectPage.items[0].id);
+      const preferred =
+        options?.preferredProjectId && projectPage.items.some((project) => project.id === options.preferredProjectId)
+          ? options.preferredProjectId
+          : projectPage.items[0]?.id;
+      if (preferred) await chooseProject(accessToken, workspaceId, preferred);
     } catch (error) {
       clearProjectState();
       clearTaskDetailState();
