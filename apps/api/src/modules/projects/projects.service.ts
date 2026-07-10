@@ -215,6 +215,7 @@ export class ProjectsService {
     if (existing) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "User is already a Project member.");
 
     const member = await this.projectsRepository.addMember({ ...input, projectId });
+    this.permissions.invalidateUser(input.userId);
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: member.id,
@@ -234,6 +235,7 @@ export class ProjectsService {
     await this.ensureProjectAdminCanChange(projectId, member.role as ProjectRole, input.role as ProjectRole);
 
     const updated = await this.projectsRepository.updateMemberRole({ projectId, role: input.role as ProjectRole, userId });
+    this.permissions.invalidateUser(userId);
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: updated.id,
@@ -253,6 +255,7 @@ export class ProjectsService {
     await this.ensureProjectAdminCanChange(projectId, member.role as ProjectRole, null);
 
     const removed = await this.projectsRepository.removeMember({ projectId, userId });
+    this.permissions.invalidateUser(userId);
     await this.events.recordActivity({
       actorUserId: ctx.userId,
       entityId: removed.id,

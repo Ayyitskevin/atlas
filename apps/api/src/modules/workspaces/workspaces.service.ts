@@ -111,6 +111,8 @@ export class WorkspacesService {
       workspaceId: invitation.workspaceId,
     });
     if (!member) throw new AtlasHttpError(409, ATLAS_ERROR_CODES.CONFLICT, "Invitation can no longer be accepted.");
+    this.permissions.invalidateUser(ctx.userId);
+    this.permissions.invalidateWorkspace(invitation.workspaceId);
     return { member };
   }
 
@@ -161,6 +163,8 @@ export class WorkspacesService {
 
     const result = await this.workspacesRepository.updateMemberRole({ role: input.role as WorkspaceRole, userId, workspaceId });
     if (result.count === 0) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Workspace member not found.");
+    this.permissions.invalidateUser(userId);
+    this.permissions.invalidateWorkspace(workspaceId);
     return { ok: true };
   }
 
@@ -173,6 +177,8 @@ export class WorkspacesService {
 
     const result = await this.workspacesRepository.removeMember({ userId, workspaceId });
     if (result.count === 0) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Workspace member not found.");
+    this.permissions.invalidateUser(userId);
+    this.permissions.invalidateWorkspace(workspaceId);
     return { ok: true };
   }
 
@@ -185,6 +191,9 @@ export class WorkspacesService {
       workspaceId,
     });
     if (!member) throw new AtlasHttpError(404, ATLAS_ERROR_CODES.NOT_FOUND, "Target Workspace member not found.");
+    this.permissions.invalidateUser(ctx.userId);
+    this.permissions.invalidateUser(input.userId);
+    this.permissions.invalidateWorkspace(workspaceId);
     return { ok: true };
   }
 
