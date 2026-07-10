@@ -61,6 +61,8 @@ export function taskNotificationCopy(event: MutationEventJob, taskTitle: string)
       return { body: "A subtask was removed from " + quote(title) + ".", title: "Subtask removed" };
     case "CommentCreated":
       return { body: "A comment was added to " + quote(title) + ".", title: "New comment" };
+    case "CommentMentioned":
+      return { body: "You were mentioned in a comment on " + quote(title) + ".", title: "You were mentioned" };
     case "CommentUpdated":
       return { body: "A comment was edited on " + quote(title) + ".", title: "Comment edited" };
     case "CommentDeleted":

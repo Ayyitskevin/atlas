@@ -296,7 +296,7 @@ All errors use a consistent shape:
 
 ## Realtime Model
 
-Fastify owns the WebSocket gateway.
+Fastify owns the WebSocket gateway. `RealtimeHub` delivers locally and publishes to Redis channel `atlas:realtime:broadcast` so other API instances share broadcasts.
 
 Rooms:
 
@@ -304,7 +304,7 @@ Rooms:
 - `project:{projectId}` for project task/section changes.
 - `task:{taskId}` for comments and task detail updates.
 
-Clients authenticate the socket with an access token and must subscribe with explicit workspace/project/task identifiers. Subscription checks reuse service-layer permission guards. Broadcast payloads are versioned domain-event projections, not raw database rows.
+Clients open `/ws` without secrets in the query string, send `{ action: "auth", accessToken }`, then subscribe with explicit workspace/project/task identifiers. Optional presence messages broadcast who is viewing a task. Subscription checks reuse service-layer permission guards. Broadcast payloads are versioned domain-event projections, not raw database rows.
 
 The API treats websocket delivery as best-effort after durable mutation state is written: closed sockets are pruned from rooms during broadcast, send failures remove only the failing socket, and remaining subscribers still receive the event.
 
@@ -389,14 +389,14 @@ interface SearchService {
 }
 ```
 
-The initial implementation can store generated `tsvector` columns or a separate `search_documents` table. The interface keeps future Elasticsearch/OpenSearch migration isolated.
+Generated `search_vector` columns on projects/tasks power `plainto_tsquery` ranking. ILIKE fallback covers short queries or empty FTS hits. The search module keeps future Elasticsearch/OpenSearch migration isolated.
 
 ## Observability
 
 - Structured logs with pino in API and worker processes.
 - Request ids on every HTTP request and WebSocket connection.
 - Worker side effects persist delivered/skipped/failed/stubbed outcomes to `worker_job_outcomes` and expose recent rows from outbox detail.
-- OpenTelemetry hooks for HTTP, Prisma, Redis/BullMQ, and custom domain-event spans.
+- Optional OpenTelemetry via `OTEL_EXPORTER_OTLP_ENDPOINT` (OTLP/HTTP traces; auto-instrumentations when packages are installed).
 - Health endpoints:
   - `GET /healthz`: process liveness.
   - `GET /readyz`: database, Redis, and object storage readiness.
@@ -427,7 +427,9 @@ Staging AWS modules:
 - Chosen: REST first with OpenAPI; GraphQL is deferred but service DTOs should not be HTTP-specific.
 - Chosen: WebSockets over SSE because future collaboration features need bidirectional subscription control.
 - Deferred: PostgreSQL row-level security. Application-layer scoping is mandatory now; RLS can be added after query patterns settle.
-- Deferred: invitation email delivery. Invitation records and notification jobs exist; email provider integration is stubbed.
+- Chosen: Email provider seam with `noop` (local) and `resend` (real delivery). Invitations, verification, password reset, and task notification emails use the same provider.
 - Deferred: billing. Interfaces may exist, but no billing product logic is part of the foundation.
-- Deferred: advanced search engine. Postgres full-text is enough for MVP and hidden behind `SearchService`.
-- Deferred: file scanning and preview generation. Attachments store metadata and object keys only.
+- Chosen: Postgres full-text via generated `search_vector` columns with ILIKE fallback; OpenSearch still optional later behind the same search module.
+- Chosen: Attachment scan status hooks with optional ClamAV; preview generation remains thin (signed download + scan-aware UI).
+- Chosen: Realtime hub fans out via Redis pub/sub so multiple API instances share broadcasts; presence-lite lives on task/project rooms.
+- Chosen: Auth rate limits on register/login/refresh; refresh tokens also set as httpOnly cookies; WebSocket auth prefers first-message token (query string fallback only).

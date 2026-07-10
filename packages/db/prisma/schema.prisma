@@ -66,12 +66,15 @@ model User {
   name                         String
   passwordHash                 String                            @map("password_hash")
   avatarUrl                    String?                           @map("avatar_url")
+  emailVerifiedAt              DateTime?                         @map("email_verified_at") @db.Timestamptz(6)
   disabledAt                   DateTime?                         @map("disabled_at") @db.Timestamptz(6)
   createdAt                    DateTime                          @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt                    DateTime                          @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt                    DateTime?                         @map("deleted_at") @db.Timestamptz(6)
   sessions                     Session[]
   oauthAccounts                OAuthAccount[]
+  emailVerificationTokens      EmailVerificationToken[]
+  passwordResetTokens          PasswordResetToken[]
   workspaceLinks               WorkspaceMember[]
   sentWorkspaceInvitations     WorkspaceInvitation[]             @relation("WorkspaceInvitationInviter")
   ownedWorkspaces              Workspace[]                       @relation("WorkspaceOwner")
@@ -97,6 +100,34 @@ model User {
 
   @@index([deletedAt])
   @@map("users")
+}
+
+model EmailVerificationToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("email_verification_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("password_reset_tokens")
 }
 
 model Session {

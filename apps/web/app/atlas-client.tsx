@@ -274,7 +274,7 @@ export function AtlasClient({
   });
   const { clearSearch, hasMoreSearchResults, loadMoreSearchResults, openSearchResult, searchQuery, searchResults, searchStatus, searchWorkspace, setSearchQuery } =
     useWorkspaceSearch({ auth, chooseProject, chooseTask, selectedWorkspaceId, setMessage });
-  const realtimeStatus = useRealtime({
+  const { presenceNames, status: realtimeStatus } = useRealtime({
     accessToken: auth?.accessToken,
     onError: setMessage,
     onEvent: handleRealtimeEvent,
@@ -836,6 +836,26 @@ export function AtlasClient({
     await chooseTask(task.id);
   }
 
+  async function manageSessions() {
+    if (!auth) return;
+    try {
+      const result = await api<{ items: Array<{ current: boolean; id: string; ipAddress?: string | null; userAgent?: string | null; createdAt: string }> }>(
+        "/auth/sessions",
+        {},
+        auth.accessToken,
+      );
+      const summary = result.items
+        .map((session) => (session.current ? "current" : "other") + " · " + (session.ipAddress ?? "unknown ip") + " · " + new Date(session.createdAt).toLocaleString())
+        .join("\n");
+      const revokeOthers = window.confirm((summary || "No active sessions.") + "\n\nRevoke all other sessions?");
+      if (!revokeOthers) return;
+      const revoked = await api<{ revokedCount: number }>("/auth/sessions/revoke-other", { method: "POST" }, auth.accessToken);
+      setMessage("Revoked " + revoked.revokedCount + " other session(s).");
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
+  }
+
   function logout() {
     clearSession();
     setAuth(null);
@@ -934,9 +954,18 @@ export function AtlasClient({
               ))}
             </nav>
           </div>
-          <div className="flex items-center gap-2 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-sm">
             <span className="atlas-chip">{realtimeStatus}</span>
+            {presenceNames.length ? (
+              <span className="atlas-chip" title={presenceNames.join(", ")}>
+                Viewing: {presenceNames.slice(0, 3).join(", ")}
+                {presenceNames.length > 3 ? " +" + (presenceNames.length - 3) : ""}
+              </span>
+            ) : null}
             {selectedWorkspace ? <span className="atlas-chip">{selectedWorkspace.name}</span> : null}
+            <button className="atlas-btn" onClick={() => void manageSessions()} type="button">
+              Sessions
+            </button>
             <button className="atlas-btn" onClick={logout} type="button">
               Log out
             </button>

@@ -11,6 +11,7 @@ const activityTitles: Record<string, string> = {
   AttachmentCommentDeleted: "File comment deleted",
   AttachmentCommentUpdated: "File comment edited",
   CommentCreated: "Comment added",
+  CommentMentioned: "Mentioned in comment",
   CommentDeleted: "Comment deleted",
   CommentUpdated: "Comment edited",
   MemberInvited: "Member invited",

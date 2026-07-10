@@ -15,15 +15,15 @@ import {
 import type { MutationEventJob } from "../../src/jobs/queues.js";
 
 describe("worker handlers", () => {
-  it("records search indexing as an explicit stub outcome", async () => {
+  it("records search indexing as a postgres FTS outcome", async () => {
     const job = jobFor(eventJob({ eventType: "TaskUpdated" }));
 
     await expect(handleSearchIndexJob(job)).resolves.toMatchObject({
-      provider: "database-search",
+      provider: "postgres-fts",
       queue: "atlas-search-index",
-      status: "stubbed",
+      status: "delivered",
     });
-    expectLoggedOutcome(job, { provider: "database-search", status: "stubbed" });
+    expectLoggedOutcome(job, { provider: "postgres-fts", status: "delivered" });
   });
 
   it("persists worker outcomes when an outcome store is provided", async () => {
@@ -31,8 +31,8 @@ describe("worker handlers", () => {
     const store = outcomeStore();
 
     await expect(handleSearchIndexJob(job, store)).resolves.toMatchObject({
-      provider: "database-search",
-      status: "stubbed",
+      provider: "postgres-fts",
+      status: "delivered",
     });
 
     expect(store.workerJobOutcome.create).toHaveBeenCalledWith({
@@ -40,9 +40,9 @@ describe("worker handlers", () => {
         eventId: job.data.eventId,
         eventType: "TaskUpdated",
         jobId: "bull-job-1",
-        provider: "database-search",
+        provider: "postgres-fts",
         queue: "atlas-search-index",
-        status: "stubbed",
+        status: "delivered",
         workspaceId: job.data.workspaceId,
       }),
     });
@@ -333,7 +333,7 @@ describe("worker handlers", () => {
     const job = jobFor(eventJob({ actorUserId }));
 
     await expect(handleNotificationFanoutJob(job, store)).resolves.toMatchObject({
-      reason: "No eligible task assignees or watchers.",
+      reason: "No eligible task assignees, watchers, or mentions.",
       recipientCount: 0,
       status: "skipped",
     });

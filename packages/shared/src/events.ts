@@ -44,6 +44,7 @@ export const domainEventTypeSchema = z.enum([
   "SubtaskUpdated",
   "SubtaskDeleted",
   "CommentCreated",
+  "CommentMentioned",
   "CommentUpdated",
   "CommentDeleted",
   "AttachmentAdded",

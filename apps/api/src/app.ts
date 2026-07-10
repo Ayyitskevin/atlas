@@ -1,3 +1,4 @@
+import cookie from "@fastify/cookie";
 import cors from "@fastify/cors";
 import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
@@ -30,6 +31,7 @@ export async function buildApp(): Promise<FastifyInstance> {
 
   await app.register(helmet);
   await app.register(cors, { origin: env.WEB_ORIGIN, credentials: true });
+  await app.register(cookie);
   await app.register(sensible);
   await app.register(rateLimit, {
     max: env.RATE_LIMIT_MAX,

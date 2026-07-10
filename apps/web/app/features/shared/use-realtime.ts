@@ -23,6 +23,7 @@ type UseRealtimeInput = {
 
 export function useRealtime({ accessToken, onError, onEvent, projectId, taskId, workspaceId }: UseRealtimeInput) {
   const [status, setStatus] = useState<RealtimeStatus>("offline");
+  const [presenceNames, setPresenceNames] = useState<string[]>([]);
   const onErrorRef = useRef(onError);
   const onEventRef = useRef(onEvent);
   const recentEventIdsRef = useRef<string[]>([]);
@@ -38,6 +39,7 @@ export function useRealtime({ accessToken, onError, onEvent, projectId, taskId, 
   useEffect(() => {
     if (!accessToken || !workspaceId) {
       setStatus("offline");
+      setPresenceNames([]);
       return;
     }
 
@@ -49,18 +51,43 @@ export function useRealtime({ accessToken, onError, onEvent, projectId, taskId, 
     function connect() {
       if (stopped || !accessToken) return;
       setStatus(reconnectAttempt === 0 ? "connecting" : "reconnecting");
-      socket = new WebSocket(websocketUrl(accessToken));
+      socket = new WebSocket(websocketUrl());
 
       socket.onopen = () => {
-        reconnectAttempt = 0;
-        setStatus("connected");
-        for (const subscription of realtimeSubscriptions({ projectId, taskId, workspaceId })) {
-          socket?.send(JSON.stringify(subscription));
-        }
+        socket?.send(JSON.stringify({ action: "auth", accessToken }));
       };
 
       socket.onmessage = (event) => {
-        const message = parseRealtimeMessage(String(event.data));
+        const raw = String(event.data);
+        try {
+          const data = JSON.parse(raw) as {
+            authenticated?: boolean;
+            ok?: boolean;
+            presence?: { members?: Array<{ userName?: string; userId: string }> };
+            type?: string;
+            members?: Array<{ userName?: string; userId: string }>;
+          };
+          if (data.ok && data.authenticated) {
+            reconnectAttempt = 0;
+            setStatus("connected");
+            for (const subscription of realtimeSubscriptions({ projectId, taskId, workspaceId })) {
+              socket?.send(JSON.stringify(subscription));
+            }
+            if (taskId) {
+              socket?.send(JSON.stringify({ action: "presence", scope: "task", id: taskId, state: "join" }));
+            }
+            return;
+          }
+          if (data.type === "PresenceUpdated" || data.presence) {
+            const members = data.members ?? data.presence?.members ?? [];
+            setPresenceNames(members.map((member) => member.userName || member.userId).filter(Boolean));
+            return;
+          }
+        } catch {
+          // fall through to domain event parser
+        }
+
+        const message = parseRealtimeMessage(raw);
         if (message.kind === "error") {
           setStatus("error");
           onErrorRef.current(message.message);
@@ -91,9 +118,16 @@ export function useRealtime({ accessToken, onError, onEvent, projectId, taskId, 
     return () => {
       stopped = true;
       if (reconnectTimer) clearTimeout(reconnectTimer);
+      if (socket && taskId && socket.readyState === WebSocket.OPEN) {
+        try {
+          socket.send(JSON.stringify({ action: "presence", scope: "task", id: taskId, state: "leave" }));
+        } catch {
+          // ignore
+        }
+      }
       socket?.close();
     };
   }, [accessToken, projectId, taskId, workspaceId]);
 
-  return status;
+  return { presenceNames, status };
 }

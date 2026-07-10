@@ -16,7 +16,13 @@ export function TaskCommentsPanel({ comments, onCreateComment, onDeleteComment, 
     <section className="grid gap-2 border-t border-slate-200 pt-4">
       <h3 className="text-sm font-semibold uppercase text-slate-500">Comments</h3>
       <form className="grid gap-2" onSubmit={(event) => void onCreateComment(event)}>
-        <textarea className="min-h-24 rounded-md border border-slate-300 px-3 py-2 text-sm" name="body" required />
+        <textarea
+          className="min-h-24 rounded-md border border-slate-300 px-3 py-2 text-sm"
+          name="body"
+          placeholder="Write a comment. Mention teammates with @email or @Name"
+          required
+        />
+        <p className="text-xs text-slate-500">Mentions notify workspace members (e.g. @ada@example.com or @Ada).</p>
         <button className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white" type="submit">
           Comment
         </button>

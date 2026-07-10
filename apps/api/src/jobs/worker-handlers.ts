@@ -113,12 +113,15 @@ export async function handleNotificationFanoutJob(
     return recordWorkerOutcome(job, baseOutcome(WORKER_QUEUE_NAMES.notificationFanout, event, "skipped", "Task no longer exists."), outcomeStore);
   }
 
-  const recipientIds = taskRecipientIds(task, event.actorUserId);
+  const recipientIds =
+    event.eventType === "CommentMentioned"
+      ? mentionedRecipientIds(event, event.actorUserId)
+      : taskRecipientIds(task, event.actorUserId);
   if (!recipientIds.length) {
     return recordWorkerOutcome(
       job,
       {
-        ...baseOutcome(WORKER_QUEUE_NAMES.notificationFanout, event, "skipped", "No eligible task assignees or watchers."),
+        ...baseOutcome(WORKER_QUEUE_NAMES.notificationFanout, event, "skipped", "No eligible task assignees, watchers, or mentions."),
         recipientCount: 0,
       },
       outcomeStore,
@@ -154,10 +157,10 @@ export async function handleSearchIndexJob(job: WorkerJobLike, outcomeStore?: Wo
       ...baseOutcome(
         WORKER_QUEUE_NAMES.searchIndex,
         job.data,
-        "stubbed",
-        "Search is currently served by direct workspace-scoped database queries; no external index provider is configured.",
+        "delivered",
+        "Postgres full-text search_vector columns are maintained by generated columns; no external index provider is configured.",
       ),
-      provider: "database-search",
+      provider: "postgres-fts",
     },
     outcomeStore,
   );
@@ -333,6 +336,12 @@ function taskRecipientIds(task: Pick<TaskWithNotificationTargets, "assignees" | 
   return [...new Set([...task.assignees.map((assignee) => assignee.userId), ...task.watchers.map((watcher) => watcher.userId)])].filter(
     (userId) => userId !== actorUserId,
   );
+}
+
+function mentionedRecipientIds(event: MutationEventJob, actorUserId: string) {
+  const raw = event.payload?.mentionedUserIds;
+  if (!Array.isArray(raw)) return [] as string[];
+  return [...new Set(raw.filter((value): value is string => typeof value === "string" && value !== actorUserId))];
 }
 
 function taskRecipientUsers(task: Pick<TaskWithNotificationTargetUsers, "assignees" | "watchers">, actorUserId: string) {

@@ -7,6 +7,12 @@ const minimumProductionSecretLength = 32;
 const envSchema = z.object({
   API_HOST: z.string().default("0.0.0.0"),
   API_PORT: z.coerce.number().int().positive().default(4000),
+  AUTH_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(20),
+  AUTH_RATE_LIMIT_WINDOW: z.string().default("1 minute"),
+  COOKIE_SECURE: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((value) => value === "true"),
   DATABASE_URL: z.string().default("postgresql://atlas:atlas@localhost:5432/atlas"),
   EMAIL_FROM: z.string().default("no-reply@atlas.local"),
   EMAIL_PROVIDER: z.enum(["noop", "resend"]).default("noop"),
@@ -14,6 +20,8 @@ const envSchema = z.object({
   JWT_REFRESH_SECRET: z.string().default(localDevRefreshSecret),
   LOG_LEVEL: z.enum(["fatal", "error", "warn", "info", "debug", "trace", "silent"]).default("info"),
   NODE_ENV: z.string().default("development"),
+  OTEL_EXPORTER_OTLP_ENDPOINT: z.string().optional(),
+  OTEL_SERVICE_NAME: z.string().default("atlas-api"),
   RATE_LIMIT_MAX: z.coerce.number().int().positive().default(300),
   RATE_LIMIT_WINDOW: z.string().default("1 minute"),
   REDIS_URL: z.string().default("redis://localhost:6379"),
