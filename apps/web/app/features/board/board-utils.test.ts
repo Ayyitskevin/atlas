@@ -1,6 +1,14 @@
 import { describe, expect, it } from "vitest";
 
-import { moveItemById, nextTaskPosition, sectionPositionPayload } from "./board-utils";
+import {
+  emptyBoardTaskFilters,
+  filterBoardTasks,
+  isConflictErrorMessage,
+  moveItemById,
+  nextTaskPosition,
+  sectionPositionPayload,
+  toggleSelection,
+} from "./board-utils";
 import type { Section, Task } from "../shared/atlas-types";
 
 const sections: Section[] = [
@@ -10,11 +18,12 @@ const sections: Section[] = [
 ];
 
 const task = (input: Partial<Task> & Pick<Task, "id" | "sectionId">): Task => ({
+  assignees: input.assignees,
   id: input.id,
-  priority: "MEDIUM",
+  priority: input.priority ?? "MEDIUM",
   projectId: "project-1",
   sectionId: input.sectionId,
-  status: "TODO",
+  status: input.status ?? "TODO",
   title: input.title ?? input.id,
   version: input.version ?? 0,
   position: input.position,
@@ -40,5 +49,22 @@ describe("board utils", () => {
     expect(nextTaskPosition([task({ id: "a", position: 1000, sectionId: "todo" })], "todo")).toBe(2000);
     expect(nextTaskPosition([task({ id: "a", position: "7000", sectionId: "todo" })], "todo")).toBe(8000);
     expect(nextTaskPosition([], "todo")).toBe(1000);
+  });
+
+  it("filters board tasks by status, priority, and assignee", () => {
+    const tasks = [
+      task({ id: "a", sectionId: "todo", status: "TODO", priority: "HIGH", assignees: [{ id: "1", taskId: "a", userId: "u1" }] as Task["assignees"] }),
+      task({ id: "b", sectionId: "todo", status: "DONE", priority: "LOW", assignees: [{ id: "2", taskId: "b", userId: "u2" }] as Task["assignees"] }),
+    ];
+    expect(filterBoardTasks(tasks, { ...emptyBoardTaskFilters, status: "DONE" }).map((item) => item.id)).toEqual(["b"]);
+    expect(filterBoardTasks(tasks, { ...emptyBoardTaskFilters, priority: "HIGH" }).map((item) => item.id)).toEqual(["a"]);
+    expect(filterBoardTasks(tasks, { ...emptyBoardTaskFilters, assigneeId: "u2" }).map((item) => item.id)).toEqual(["b"]);
+  });
+
+  it("toggles selection and detects conflict messages", () => {
+    expect(toggleSelection(["a"], "b")).toEqual(["a", "b"]);
+    expect(toggleSelection(["a", "b"], "a")).toEqual(["b"]);
+    expect(isConflictErrorMessage("Version conflict on task")).toBe(true);
+    expect(isConflictErrorMessage("Not found")).toBe(false);
   });
 });

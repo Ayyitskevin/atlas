@@ -1,6 +1,6 @@
 "use client";
 
-import type { Notification, Task } from "../shared/atlas-types";
+import type { Notification } from "../shared/atlas-types";
 
 type NotificationFilter = "all" | "unread";
 
@@ -12,9 +12,8 @@ type NotificationsPanelProps = {
   onFilterChange: (filter: NotificationFilter) => void;
   onMarkAllRead: () => Promise<void>;
   onMarkRead: (notificationId: string) => Promise<void>;
-  onOpenTask: (taskId: string) => Promise<void>;
+  onOpenTask: (taskId: string, notificationId: string) => Promise<void>;
   preferenceStatus: string;
-  tasks: Task[];
   unreadCount: number;
   workspaceSelected: boolean;
 };
@@ -29,7 +28,6 @@ export function NotificationsPanel({
   onMarkRead,
   onOpenTask,
   preferenceStatus,
-  tasks,
   unreadCount,
   workspaceSelected,
 }: NotificationsPanelProps) {
@@ -38,7 +36,10 @@ export function NotificationsPanel({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold uppercase text-slate-500">Notifications</h2>
-          <p className="text-sm text-slate-600">{unreadCount} unread</p>
+          <p className="text-sm text-slate-600">
+            <span className="font-semibold text-slate-950">{unreadCount}</span> unread
+            {unreadCount > 0 ? " · open a card to jump to the task" : ""}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <div className="inline-flex overflow-hidden rounded-md border border-slate-300">
@@ -71,6 +72,7 @@ export function NotificationsPanel({
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm">
         <div>
           <p className="font-medium text-slate-900">Task email updates</p>
+          <p className="text-xs text-slate-500">Mentions and assignments email when enabled (Resend or noop stub).</p>
           {preferenceStatus ? <p className="text-xs text-slate-500">{preferenceStatus}</p> : null}
         </div>
         <label className="inline-flex items-center gap-2 font-medium text-slate-700">
@@ -88,7 +90,7 @@ export function NotificationsPanel({
       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
         {notifications.length ? (
           notifications.map((notification) => {
-            const canOpenTask = Boolean(notification.taskId && tasks.some((task) => task.id === notification.taskId));
+            const canOpenTask = Boolean(notification.taskId);
             return (
               <article
                 className={`rounded-md border px-3 py-2 text-sm ${notification.status === "UNREAD" ? "border-slate-300 bg-slate-50" : "border-slate-200 bg-white"}`}
@@ -112,7 +114,7 @@ export function NotificationsPanel({
                   {canOpenTask ? (
                     <button
                       className="rounded-md border border-slate-300 px-2 py-1 text-xs font-medium text-slate-700"
-                      onClick={() => notification.taskId && void onOpenTask(notification.taskId)}
+                      onClick={() => notification.taskId && void onOpenTask(notification.taskId, notification.id)}
                       type="button"
                     >
                       Open task

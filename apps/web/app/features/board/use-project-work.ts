@@ -5,7 +5,7 @@ import { useMemo, useState } from "react";
 
 import { attachmentMimeTypeForUpload, attachmentUploadValidationMessage } from "../shared/attachment-upload-utils";
 import { api, errorMessage } from "../shared/atlas-api";
-import { moveItemById, nextTaskPosition, sectionPositionPayload } from "./board-utils";
+import { isConflictErrorMessage, moveItemById, nextTaskPosition, sectionPositionPayload } from "./board-utils";
 import { dependencyTaskIds, readyDependencyBlockers } from "../task/task-dependency-utils";
 import type {
   ActivityScope,
@@ -191,12 +191,17 @@ export function useProjectWork({
 
   async function moveTaskToSection(task: Task, sectionId: string) {
     if (!auth || !selectedWorkspaceId || !selectedProjectId || task.sectionId === sectionId) return;
+    const previousTasks = tasks;
+    const optimisticPosition = nextTaskPosition(tasks, sectionId);
+    setTasks((current) =>
+      current.map((item) => (item.id === task.id ? { ...item, position: optimisticPosition, sectionId } : item)),
+    );
     try {
       setMessage("");
       const moved = await api<Task>(
         "/workspaces/" + selectedWorkspaceId + "/tasks/" + task.id + "/move",
         {
-          body: JSON.stringify({ position: nextTaskPosition(tasks, sectionId), sectionId, version: task.version }),
+          body: JSON.stringify({ position: optimisticPosition, sectionId, version: task.version }),
           method: "POST",
         },
         auth.accessToken,
@@ -205,7 +210,55 @@ export function useProjectWork({
       await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
       await loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId);
     } catch (error) {
+      setTasks(previousTasks);
+      const text = errorMessage(error);
+      setMessage(isConflictErrorMessage(text) ? "Move conflict — board reloaded. Try again." : text);
+      if (auth && selectedWorkspaceId && selectedProjectId) {
+        await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId).catch(() => undefined);
+      }
+    }
+  }
+
+  async function completeTasksByIds(taskIds: string[]) {
+    if (!auth || !selectedWorkspaceId || !taskIds.length) return;
+    try {
+      setMessage("");
+      for (const taskId of taskIds) {
+        await api<Task>("/workspaces/" + selectedWorkspaceId + "/tasks/" + taskId + "/complete", { method: "POST" }, auth.accessToken);
+      }
+      if (selectedProjectId) await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId);
+    } catch (error) {
       setMessage(errorMessage(error));
+    }
+  }
+
+  async function moveTasksByIds(taskIds: string[], sectionId: string) {
+    if (!auth || !selectedWorkspaceId || !selectedProjectId || !taskIds.length) return;
+    try {
+      setMessage("");
+      let working = tasks;
+      for (const taskId of taskIds) {
+        const task = working.find((item) => item.id === taskId);
+        if (!task || task.sectionId === sectionId) continue;
+        const position = nextTaskPosition(working, sectionId);
+        const moved = await api<Task>(
+          "/workspaces/" + selectedWorkspaceId + "/tasks/" + task.id + "/move",
+          {
+            body: JSON.stringify({ position, sectionId, version: task.version }),
+            method: "POST",
+          },
+          auth.accessToken,
+        );
+        working = working.map((item) => (item.id === moved.id ? moved : item));
+      }
+      setTasks(working);
+      await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId);
+      await loadActivity(auth.accessToken, selectedWorkspaceId, activityScope, selectedProjectId, selectedTaskId);
+    } catch (error) {
+      const text = errorMessage(error);
+      setMessage(isConflictErrorMessage(text) ? "Bulk move conflict — board reloaded. Try again." : text);
+      await loadProjectData(auth.accessToken, selectedWorkspaceId, selectedProjectId).catch(() => undefined);
     }
   }
 
@@ -973,7 +1026,9 @@ export function useProjectWork({
     clearTaskDetailState,
     comments,
     completeTask,
+    completeTasksByIds,
     completeReadyBlockers,
+    moveTasksByIds,
     changeTaskDependencyFilter,
     createComment,
     createAttachmentComment,

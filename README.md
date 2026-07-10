@@ -151,6 +151,7 @@ docs/
 
 - [Architecture](docs/architecture.md)
 - [Deployment](docs/deployment.md)
+- [Email dogfood loop](docs/email-dogfood.md) — Resend setup + multi-user golden path
 - [ADRs](docs/decisions)
 - [Notes](docs/notes)
 

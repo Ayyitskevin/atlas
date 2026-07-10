@@ -1,8 +1,10 @@
 "use client";
 
 import { FormEvent, useEffect, useMemo, useState } from "react";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 
+import { AuthPanel, type AuthPanelMode } from "./features/auth/auth-panel";
+import { authModeFromQuery, readAuthQueryTokens } from "./features/auth/auth-query";
 import { api, clearSession, errorMessage, storeSession } from "./features/shared/atlas-api";
 import { ActivityPanel } from "./features/workspace/activity-panel";
 import { BoardPanel } from "./features/board/board-panel";
@@ -50,6 +52,7 @@ import type {
   ProjectTemplate,
   ProjectTemplateDetail,
   ProjectVisibility,
+  Task,
   User,
   Workspace,
 } from "./features/shared/atlas-types";
@@ -68,7 +71,29 @@ export function AtlasClient({
   initialProjectId?: string;
 }) {
   const pathname = usePathname();
-  const [mode, setMode] = useState<"login" | "register">(initialMode);
+  const searchParams = useSearchParams();
+  const queryTokens = useMemo(
+    () =>
+      readAuthQueryTokens(
+        searchParams?.toString()
+          ? "?" + searchParams.toString()
+          : typeof window !== "undefined"
+            ? window.location.search
+            : "",
+      ),
+    [searchParams],
+  );
+  const [mode, setMode] = useState<AuthPanelMode>(initialMode === "register" ? "register" : "login");
+  const [verifyToken, setVerifyToken] = useState("");
+  const [resetToken, setResetToken] = useState("");
+  const [authStatusMessage, setAuthStatusMessage] = useState("");
+
+  useEffect(() => {
+    setVerifyToken(queryTokens.verifyToken);
+    setResetToken(queryTokens.resetToken);
+    if (initialMode === "register") setMode("register");
+    else setMode(authModeFromQuery(queryTokens));
+  }, [initialMode, queryTokens]);
   const [auth, setAuth] = useState<AuthPair | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -212,6 +237,7 @@ export function AtlasClient({
     clearTaskDetailState,
     comments,
     completeTask,
+    completeTasksByIds,
     completeReadyBlockers,
     changeTaskDependencyFilter,
     createAttachmentComment,
@@ -237,6 +263,7 @@ export function AtlasClient({
     labelStatus,
     moveSection,
     moveTaskToSection,
+    moveTasksByIds,
     projectDependencyMap,
     renameSection,
     sections,
@@ -462,6 +489,7 @@ export function AtlasClient({
         ? { email: String(form.get("email")), name: String(form.get("name")), password: String(form.get("password")) }
         : { email: String(form.get("email")), password: String(form.get("password")) };
     try {
+      setAuthStatusMessage(mode === "register" ? "Creating account..." : "Signing in...");
       const nextAuth = await api<AuthPair>(mode === "register" ? "/auth/register" : "/auth/login", {
         body: JSON.stringify(payload),
         method: "POST",
@@ -470,6 +498,99 @@ export function AtlasClient({
       setAuth(nextAuth);
       await hydrate(nextAuth);
       setMessage("");
+      setAuthStatusMessage(mode === "register" ? "Account created. Check your email to verify." : "");
+    } catch (error) {
+      setMessage(errorMessage(error));
+      setAuthStatusMessage("");
+    }
+  }
+
+  async function requestPasswordReset(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      setMessage("");
+      setAuthStatusMessage("Sending reset email...");
+      await api<{ ok: boolean }>("/auth/password/request-reset", {
+        body: JSON.stringify({ email: String(form.get("email")) }),
+        method: "POST",
+      });
+      setAuthStatusMessage("If that email exists, a reset link was sent (or stubbed with EMAIL_PROVIDER=noop).");
+      setMode("login");
+    } catch (error) {
+      setMessage(errorMessage(error));
+      setAuthStatusMessage("");
+    }
+  }
+
+  async function resetPassword(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      setMessage("");
+      setAuthStatusMessage("Updating password...");
+      await api<{ ok: boolean }>("/auth/password/reset", {
+        body: JSON.stringify({ password: String(form.get("password")), token: String(form.get("token")) }),
+        method: "POST",
+      });
+      setAuthStatusMessage("Password updated. Log in with your new password.");
+      setResetToken("");
+      setMode("login");
+    } catch (error) {
+      setMessage(errorMessage(error));
+      setAuthStatusMessage("");
+    }
+  }
+
+  async function verifyEmail(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    try {
+      setMessage("");
+      setAuthStatusMessage("Verifying email...");
+      await api<{ ok: boolean }>("/auth/email/verify", {
+        body: JSON.stringify({ token: String(form.get("token")) }),
+        method: "POST",
+      });
+      setAuthStatusMessage("Email verified. You can log in.");
+      setVerifyToken("");
+      if (window.location.search.includes("verifyToken=")) {
+        window.history.replaceState(window.history.state, "", window.location.pathname);
+      }
+    } catch (error) {
+      setMessage(errorMessage(error));
+      setAuthStatusMessage("");
+    }
+  }
+
+  async function resendEmailVerification() {
+    if (!auth) return;
+    try {
+      setMessage("");
+      const result = await api<{ alreadyVerified?: boolean; ok: boolean }>(
+        "/auth/email/request-verification",
+        { method: "POST" },
+        auth.accessToken,
+      );
+      setMessage(result.alreadyVerified ? "Email is already verified." : "Verification email sent (or stubbed with EMAIL_PROVIDER=noop).");
+      const me = await api<{ user: User }>("/auth/me", {}, auth.accessToken);
+      setUser(me.user);
+    } catch (error) {
+      setMessage(errorMessage(error));
+    }
+  }
+
+  async function openNotificationTask(taskId: string, notificationId?: string) {
+    if (!auth || !selectedWorkspaceId) return;
+    try {
+      setMessage("");
+      setShellView("board");
+      const task = await api<Task>("/workspaces/" + selectedWorkspaceId + "/tasks/" + taskId, {}, auth.accessToken);
+      if (task.projectId !== selectedProjectId) {
+        await chooseProject(auth.accessToken, selectedWorkspaceId, task.projectId);
+      }
+      await chooseTask(task.id);
+      if (notificationId) await markNotificationRead(notificationId);
     } catch (error) {
       setMessage(errorMessage(error));
     }
@@ -883,44 +1004,19 @@ export function AtlasClient({
 
   if (!auth) {
     return (
-      <main className="min-h-screen px-6 py-8">
-        <section className="mx-auto grid w-full max-w-md gap-6 rounded-lg border border-slate-200 bg-white p-6">
-          <div>
-            <p className="text-sm font-medium text-slate-500">Atlas</p>
-            <h1 className="text-2xl font-semibold text-slate-950">
-              {mode === "register" ? "Create your account" : "Log in"}
-            </h1>
-          </div>
-          <form className="grid gap-4" onSubmit={submitAuth}>
-            {mode === "register" ? (
-              <label className="grid gap-2 text-sm font-medium text-slate-700">
-                Name
-                <input className="rounded-md border border-slate-300 px-3 py-2" name="name" required />
-              </label>
-            ) : null}
-            <label className="grid gap-2 text-sm font-medium text-slate-700">
-              Email
-              <input className="rounded-md border border-slate-300 px-3 py-2" name="email" required type="email" />
-            </label>
-            <label className="grid gap-2 text-sm font-medium text-slate-700">
-              Password
-              <input className="rounded-md border border-slate-300 px-3 py-2" name="password" required type="password" />
-            </label>
-            {message ? <p className="text-sm text-red-700">{message}</p> : null}
-            {invitationMessage ? <p className="text-sm text-slate-600">{invitationMessage}</p> : null}
-            <button className="rounded-md bg-slate-950 px-4 py-2 font-semibold text-white" type="submit">
-              {mode === "register" ? "Register" : "Log in"}
-            </button>
-          </form>
-          <button
-            className="text-left text-sm font-medium text-slate-600"
-            onClick={() => setMode(mode === "register" ? "login" : "register")}
-            type="button"
-          >
-            {mode === "register" ? "Use an existing account" : "Create an account"}
-          </button>
-        </section>
-      </main>
+      <AuthPanel
+        invitationMessage={invitationMessage}
+        message={message}
+        mode={mode}
+        onModeChange={setMode}
+        onRequestPasswordReset={requestPasswordReset}
+        onResetPassword={resetPassword}
+        onSubmitAuth={submitAuth}
+        onVerifyEmail={verifyEmail}
+        resetToken={resetToken}
+        statusMessage={authStatusMessage}
+        verifyToken={verifyToken}
+      />
     );
   }
 
@@ -973,6 +1069,14 @@ export function AtlasClient({
         </header>
 
         {message ? <p className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{message}</p> : null}
+        {user && !user.emailVerifiedAt ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <p>Your email is not verified yet. Some invite flows work better after verification.</p>
+            <button className="rounded-md border border-amber-300 bg-white px-3 py-1.5 text-xs font-semibold text-amber-900" onClick={() => void resendEmailVerification()} type="button">
+              Resend verification
+            </button>
+          </div>
+        ) : null}
 
         {shellView === "home" ? (
           <div className="grid gap-4">
@@ -1051,12 +1155,10 @@ export function AtlasClient({
               onFilterChange={setNotificationFilter}
               onMarkAllRead={markAllNotificationsRead}
               onMarkRead={markNotificationRead}
-              onOpenTask={async (taskId) => {
-                setShellView("board");
-                await chooseTask(taskId);
+              onOpenTask={async (taskId, notificationId) => {
+                await openNotificationTask(taskId, notificationId);
               }}
               preferenceStatus={notificationPreferenceStatus}
-              tasks={tasks}
               unreadCount={unreadCount}
               workspaceSelected={Boolean(selectedWorkspaceId)}
             />
@@ -1179,6 +1281,8 @@ export function AtlasClient({
 
             <div className="grid gap-3">
               <BoardPanel
+                onBulkComplete={completeTasksByIds}
+                onBulkMove={moveTasksByIds}
                 onChooseTask={chooseTask}
                 onCreateSection={createSection}
                 onCreateTask={createTask}
@@ -1192,6 +1296,7 @@ export function AtlasClient({
                 selectedTaskId={selectedTaskId}
                 taskDependencyFilter={taskDependencyFilter}
                 tasks={tasks}
+                workspaceMembers={workspaceMembers}
               />
               <ProjectDependencyMapPanel dependencyMap={projectDependencyMap} onOpenTask={chooseTask} />
             </div>

@@ -148,6 +148,10 @@ export function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now().toString(36);
 }
 
+export function taskPriorityLabel(value: string) {
+  return value.toLowerCase().replaceAll("_", " ");
+}
+
 export function taskStatusLabel(value: string) {
   return value.replace(/_/g, " ").toLowerCase();
 }
