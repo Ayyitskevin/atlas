@@ -1,0 +1,160 @@
+"use client";
+
+import type { FormEvent } from "react";
+
+import { dateInputValue, taskStatusLabel } from "../shared/atlas-format";
+import type { Section, Task, TaskPriority, TaskRecurrenceFrequency, TaskStatus } from "../shared/atlas-types";
+
+const taskStatuses: TaskStatus[] = ["TODO", "IN_PROGRESS", "DONE", "ARCHIVED"];
+const taskPriorities: TaskPriority[] = ["LOW", "MEDIUM", "HIGH", "URGENT"];
+const recurrenceFrequencies: TaskRecurrenceFrequency[] = ["DAILY", "WEEKLY", "MONTHLY"];
+
+type TaskDetailFormPanelProps = {
+  onCompleteTask: () => Promise<void>;
+  onDeleteTask: () => Promise<void>;
+  onSkipRecurringTask: () => Promise<void>;
+  onUpdateTask: (event: FormEvent<HTMLFormElement>) => Promise<void>;
+  openBlockerCount: number;
+  sections: Section[];
+  task: Task;
+};
+
+export function TaskDetailFormPanel({
+  onCompleteTask,
+  onDeleteTask,
+  onSkipRecurringTask,
+  onUpdateTask,
+  openBlockerCount,
+  sections,
+  task,
+}: TaskDetailFormPanelProps) {
+  const isRecurring = Boolean(task.recurrenceFrequency);
+  const isPaused = Boolean(task.recurrencePausedAt);
+  const isSkipped = Boolean(task.recurrenceSkippedAt);
+  const completionBlocked = task.status !== "DONE" && openBlockerCount > 0;
+  const canSkipOccurrence = isRecurring && !isPaused && !isSkipped && task.status !== "DONE";
+
+  return (
+    <form className="grid gap-3" key={task.id + "-details-" + task.version} onSubmit={(event) => void onUpdateTask(event)}>
+      <label className="grid gap-1 text-sm font-medium text-slate-700">
+        Title
+        <input className="rounded-md border border-slate-300 px-3 py-2 text-sm" defaultValue={task.title} name="title" required />
+      </label>
+      <label className="grid gap-1 text-sm font-medium text-slate-700">
+        Description
+        <textarea className="min-h-24 rounded-md border border-slate-300 px-3 py-2 text-sm" defaultValue={task.description ?? ""} name="description" />
+      </label>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="grid gap-1 text-sm font-medium text-slate-700">
+          Status
+          <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" defaultValue={task.status} name="status">
+            {taskStatuses.map((status) => (
+              <option disabled={status === "DONE" && completionBlocked} key={status} value={status}>
+                {taskStatusLabel(status)}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-sm font-medium text-slate-700">
+          Priority
+          <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" defaultValue={task.priority} name="priority">
+            {taskPriorities.map((priority) => (
+              <option key={priority} value={priority}>
+                {priority.toLowerCase()}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="grid gap-1 text-sm font-medium text-slate-700">
+          Due date
+          <input className="rounded-md border border-slate-300 px-3 py-2 text-sm" defaultValue={dateInputValue(task.dueDate)} name="dueDate" type="date" />
+        </label>
+        <label className="grid gap-1 text-sm font-medium text-slate-700">
+          Section
+          <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" defaultValue={task.sectionId} name="sectionId">
+            {sections.map((section) => (
+              <option key={section.id} value={section.id}>
+                {section.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <label className="grid gap-1 text-sm font-medium text-slate-700">
+          Repeat
+          <select className="rounded-md border border-slate-300 px-3 py-2 text-sm" defaultValue={task.recurrenceFrequency ?? ""} name="recurrenceFrequency">
+            <option value="">None</option>
+            {recurrenceFrequencies.map((frequency) => (
+              <option key={frequency} value={frequency}>
+                {frequency.toLowerCase()}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="grid gap-1 text-sm font-medium text-slate-700">
+          Interval
+          <input
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            defaultValue={task.recurrenceInterval ?? 1}
+            max={365}
+            min={1}
+            name="recurrenceInterval"
+            type="number"
+          />
+        </label>
+        <label className="grid gap-1 text-sm font-medium text-slate-700">
+          Repeat until
+          <input
+            className="rounded-md border border-slate-300 px-3 py-2 text-sm"
+            defaultValue={dateInputValue(task.recurrenceEndDate)}
+            name="recurrenceEndDate"
+            type="date"
+          />
+        </label>
+        <label className="flex min-h-10 items-center gap-2 self-end rounded-md border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700">
+          <input
+            className="h-4 w-4 rounded border-slate-300"
+            defaultChecked={isPaused}
+            disabled={!isRecurring}
+            name="recurrencePaused"
+            type="checkbox"
+            value="true"
+          />
+          Pause repeat
+        </label>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <button className="rounded-md bg-slate-950 px-3 py-2 text-sm font-semibold text-white" type="submit">
+          Save changes
+        </button>
+        <button
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={task.status === "DONE" || completionBlocked}
+          onClick={() => void onCompleteTask()}
+          type="button"
+        >
+          Complete
+        </button>
+        <button
+          className="rounded-md border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!canSkipOccurrence}
+          onClick={() => void onSkipRecurringTask()}
+          type="button"
+        >
+          Skip occurrence
+        </button>
+        <button className="rounded-md border border-red-300 px-3 py-2 text-sm font-medium text-red-700" onClick={() => void onDeleteTask()} type="button">
+          Delete
+        </button>
+      </div>
+      {completionBlocked ? (
+        <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Complete {openBlockerCount} blocking {openBlockerCount === 1 ? "task" : "tasks"} first.
+        </p>
+      ) : null}
+    </form>
+  );
+}

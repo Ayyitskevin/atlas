@@ -1,173 +1,26 @@
 import type { FastifyInstance } from "fastify";
-import { z } from "zod";
 
-import {
-  activityQuerySchema,
-  addTaskDependencyRequestSchema,
-  createAttachmentCommentRequestSchema,
-  attachmentDownloadResponseSchema,
-  attachmentResponseSchema,
-  createAttachmentRequestSchema,
-  createAttachmentResponseSchema,
-  createCommentRequestSchema,
-  createSectionRequestSchema,
-  createSubtaskRequestSchema,
-  createTaskLabelRequestSchema,
-  createTaskRequestSchema,
-  cursorPaginationQuerySchema,
-  moveTaskRequestSchema,
-  myWorkQuerySchema,
-  notificationQuerySchema,
-  notificationPreferenceResponseSchema,
-  projectDependencyMapResponseSchema,
-  projectTaskQuerySchema,
-  replaceAttachmentRequestSchema,
-  replaceAttachmentResponseSchema,
-  reorderSectionsRequestSchema,
-  searchResponseSchema,
-  searchQuerySchema,
-  taskWatcherUserRequestSchema,
-  updateAttachmentCommentRequestSchema,
-  updateAttachmentRequestSchema,
-  updateCommentRequestSchema,
-  updateNotificationPreferenceRequestSchema,
-  updateSectionRequestSchema,
-  updateSubtaskRequestSchema,
-  updateTaskLabelRequestSchema,
-  updateTaskRequestSchema,
-} from "@atlas/shared";
-import { prisma } from "@atlas/db";
+import { registerActivityRoutes } from "../activity/activity.routes.js";
+import { registerAttachmentsRoutes } from "../attachments/attachments.routes.js";
+import { registerCommentsRoutes } from "../comments/comments.routes.js";
+import { registerDependenciesRoutes } from "../dependencies/dependencies.routes.js";
+import { registerLabelsRoutes } from "../labels/labels.routes.js";
+import { registerNotificationsRoutes } from "../notifications/notifications.routes.js";
+import { registerSearchRoutes } from "../search/search.routes.js";
+import { registerSectionsRoutes } from "../sections/sections.routes.js";
+import { registerSubtasksRoutes } from "../subtasks/subtasks.routes.js";
+import { registerTasksRoutes } from "../tasks/tasks.routes.js";
 
-import { openApiSchema } from "../../shared/zod-openapi.js";
-import { DomainEventsRepository } from "../events/domain-events.repository.js";
-import { PermissionsService } from "../permissions/permissions.service.js";
-import { WorkController } from "./work.controller.js";
-import { WorkRepository } from "./work.repository.js";
-import { WorkService } from "./work.service.js";
-
-const workspaceParamsSchema = z.object({ workspaceId: z.string().uuid() });
-const projectParamsSchema = workspaceParamsSchema.extend({ projectId: z.string().uuid() });
-const sectionParamsSchema = projectParamsSchema.extend({ sectionId: z.string().uuid() });
-const taskParamsSchema = workspaceParamsSchema.extend({ taskId: z.string().uuid() });
-const taskWatcherParamsSchema = taskParamsSchema.extend({ userId: z.string().uuid() });
-const labelParamsSchema = workspaceParamsSchema.extend({ labelId: z.string().uuid() });
-const taskLabelParamsSchema = taskParamsSchema.extend({ labelId: z.string().uuid() });
-const taskDependencyParamsSchema = workspaceParamsSchema.extend({ dependencyId: z.string().uuid() });
-const subtaskParamsSchema = workspaceParamsSchema.extend({ subtaskId: z.string().uuid() });
-const commentParamsSchema = workspaceParamsSchema.extend({ commentId: z.string().uuid() });
-const attachmentParamsSchema = workspaceParamsSchema.extend({ attachmentId: z.string().uuid() });
-const attachmentCommentParamsSchema = workspaceParamsSchema.extend({ attachmentCommentId: z.string().uuid() });
-const attachmentVersionParamsSchema = attachmentParamsSchema.extend({ versionId: z.string().uuid() });
-const notificationParamsSchema = workspaceParamsSchema.extend({ notificationId: z.string().uuid() });
-const userBodySchema = z.object({ userId: z.string().uuid() });
-
+/** Registers all work-domain route plugins. HTTP paths unchanged from monolithic work routes. */
 export async function registerWorkRoutes(app: FastifyInstance): Promise<void> {
-  const controller = new WorkController(
-    new WorkService(new WorkRepository(prisma), new DomainEventsRepository(prisma), new PermissionsService(prisma)),
-  );
-
-  app.post("/workspaces/:workspaceId/projects/:projectId/sections", { schema: openApiSchema({ body: createSectionRequestSchema, params: projectParamsSchema, tags: ["Sections"] }) }, controller.createSection);
-  app.get("/workspaces/:workspaceId/projects/:projectId/sections", { schema: openApiSchema({ params: projectParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Sections"] }) }, controller.listSections);
-  app.patch("/workspaces/:workspaceId/projects/:projectId/sections/:sectionId", { schema: openApiSchema({ body: updateSectionRequestSchema, params: sectionParamsSchema, tags: ["Sections"] }) }, controller.updateSection);
-  app.delete("/workspaces/:workspaceId/projects/:projectId/sections/:sectionId", { schema: openApiSchema({ params: sectionParamsSchema, tags: ["Sections"] }) }, controller.deleteSection);
-  app.post("/workspaces/:workspaceId/projects/:projectId/sections/reorder", { schema: openApiSchema({ body: reorderSectionsRequestSchema, params: projectParamsSchema, tags: ["Sections"] }) }, controller.reorderSections);
-
-  app.post("/workspaces/:workspaceId/projects/:projectId/tasks", { schema: openApiSchema({ body: createTaskRequestSchema, params: projectParamsSchema, tags: ["Tasks"] }) }, controller.createTask);
-  app.get("/workspaces/:workspaceId/projects/:projectId/tasks", { schema: openApiSchema({ params: projectParamsSchema, querystring: projectTaskQuerySchema, tags: ["Tasks"] }) }, controller.listTasks);
-  app.get("/workspaces/:workspaceId/my-work", { schema: openApiSchema({ params: workspaceParamsSchema, querystring: myWorkQuerySchema, tags: ["Tasks"] }) }, controller.listMyWork);
-  app.get("/workspaces/:workspaceId/tasks/:taskId", { schema: openApiSchema({ params: taskParamsSchema, tags: ["Tasks"] }) }, controller.getTask);
-  app.patch("/workspaces/:workspaceId/tasks/:taskId", { schema: openApiSchema({ body: updateTaskRequestSchema, params: taskParamsSchema, tags: ["Tasks"] }) }, controller.updateTask);
-  app.delete("/workspaces/:workspaceId/tasks/:taskId", { schema: openApiSchema({ params: taskParamsSchema, tags: ["Tasks"] }) }, controller.deleteTask);
-  app.post("/workspaces/:workspaceId/tasks/:taskId/move", { schema: openApiSchema({ body: moveTaskRequestSchema, params: taskParamsSchema, tags: ["Tasks"] }) }, controller.moveTask);
-  app.post("/workspaces/:workspaceId/tasks/:taskId/assign", { schema: openApiSchema({ body: userBodySchema, params: taskParamsSchema, tags: ["Tasks"] }) }, controller.assignTask);
-  app.post("/workspaces/:workspaceId/tasks/:taskId/unassign", { schema: openApiSchema({ body: userBodySchema, params: taskParamsSchema, tags: ["Tasks"] }) }, controller.unassignTask);
-  app.get("/workspaces/:workspaceId/tasks/:taskId/watchers", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Tasks"] }) }, controller.listTaskWatchers);
-  app.post("/workspaces/:workspaceId/tasks/:taskId/watchers", { schema: openApiSchema({ body: taskWatcherUserRequestSchema, params: taskParamsSchema, tags: ["Tasks"] }) }, controller.watchTask);
-  app.delete("/workspaces/:workspaceId/tasks/:taskId/watchers/:userId", { schema: openApiSchema({ params: taskWatcherParamsSchema, tags: ["Tasks"] }) }, controller.unwatchTask);
-  app.post("/workspaces/:workspaceId/tasks/:taskId/complete", { schema: openApiSchema({ params: taskParamsSchema, tags: ["Tasks"] }) }, controller.completeTask);
-  app.post("/workspaces/:workspaceId/tasks/:taskId/skip", { schema: openApiSchema({ params: taskParamsSchema, tags: ["Tasks"] }) }, controller.skipRecurringTask);
-
-  app.get("/workspaces/:workspaceId/labels", { schema: openApiSchema({ params: workspaceParamsSchema, tags: ["Labels"] }) }, controller.listLabels);
-  app.post("/workspaces/:workspaceId/labels", { schema: openApiSchema({ body: createTaskLabelRequestSchema, params: workspaceParamsSchema, tags: ["Labels"] }) }, controller.createLabel);
-  app.patch("/workspaces/:workspaceId/labels/:labelId", { schema: openApiSchema({ body: updateTaskLabelRequestSchema, params: labelParamsSchema, tags: ["Labels"] }) }, controller.updateLabel);
-  app.delete("/workspaces/:workspaceId/labels/:labelId", { schema: openApiSchema({ params: labelParamsSchema, tags: ["Labels"] }) }, controller.deleteLabel);
-  app.get("/workspaces/:workspaceId/tasks/:taskId/labels", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Labels"] }) }, controller.listTaskLabels);
-  app.post("/workspaces/:workspaceId/tasks/:taskId/labels/:labelId", { schema: openApiSchema({ params: taskLabelParamsSchema, tags: ["Labels"] }) }, controller.assignTaskLabel);
-  app.delete("/workspaces/:workspaceId/tasks/:taskId/labels/:labelId", { schema: openApiSchema({ params: taskLabelParamsSchema, tags: ["Labels"] }) }, controller.unassignTaskLabel);
-
-  app.get(
-    "/workspaces/:workspaceId/projects/:projectId/dependencies",
-    { schema: openApiSchema({ params: projectParamsSchema, response: { 200: projectDependencyMapResponseSchema }, tags: ["Dependencies"] }) },
-    controller.listProjectDependencyMap,
-  );
-  app.get("/workspaces/:workspaceId/tasks/:taskId/dependencies", { schema: openApiSchema({ params: taskParamsSchema, tags: ["Dependencies"] }) }, controller.listTaskDependencies);
-  app.post("/workspaces/:workspaceId/tasks/:taskId/dependencies", { schema: openApiSchema({ body: addTaskDependencyRequestSchema, params: taskParamsSchema, tags: ["Dependencies"] }) }, controller.addTaskDependency);
-  app.delete("/workspaces/:workspaceId/task-dependencies/:dependencyId", { schema: openApiSchema({ params: taskDependencyParamsSchema, tags: ["Dependencies"] }) }, controller.removeTaskDependency);
-
-  app.post("/workspaces/:workspaceId/tasks/:taskId/subtasks", { schema: openApiSchema({ body: createSubtaskRequestSchema, params: taskParamsSchema, tags: ["Subtasks"] }) }, controller.createSubtask);
-  app.get("/workspaces/:workspaceId/tasks/:taskId/subtasks", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Subtasks"] }) }, controller.listSubtasks);
-  app.patch("/workspaces/:workspaceId/subtasks/:subtaskId", { schema: openApiSchema({ body: updateSubtaskRequestSchema, params: subtaskParamsSchema, tags: ["Subtasks"] }) }, controller.updateSubtask);
-  app.delete("/workspaces/:workspaceId/subtasks/:subtaskId", { schema: openApiSchema({ params: subtaskParamsSchema, tags: ["Subtasks"] }) }, controller.deleteSubtask);
-
-  app.post("/workspaces/:workspaceId/tasks/:taskId/comments", { schema: openApiSchema({ body: createCommentRequestSchema, params: taskParamsSchema, tags: ["Comments"] }) }, controller.createComment);
-  app.get("/workspaces/:workspaceId/tasks/:taskId/comments", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Comments"] }) }, controller.listComments);
-  app.patch("/workspaces/:workspaceId/comments/:commentId", { schema: openApiSchema({ body: updateCommentRequestSchema, params: commentParamsSchema, tags: ["Comments"] }) }, controller.updateComment);
-  app.delete("/workspaces/:workspaceId/comments/:commentId", { schema: openApiSchema({ params: commentParamsSchema, tags: ["Comments"] }) }, controller.deleteComment);
-
-  app.post("/workspaces/:workspaceId/tasks/:taskId/attachments", { schema: openApiSchema({ body: createAttachmentRequestSchema, params: taskParamsSchema, response: { 201: createAttachmentResponseSchema }, tags: ["Attachments"] }) }, controller.createAttachment);
-  app.get("/workspaces/:workspaceId/tasks/:taskId/attachments", { schema: openApiSchema({ params: taskParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Attachments"] }) }, controller.listAttachments);
-  app.post("/workspaces/:workspaceId/attachments/:attachmentId/comments", { schema: openApiSchema({ body: createAttachmentCommentRequestSchema, params: attachmentParamsSchema, tags: ["Attachments"] }) }, controller.createAttachmentComment);
-  app.get("/workspaces/:workspaceId/attachments/:attachmentId/comments", { schema: openApiSchema({ params: attachmentParamsSchema, querystring: cursorPaginationQuerySchema, tags: ["Attachments"] }) }, controller.listAttachmentComments);
-  app.patch("/workspaces/:workspaceId/attachment-comments/:attachmentCommentId", { schema: openApiSchema({ body: updateAttachmentCommentRequestSchema, params: attachmentCommentParamsSchema, tags: ["Attachments"] }) }, controller.updateAttachmentComment);
-  app.delete("/workspaces/:workspaceId/attachment-comments/:attachmentCommentId", { schema: openApiSchema({ params: attachmentCommentParamsSchema, tags: ["Attachments"] }) }, controller.deleteAttachmentComment);
-  app.get("/workspaces/:workspaceId/attachments/:attachmentId/download", { schema: openApiSchema({ params: attachmentParamsSchema, response: { 200: attachmentDownloadResponseSchema }, tags: ["Attachments"] }) }, controller.getAttachmentDownload);
-  app.post("/workspaces/:workspaceId/attachments/:attachmentId/complete", { schema: openApiSchema({ params: attachmentParamsSchema, response: { 200: attachmentResponseSchema }, tags: ["Attachments"] }) }, controller.completeAttachment);
-  app.post("/workspaces/:workspaceId/attachments/:attachmentId/versions", { schema: openApiSchema({ body: replaceAttachmentRequestSchema, params: attachmentParamsSchema, response: { 201: replaceAttachmentResponseSchema }, tags: ["Attachments"] }) }, controller.createAttachmentVersion);
-  app.post("/workspaces/:workspaceId/attachments/:attachmentId/versions/:versionId/complete", { schema: openApiSchema({ params: attachmentVersionParamsSchema, response: { 200: attachmentResponseSchema }, tags: ["Attachments"] }) }, controller.completeAttachmentVersion);
-  app.patch("/workspaces/:workspaceId/attachments/:attachmentId", { schema: openApiSchema({ body: updateAttachmentRequestSchema, params: attachmentParamsSchema, response: { 200: attachmentResponseSchema }, tags: ["Attachments"] }) }, controller.updateAttachment);
-  app.delete("/workspaces/:workspaceId/attachments/:attachmentId", { schema: openApiSchema({ params: attachmentParamsSchema, tags: ["Attachments"] }) }, controller.deleteAttachment);
-
-  app.get("/workspaces/:workspaceId/activity", { schema: openApiSchema({ params: workspaceParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listWorkspaceActivity);
-  app.get("/workspaces/:workspaceId/projects/:projectId/activity", { schema: openApiSchema({ params: projectParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listProjectActivity);
-  app.get("/workspaces/:workspaceId/tasks/:taskId/activity", { schema: openApiSchema({ params: taskParamsSchema, querystring: activityQuerySchema, tags: ["Activity"] }) }, controller.listTaskActivity);
-
-  app.get("/workspaces/:workspaceId/notifications", { schema: openApiSchema({ params: workspaceParamsSchema, querystring: notificationQuerySchema, tags: ["Notifications"] }) }, controller.listNotifications);
-  app.get(
-    "/workspaces/:workspaceId/notification-preferences",
-    {
-      schema: openApiSchema({
-        params: workspaceParamsSchema,
-        response: { 200: notificationPreferenceResponseSchema },
-        tags: ["Notifications"],
-      }),
-    },
-    controller.getNotificationPreferences,
-  );
-  app.patch(
-    "/workspaces/:workspaceId/notification-preferences",
-    {
-      schema: openApiSchema({
-        body: updateNotificationPreferenceRequestSchema,
-        params: workspaceParamsSchema,
-        response: { 200: notificationPreferenceResponseSchema },
-        tags: ["Notifications"],
-      }),
-    },
-    controller.updateNotificationPreferences,
-  );
-  app.post("/workspaces/:workspaceId/notifications/:notificationId/read", { schema: openApiSchema({ params: notificationParamsSchema, tags: ["Notifications"] }) }, controller.markNotificationRead);
-  app.post("/workspaces/:workspaceId/notifications/read-all", { schema: openApiSchema({ params: workspaceParamsSchema, tags: ["Notifications"] }) }, controller.markAllNotificationsRead);
-
-  app.get(
-    "/workspaces/:workspaceId/search",
-    {
-      schema: openApiSchema({
-        params: workspaceParamsSchema,
-        querystring: searchQuerySchema,
-        response: { 200: searchResponseSchema },
-        tags: ["Search"],
-      }),
-    },
-    controller.search,
-  );
+  await registerSectionsRoutes(app);
+  await registerTasksRoutes(app);
+  await registerLabelsRoutes(app);
+  await registerDependenciesRoutes(app);
+  await registerSubtasksRoutes(app);
+  await registerCommentsRoutes(app);
+  await registerAttachmentsRoutes(app);
+  await registerActivityRoutes(app);
+  await registerNotificationsRoutes(app);
+  await registerSearchRoutes(app);
 }

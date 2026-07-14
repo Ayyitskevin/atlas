@@ -129,7 +129,10 @@ API integration tests require `DATABASE_URL` to point at a reachable PostgreSQL 
 ```text
 apps/
   api/          # Fastify REST API, WebSocket gateway, workers
-  web/          # Next.js App Router shell
+                # Domain route modules: sections, tasks, labels, dependencies,
+                # subtasks, comments, attachments, activity, notifications, search
+                # work/ holds WorkService + WorkRepository + composition root
+  web/          # Next.js App Router shell (+ /w/:workspaceId deep links)
 packages/
   config/       # Shared TypeScript config
   db/           # Prisma schema, migrations, seed, database client
@@ -140,7 +143,7 @@ infra/
 docs/
   architecture.md
   decisions/
-  notes/
+  notes/        # golden paths + refactor notes
 ```
 
 ## Documentation
