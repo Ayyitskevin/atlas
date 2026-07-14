@@ -10,7 +10,14 @@ export class AuthRepository {
   findUserById(userId: string) {
     return this.prisma.user.findFirst({
       where: { deletedAt: null, disabledAt: null, id: userId },
-      select: { createdAt: true, email: true, id: true, name: true, updatedAt: true },
+      select: {
+        createdAt: true,
+        email: true,
+        emailVerifiedAt: true,
+        id: true,
+        name: true,
+        updatedAt: true,
+      },
     });
   }
 
@@ -80,5 +87,57 @@ export class AuthRepository {
       data: { revokedAt: new Date() },
       where: { revokedAt: null, tokenFamily: input.tokenFamily, userId: input.userId },
     });
+  }
+
+  createEmailVerificationToken(input: { expiresAt: Date; tokenHash: string; userId: string }) {
+    return this.prisma.emailVerificationToken.create({ data: input });
+  }
+
+  findEmailVerificationToken(tokenHash: string) {
+    return this.prisma.emailVerificationToken.findFirst({
+      include: { user: true },
+      where: { tokenHash, usedAt: null },
+    });
+  }
+
+  markEmailVerified(userId: string, tokenId: string) {
+    return this.prisma.$transaction([
+      this.prisma.user.update({
+        data: { emailVerifiedAt: new Date() },
+        where: { id: userId },
+      }),
+      this.prisma.emailVerificationToken.update({
+        data: { usedAt: new Date() },
+        where: { id: tokenId },
+      }),
+    ]);
+  }
+
+  createPasswordResetToken(input: { expiresAt: Date; tokenHash: string; userId: string }) {
+    return this.prisma.passwordResetToken.create({ data: input });
+  }
+
+  findPasswordResetToken(tokenHash: string) {
+    return this.prisma.passwordResetToken.findFirst({
+      include: { user: true },
+      where: { tokenHash, usedAt: null },
+    });
+  }
+
+  consumePasswordReset(input: { passwordHash: string; tokenId: string; userId: string }) {
+    return this.prisma.$transaction([
+      this.prisma.user.update({
+        data: { passwordHash: input.passwordHash },
+        where: { id: input.userId },
+      }),
+      this.prisma.passwordResetToken.update({
+        data: { usedAt: new Date() },
+        where: { id: input.tokenId },
+      }),
+      this.prisma.session.updateMany({
+        data: { revokedAt: new Date() },
+        where: { revokedAt: null, userId: input.userId },
+      }),
+    ]);
   }
 }

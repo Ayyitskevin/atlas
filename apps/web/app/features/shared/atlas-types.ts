@@ -6,6 +6,7 @@ export type AuthPair = {
 
 export type User = {
   email: string;
+  emailVerifiedAt?: string | null;
   id: string;
   name: string;
 };

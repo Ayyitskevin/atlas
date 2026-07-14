@@ -33,4 +33,11 @@ export class CommentsRepository extends WorkRepositoryBase {
       where: { deletedAt: null, id: input.commentId, workspaceId: input.workspaceId },
     });
   }
+
+  listWorkspaceMembersForMentions(workspaceId: string) {
+    return this.prisma.workspaceMember.findMany({
+      where: { deletedAt: null, workspaceId },
+      select: { user: { select: { email: true, id: true, name: true } } },
+    });
+  }
 }

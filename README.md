@@ -2,16 +2,17 @@
 
 Atlas is an Asana-class team project-management app foundation for organizing work across Workspaces, Projects, Sections, Tasks, comments, activity, notifications, search, attachments, and realtime collaboration.
 
-The current phase is deliberately foundation-first: production-minded domain boundaries, tenant isolation, RBAC, auth, REST/OpenAPI contracts, background jobs, realtime delivery, local infrastructure, and a usable web workflow shell. It is not trying to be a polished project-management UI yet.
+The current phase is foundation-first with a usable collaboration shell: production-minded domain modules, tenant isolation, RBAC, auth (sessions, email verification, password reset), REST/OpenAPI contracts, background jobs, Redis-backed realtime + presence, Postgres full-text search, attachments with scan status, local infrastructure, and drag-and-drop board workflows.
 
 ## What Works Today
 
-- Email/password auth with JWT access tokens, refresh rotation, live session checks, logout, and session revocation.
+- Email/password auth with JWT access tokens, refresh rotation (body or httpOnly cookie), live session checks, logout, session list/revoke, email verification, and password reset.
 - Multi-tenant Workspaces with member roles, invitations, role updates, member removal, and owner transfer.
 - Projects with workspace/private visibility, explicit project-member roles, Sections, Tasks, one-level Subtasks, assignees, status, priority, due dates, ordering, optimistic version checks, and a cross-project My Work view.
 - Workspace dashboard with project/task quick actions, project/member counts, recent notifications, activity, and assigned-work summary.
 - Task comments, scoped activity feeds, in-app notifications with a web inbox, and workspace search in the web shell.
-- Realtime WebSocket broadcasts for project/member/task/comment/activity mutations.
+- Realtime WebSocket broadcasts (Redis pub/sub for multi-instance) plus task presence; clients authenticate over the socket without putting tokens in the URL query string.
+- Comment @mentions (`@email` / `@Name`) fan out dedicated mention notifications.
 - Durable domain event outbox feeding BullMQ workers for notification fanout plus observable search-index and email-delivery provider seams.
 - Workspace-admin outbox inspection/detail, dispatch attempt history, worker outcome history, and failed-event replay endpoints.
 - Task attachment metadata with S3-compatible signed upload/download URLs, local MinIO support, server-side object validation before activation, explicit scan status hooks, file notes, version history, and per-file discussion threads.
@@ -150,6 +151,7 @@ docs/
 
 - [Architecture](docs/architecture.md)
 - [Deployment](docs/deployment.md)
+- [Email dogfood loop](docs/email-dogfood.md) — Resend setup + multi-user golden path
 - [ADRs](docs/decisions)
 - [Notes](docs/notes)
 

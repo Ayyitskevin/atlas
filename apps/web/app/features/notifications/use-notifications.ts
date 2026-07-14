@@ -21,7 +21,7 @@ export function useNotifications(auth: AuthPair | null, selectedWorkspaceId: str
 
   async function loadNotifications(accessToken: string, workspaceId: string, filter: NotificationFilter = notificationFilter) {
     try {
-      const query = new URLSearchParams({ limit: "20" });
+      const query = new URLSearchParams({ limit: "50" });
       if (filter === "unread") query.set("unreadOnly", "true");
       const notificationPage = await api<Page<Notification>>(
         "/workspaces/" + workspaceId + "/notifications?" + query.toString(),

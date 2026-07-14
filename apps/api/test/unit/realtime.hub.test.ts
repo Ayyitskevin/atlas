@@ -15,7 +15,7 @@ describe("RealtimeHub", () => {
     hub.join("workspace:workspace-1", closedSocket);
 
     expect(hub.roomSize("workspace:workspace-1")).toBe(2);
-    expect(hub.broadcastWorkspace("workspace-1", { type: "TaskUpdated" })).toEqual({
+    expect(hub.broadcastWorkspace("workspace-1", { type: "TaskUpdated" })).toMatchObject({
       delivered: 1,
       pruned: 1,
       roomSize: 1,
@@ -49,11 +49,19 @@ describe("RealtimeHub", () => {
     expect(hub.roomSize("project:project-1")).toBe(1);
     leave();
     expect(hub.roomSize("project:project-1")).toBe(0);
-    expect(hub.broadcastProject("project-1", { type: "ProjectUpdated" })).toEqual({
+    expect(hub.broadcastProject("project-1", { type: "ProjectUpdated" })).toMatchObject({
       delivered: 0,
       pruned: 0,
       roomSize: 0,
     });
+  });
+
+  it("tracks presence members per room", () => {
+    const hub = new RealtimeHub();
+    hub.setPresence("task:t1", { joinedAt: "2026-07-09T00:00:00.000Z", userId: "u1", userName: "Ada" });
+    hub.setPresence("task:t1", { joinedAt: "2026-07-09T00:00:01.000Z", userId: "u2", userName: "Bob" });
+    expect(hub.listPresence("task:t1")).toHaveLength(2);
+    expect(hub.clearPresence("task:t1", "u1")).toEqual([{ joinedAt: "2026-07-09T00:00:01.000Z", userId: "u2", userName: "Bob" }]);
   });
 });
 

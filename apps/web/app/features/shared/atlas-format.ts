@@ -11,6 +11,7 @@ const activityTitles: Record<string, string> = {
   AttachmentCommentDeleted: "File comment deleted",
   AttachmentCommentUpdated: "File comment edited",
   CommentCreated: "Comment added",
+  CommentMentioned: "Mentioned in comment",
   CommentDeleted: "Comment deleted",
   CommentUpdated: "Comment edited",
   MemberInvited: "Member invited",
@@ -145,6 +146,10 @@ export function dateInputValue(value?: string | null) {
 
 export function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + "-" + Date.now().toString(36);
+}
+
+export function taskPriorityLabel(value: string) {
+  return value.toLowerCase().replaceAll("_", " ");
 }
 
 export function taskStatusLabel(value: string) {

@@ -38,6 +38,19 @@ export async function sendWorkspaceInvitationEmail(
 
 export function workspaceInvitationEmailDraft(input: WorkspaceInvitationEmailInput): EmailDraft {
   const inviteLink = invitationLink(input.webOrigin, input.acceptToken);
+  const roleLabel = input.role.toLowerCase();
+  const text =
+    input.invitedByName +
+    " invited you to join " +
+    input.workspaceName +
+    " as " +
+    roleLabel +
+    ".\n\nAccept the invitation: " +
+    inviteLink +
+    "\n\nThis invitation expires " +
+    input.expiresAt.toISOString() +
+    ".\n\n— Atlas";
+
   return {
     metadata: {
       invitationId: input.invitationId,
@@ -45,17 +58,7 @@ export function workspaceInvitationEmailDraft(input: WorkspaceInvitationEmailInp
       workspaceId: input.workspaceId,
     },
     subject: input.invitedByName + " invited you to " + input.workspaceName + " on Atlas",
-    text:
-      input.invitedByName +
-      " invited you to join " +
-      input.workspaceName +
-      " as " +
-      input.role.toLowerCase() +
-      ".\n\nAccept the invitation: " +
-      inviteLink +
-      "\n\nThis invitation expires " +
-      input.expiresAt.toISOString() +
-      ".",
+    text,
     to: [{ email: input.email }],
   };
 }

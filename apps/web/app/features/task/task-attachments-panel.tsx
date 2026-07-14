@@ -65,6 +65,16 @@ export function TaskAttachmentsPanel({
             <p className="mt-1 text-xs text-slate-500">
               v{attachment.version} · {attachment.mimeType} · {formatBytes(attachment.sizeBytes)}
             </p>
+            {attachment.mimeType.startsWith("image/") && attachment.scanStatus === "CLEAN" ? (
+              <p className="mt-1 rounded-md border border-dashed border-slate-300 bg-white px-2 py-1 text-[11px] text-slate-500">
+                Image ready — use Download for a signed preview URL (scan clean).
+              </p>
+            ) : null}
+            {attachment.scanStatus === "INFECTED" ? (
+              <p className="mt-1 rounded-md border border-rose-200 bg-rose-50 px-2 py-1 text-[11px] text-rose-700">
+                Download blocked until a clean version is uploaded.
+              </p>
+            ) : null}
             <AttachmentScanBadge
               checkedAt={attachment.scanCheckedAt}
               message={attachment.scanMessage}

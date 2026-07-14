@@ -6,7 +6,7 @@ export async function api<T>(path: string, init: RequestInit = {}, accessToken?:
   const headers = new Headers(init.headers);
   headers.set("content-type", "application/json");
   if (accessToken) headers.set("authorization", "Bearer " + accessToken);
-  const response = await fetch(apiBase + path, { ...init, headers });
+  const response = await fetch(apiBase + path, { ...init, credentials: "include", headers });
   const data = await responseBody(response);
   if (!response.ok) {
     throw new Error(apiErrorMessage(data) ?? responseErrorMessage(data, response));
@@ -40,6 +40,7 @@ export function apiErrorMessage(data: unknown) {
 }
 
 export function storeSession(auth: AuthPair) {
+  // Access token stays in localStorage for SPA API calls; refresh is also mirrored in httpOnly cookie by the API.
   window.localStorage.setItem("atlas.accessToken", auth.accessToken);
   window.localStorage.setItem("atlas.refreshToken", auth.refreshToken);
 }
@@ -53,10 +54,11 @@ export function errorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Request failed.";
 }
 
-export function websocketUrl(accessToken: string) {
+/** WebSocket URL without secrets in the query string. Auth is sent as the first message. */
+export function websocketUrl() {
   const url = new URL(apiBase);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
   url.pathname = url.pathname.replace(/\/$/, "") + "/ws";
-  url.searchParams.set("accessToken", accessToken);
+  url.search = "";
   return url.toString();
 }
